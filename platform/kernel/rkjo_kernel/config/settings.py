@@ -28,7 +28,10 @@ class KernelSettings(BaseSettings):
 
     # Adresse du broker RabbitMQ.
     # RabbitMQ assurera notamment le transport fiable des tâches entre agents.
-    rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
+    rabbitmq_url: str = "amqp://rkjo:rkjo_password@localhost:5672/"
+   
+
+    
 
     # Adresse de Redis.
     # Redis servira notamment au cache et aux états temporaires.

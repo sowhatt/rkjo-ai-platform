@@ -1,0 +1,15 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rkjo_rabbitmq
+    ports:
+      - "5672:5672"     # Port utilisé par les applications Python
+      - "15672:15672"   # Interface web d'administration RabbitMQ
+    environment:
+      RABBITMQ_DEFAULT_USER: rkjo
+      RABBITMQ_DEFAULT_PASS: rkjo_password
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data:
