@@ -1,8 +1,11 @@
+from collections.abc import Callable
+
 import pika
 
 from rkjo_kernel.config.settings import settings
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.logging.logger import get_logger
+from rkjo_kernel.messages.agent_message import AgentMessage
 
 
 class RabbitMQEventBus(EventBus):
@@ -11,31 +14,24 @@ class RabbitMQEventBus(EventBus):
 
     Pourquoi cette classe ?
 
-    Le reste de notre plateforme ne doit pas connaître les détails techniques
-    de RabbitMQ. Les agents et l'orchestrateur communiqueront uniquement avec
-    le contrat générique EventBus.
+    Les agents et l'orchestrateur ne doivent pas dépendre directement
+    des détails techniques de RabbitMQ.
 
-    Cela nous permettra plus tard de créer d'autres implémentations :
-
-    - KafkaEventBus
-    - RedisEventBus
-    - InMemoryEventBus
-
-    sans réécrire les agents IA.
+    Ils utilisent le contrat EventBus, tandis que cette classe prend en charge :
+    - la connexion au broker ;
+    - la création des files ;
+    - la publication ;
+    - la consommation ;
+    - les ACK et NACK ;
+    - la fermeture propre des connexions.
     """
 
     def __init__(self) -> None:
         """
-        Initialise la connexion à RabbitMQ.
+        Ouvre une connexion avec RabbitMQ et crée un channel.
 
-        À la création de RabbitMQEventBus :
-
-        1. On lit l'URL RabbitMQ depuis la configuration.
-        2. On crée les paramètres de connexion.
-        3. On ouvre une connexion avec RabbitMQ.
-        4. On crée un channel.
-
-        Le channel est le canal utilisé pour publier et recevoir des messages.
+        Le channel est le canal logique utilisé pour déclarer les files,
+        publier des messages et démarrer des consommateurs.
         """
 
         self.logger = get_logger("rkjo.events.rabbitmq")
@@ -45,47 +41,30 @@ class RabbitMQEventBus(EventBus):
         parameters = pika.URLParameters(settings.rabbitmq_url)
 
         self.connection = pika.BlockingConnection(parameters)
-
         self.channel = self.connection.channel()
 
         self.logger.info("Connected to RabbitMQ successfully.")
 
     def publish(self, queue_name: str, message: str) -> None:
         """
-        Publie un message dans une queue RabbitMQ.
+        Publie un message texte dans une file RabbitMQ.
 
-        Exemple :
-
-        queue_name = "agent.climat"
-
-        message = "Analyse le risque de sécheresse dans l'Eure"
-
-        RabbitMQ conservera le message jusqu'à ce qu'un consommateur
-        — par exemple l'Agent Climat — le récupère.
+        Cette méthode est conservée pour les tests simples et pour assurer
+        une transition progressive vers les AgentMessage structurés.
         """
 
-        # On crée la queue si elle n'existe pas encore.
-        #
-        # durable=True signifie que la définition de la queue peut survivre
-        # à un redémarrage de RabbitMQ.
         self.channel.queue_declare(
             queue=queue_name,
             durable=True,
         )
 
-        # On publie le message.
-        #
-        # exchange="" :
-        # utilisation de l'exchange direct par défaut de RabbitMQ.
-        #
-        # routing_key=queue_name :
-        # le message est routé vers la queue portant ce nom.
         self.channel.basic_publish(
             exchange="",
             routing_key=queue_name,
             body=message.encode("utf-8"),
             properties=pika.BasicProperties(
-                delivery_mode=pika.DeliveryMode.Persistent
+                delivery_mode=pika.DeliveryMode.Persistent,
+                content_type="text/plain",
             ),
         )
 
@@ -94,26 +73,16 @@ class RabbitMQEventBus(EventBus):
             queue_name,
         )
 
-    def consume(self, queue_name: str, callback) -> None:
+    def consume(
+        self,
+        queue_name: str,
+        callback: Callable[[str], None],
+    ) -> None:
         """
-        Écoute continuellement une queue RabbitMQ.
+        Consomme des messages texte depuis une file RabbitMQ.
 
-        Lorsqu'un message arrive :
-
-        1. RabbitMQ appelle _on_message.
-        2. Le message est décodé.
-        3. Notre callback métier est exécuté.
-        4. Si tout réussit, le message est acquitté avec basic_ack.
-
-        Exemple futur :
-
-        RabbitMQ
-            ↓
-        queue agent.climat
-            ↓
-        Agent Climat
-            ↓
-        analyse météo
+        Chaque message correctement traité reçoit un ACK.
+        En cas d'erreur, il est temporairement replacé dans la file.
         """
 
         self.channel.queue_declare(
@@ -122,11 +91,6 @@ class RabbitMQEventBus(EventBus):
         )
 
         def _on_message(channel, method, properties, body) -> None:
-            """
-            Fonction interne appelée automatiquement par pika
-            lorsqu'un message est reçu.
-            """
-
             message = body.decode("utf-8")
 
             self.logger.info(
@@ -135,15 +99,10 @@ class RabbitMQEventBus(EventBus):
             )
 
             try:
-                # On transmet le message à la logique métier.
                 callback(message)
 
-                # ACK = accusé de réception.
-                #
-                # On confirme à RabbitMQ que le traitement a réussi.
-                # RabbitMQ peut alors supprimer le message de la queue.
                 channel.basic_ack(
-                    delivery_tag=method.delivery_tag
+                    delivery_tag=method.delivery_tag,
                 )
 
             except Exception:
@@ -152,23 +111,11 @@ class RabbitMQEventBus(EventBus):
                     queue_name,
                 )
 
-                # NACK = traitement échoué.
-                #
-                # Pour cette première version, on remet le message dans la queue.
-                # Plus tard, nous ajouterons :
-                # - retry limité ;
-                # - backoff ;
-                # - Dead Letter Queue.
                 channel.basic_nack(
                     delivery_tag=method.delivery_tag,
                     requeue=True,
                 )
 
-        # QoS : un consommateur ne reçoit qu'un seul message non acquitté
-        # à la fois.
-        #
-        # C'est utile pour éviter de surcharger un agent IA avec trop
-        # de tâches simultanées.
         self.channel.basic_qos(prefetch_count=1)
 
         self.channel.basic_consume(
@@ -182,17 +129,126 @@ class RabbitMQEventBus(EventBus):
             queue_name,
         )
 
-        # Cette instruction bloque le processus et attend les messages.
+        self.channel.start_consuming()
+
+    def publish_agent_message(
+        self,
+        queue_name: str,
+        message: AgentMessage,
+    ) -> None:
+        """
+        Publie un AgentMessage validé et structuré dans RabbitMQ.
+
+        Pourquoi ?
+
+        Un système multi-agents professionnel ne doit pas échanger uniquement
+        du texte libre. Chaque mission doit être traçable et contenir notamment :
+
+        - un message_id ;
+        - un correlation_id ;
+        - une source ;
+        - une cible ;
+        - un type de message ;
+        - une priorité ;
+        - un payload métier ;
+        - des métadonnées ;
+        - une date de création.
+        """
+
+        self.channel.queue_declare(
+            queue=queue_name,
+            durable=True,
+        )
+
+        json_message = message.model_dump_json()
+
+        self.channel.basic_publish(
+            exchange="",
+            routing_key=queue_name,
+            body=json_message.encode("utf-8"),
+            properties=pika.BasicProperties(
+                delivery_mode=pika.DeliveryMode.Persistent,
+                content_type="application/json",
+                message_id=message.message_id,
+                correlation_id=message.correlation_id,
+                type=message.message_type,
+                priority=message.priority,
+            ),
+        )
+
+        self.logger.info(
+            "AgentMessage '%s' published to queue '%s' "
+            "with correlation_id '%s'.",
+            message.message_id,
+            queue_name,
+            message.correlation_id,
+        )
+
+    def consume_agent_messages(
+        self,
+        queue_name: str,
+        callback: Callable[[AgentMessage], None],
+    ) -> None:
+        """
+        Consomme des AgentMessage depuis RabbitMQ.
+
+        Le JSON reçu est validé par Pydantic avant d'être transmis à l'agent.
+        Un message invalide ou mal formé ne doit pas entrer directement
+        dans la logique métier.
+        """
+
+        self.channel.queue_declare(
+            queue=queue_name,
+            durable=True,
+        )
+
+        def _on_message(channel, method, properties, body) -> None:
+            try:
+                message = AgentMessage.model_validate_json(body)
+
+                self.logger.info(
+                    "AgentMessage '%s' received from queue '%s'.",
+                    message.message_id,
+                    queue_name,
+                )
+
+                callback(message)
+
+                channel.basic_ack(
+                    delivery_tag=method.delivery_tag,
+                )
+
+            except Exception:
+                self.logger.exception(
+                    "Error while processing AgentMessage from queue '%s'.",
+                    queue_name,
+                )
+
+                channel.basic_nack(
+                    delivery_tag=method.delivery_tag,
+                    requeue=True,
+                )
+
+        self.channel.basic_qos(prefetch_count=1)
+
+        self.channel.basic_consume(
+            queue=queue_name,
+            on_message_callback=_on_message,
+            auto_ack=False,
+        )
+
+        self.logger.info(
+            "Waiting for AgentMessages on queue '%s'...",
+            queue_name,
+        )
+
         self.channel.start_consuming()
 
     def close(self) -> None:
         """
         Ferme proprement la connexion RabbitMQ.
 
-        Pourquoi ?
-
-        Une connexion réseau doit toujours être libérée correctement,
-        notamment lors de l'arrêt du Kernel ou d'un agent.
+        Cette méthode sera appelée à l'arrêt du Kernel, d'un agent ou d'un test.
         """
 
         if self.connection and self.connection.is_open:
