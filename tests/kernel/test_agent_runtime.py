@@ -216,3 +216,24 @@ def test_runtime_stop_closes_event_bus():
 
     assert descriptor is not None
     assert descriptor.status == AgentStatus.STOPPED
+
+def test_runtime_recovers_after_previous_error():
+    service, _, runtime = create_runtime()
+
+    runtime.last_error = "Previous failure"
+
+    runtime._handle_message(
+        create_message()
+    )
+
+    health = runtime.health()
+
+    assert health["last_error"] is None
+    assert health["total_runtime_messages"] == 1
+
+    descriptor = service.get_agent(
+        "adip.runtime_agent"
+    )
+
+    assert descriptor is not None
+    assert descriptor.status == AgentStatus.AVAILABLE

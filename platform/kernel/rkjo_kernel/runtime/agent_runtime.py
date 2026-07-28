@@ -165,6 +165,11 @@ class AgentRuntime:
         de l'agent avec le RegistryService.
         """
 
+        # Une erreur précédente ne doit pas empêcher
+        # un traitement réussi de remettre l'agent
+        # en état AVAILABLE.
+        self.last_error = None
+
         started_at = perf_counter()
 
         self.registry_service.update_agent_status(
