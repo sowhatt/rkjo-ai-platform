@@ -1,5 +1,8 @@
 """Workflow domain for the RKJO AI Kernel."""
 
+from rkjo_kernel.workflow.engine import WorkflowEngine
+from rkjo_kernel.workflow.navigator import WorkflowNavigator
+from rkjo_kernel.workflow.validator import WorkflowValidator
 from rkjo_kernel.workflow.exceptions import (
     InvalidStepTransitionError,
     InvalidWorkflowDefinitionError,
@@ -24,6 +27,9 @@ __all__ = [
     "WorkflowDefinition",
     "WorkflowDomainError",
     "WorkflowExecution",
+    "WorkflowValidator",
+    "WorkflowNavigator",
+    "WorkflowEngine",
     "WorkflowStatus",
     "WorkflowStep",
 ]
