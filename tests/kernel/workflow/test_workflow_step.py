@@ -84,3 +84,69 @@ def test_running_step_cannot_start_again():
 
     with pytest.raises(InvalidStepTransitionError):
         step.start()
+
+def test_step_can_target_agent_by_name():
+    step = WorkflowStep(
+        step_id="validate",
+        name="Validate request",
+        agent_name=" validation_agent ",
+        position=0,
+    )
+
+    assert step.agent_name == "validation_agent"
+    assert step.capability_name is None
+    assert step.routing_mode == "agent"
+    assert step.routing_target == "validation_agent"
+
+
+def test_step_can_target_capability():
+    step = WorkflowStep(
+        step_id="risk",
+        name="Analyze risk",
+        capability_name=" risk.analysis ",
+        position=0,
+    )
+
+    assert step.agent_name is None
+    assert step.capability_name == "risk.analysis"
+    assert step.routing_mode == "capability"
+    assert step.routing_target == "risk.analysis"
+
+
+def test_step_requires_exactly_one_routing_target():
+    with pytest.raises(
+        ValueError,
+        match="exactly one routing target",
+    ):
+        WorkflowStep(
+            step_id="risk",
+            name="Analyze risk",
+            position=0,
+        )
+
+
+def test_step_rejects_multiple_routing_targets():
+    with pytest.raises(
+        ValueError,
+        match="exactly one routing target",
+    ):
+        WorkflowStep(
+            step_id="risk",
+            name="Analyze risk",
+            agent_name="risk_agent",
+            capability_name="risk.analysis",
+            position=0,
+        )
+
+
+def test_step_rejects_empty_capability_name():
+    with pytest.raises(
+        ValueError,
+        match="capability_name must be",
+    ):
+        WorkflowStep(
+            step_id="risk",
+            name="Analyze risk",
+            capability_name="   ",
+            position=0,
+        )

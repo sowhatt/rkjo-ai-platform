@@ -395,3 +395,32 @@ def test_workflow_executor_runs_real_local_agents():
         execution_runtime.total_runtime_messages
         == 1
     )
+
+def test_runtime_adapter_rejects_capability_target():
+    adapter = RuntimeExecutionAdapter(
+        runtimes={}
+    )
+
+    step = WorkflowStep(
+        step_id="risk",
+        name="Analyze risk",
+        capability_name="risk.analysis",
+        position=0,
+    )
+
+    result = adapter.execute(
+        step=step,
+        context=WorkflowContext(),
+    )
+
+    assert result.success is False
+    assert result.error == (
+        "RuntimeExecutionAdapter requires a "
+        "workflow step targeted by agent_name. "
+        "Capability 'risk.analysis' must be "
+        "resolved before local execution."
+    )
+    assert result.metadata["capability_name"] == (
+        "risk.analysis"
+    )
+    assert result.metadata["workflow_step_id"] == "risk"

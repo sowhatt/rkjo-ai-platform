@@ -57,6 +57,24 @@ class RuntimeExecutionAdapter(AgentExecutionAdapter):
         context: WorkflowContext,
     ) -> ExecutionResult:
         """Execute the agent referenced by a workflow step."""
+        if step.agent_name is None:
+            return ExecutionResult.failed(
+                error=(
+                    "RuntimeExecutionAdapter requires a "
+                    "workflow step targeted by agent_name. "
+                    "Capability "
+                    f"'{step.capability_name}' must be "
+                    "resolved before local execution."
+                ),
+                metadata={
+                    "adapter": "runtime",
+                    "capability_name": (
+                        step.capability_name
+                    ),
+                    "workflow_step_id": step.step_id,
+                },
+            )
+
         runtime = self._runtimes.get(step.agent_name)
 
         if runtime is None:

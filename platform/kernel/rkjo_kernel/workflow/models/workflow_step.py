@@ -23,7 +23,8 @@ class WorkflowStep:
 
     step_id: str
     name: str
-    agent_name: str
+    agent_name: str | None = None
+    capability_name: str | None = None
     description: str | None = None
     position: int = 0
     input_mapping: dict[str, Any] = field(default_factory=dict)
@@ -47,9 +48,42 @@ class WorkflowStep:
                 "Workflow step name must not be empty."
             )
 
-        if not self.agent_name or not self.agent_name.strip():
+        if self.agent_name is not None:
+            if (
+                not isinstance(self.agent_name, str)
+                or not self.agent_name.strip()
+            ):
+                raise ValueError(
+                    "Workflow step agent_name must be a "
+                    "non-empty string when provided."
+                )
+
+            self.agent_name = self.agent_name.strip()
+
+        if self.capability_name is not None:
+            if (
+                not isinstance(self.capability_name, str)
+                or not self.capability_name.strip()
+            ):
+                raise ValueError(
+                    "Workflow step capability_name must be a "
+                    "non-empty string when provided."
+                )
+
+            self.capability_name = (
+                self.capability_name.strip()
+            )
+
+        has_agent_target = self.agent_name is not None
+        has_capability_target = (
+            self.capability_name is not None
+        )
+
+        if has_agent_target == has_capability_target:
             raise ValueError(
-                "Workflow step agent_name must not be empty."
+                "Workflow step must define exactly one "
+                "routing target: agent_name or "
+                "capability_name."
             )
 
         if self.position < 0:
@@ -57,6 +91,27 @@ class WorkflowStep:
                 "Workflow step position must be greater than "
                 "or equal to zero."
             )
+
+    @property
+    def routing_mode(self) -> str:
+        """Return the routing strategy used by the step."""
+        if self.agent_name is not None:
+            return "agent"
+
+        return "capability"
+
+    @property
+    def routing_target(self) -> str:
+        """Return the configured routing target."""
+        if self.agent_name is not None:
+            return self.agent_name
+
+        if self.capability_name is not None:
+            return self.capability_name
+
+        raise RuntimeError(
+            "Workflow step has no routing target."
+        )
 
     def start(self) -> None:
         """Move the step from PENDING to RUNNING."""
