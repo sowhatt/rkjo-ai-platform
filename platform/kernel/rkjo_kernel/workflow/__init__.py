@@ -1,5 +1,6 @@
 """Workflow domain for the RKJO AI Kernel."""
 
+from rkjo_kernel.workflow.agent_execution_adapter import AgentExecutionAdapter
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.execution_result import ExecutionResult
 from rkjo_kernel.workflow.navigator import WorkflowNavigator
@@ -30,6 +31,7 @@ __all__ = [
     "WorkflowExecution",
     "WorkflowValidator",
     "WorkflowNavigator",
+    "AgentExecutionAdapter",
     "ExecutionResult",
     "WorkflowEngine",
     "WorkflowStatus",
