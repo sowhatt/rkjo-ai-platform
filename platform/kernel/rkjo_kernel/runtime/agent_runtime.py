@@ -102,7 +102,7 @@ class AgentRuntime:
 
             self.event_bus.consume_agent_messages(
                 queue_name=self.agent.queue_name,
-                callback=self._handle_message,
+                callback=self.execute,
             )
 
         except Exception as exc:
@@ -153,6 +153,19 @@ class AgentRuntime:
             "Runtime for agent '%s' stopped.",
             self.agent.agent_name,
         )
+
+
+    def execute(
+        self,
+        message: AgentMessage,
+    ) -> Any:
+        """Execute one message synchronously.
+
+        This public method is used by local execution adapters.
+        Message lifecycle, metrics and registry status changes remain
+        centralized in the internal runtime pipeline.
+        """
+        return self._handle_message(message)
 
     def _handle_message(
         self,
