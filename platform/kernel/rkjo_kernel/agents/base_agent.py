@@ -129,7 +129,7 @@ class BaseAgent(ABC):
     def _handle_message(
         self,
         message: AgentMessage,
-    ) -> None:
+    ) -> Any:
         """
         Pipeline interne standard de traitement d'un message.
 
@@ -175,6 +175,8 @@ class BaseAgent(ABC):
                 self.agent_name,
                 message.message_id,
             )
+
+            return result
 
         except Exception:
             self.failed_messages += 1

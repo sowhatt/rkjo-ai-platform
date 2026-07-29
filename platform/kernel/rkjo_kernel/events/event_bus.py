@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from typing import Any
 
 from rkjo_kernel.messages.agent_message import AgentMessage
 
@@ -66,7 +67,7 @@ class EventBus(ABC):
     def consume_agent_messages(
         self,
         queue_name: str,
-        callback: Callable[[AgentMessage], None],
+        callback: Callable[[AgentMessage], Any],
     ) -> None:
         """
         Consomme des AgentMessage validés.

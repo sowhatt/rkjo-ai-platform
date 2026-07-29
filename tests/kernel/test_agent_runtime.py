@@ -153,9 +153,14 @@ def test_runtime_initial_state():
 def test_runtime_processes_message():
     service, _, runtime = create_runtime()
 
-    runtime._handle_message(
+    result = runtime._handle_message(
         create_message()
     )
+
+    assert result == {
+        "question": "Analyse cette mission.",
+        "processed": True,
+    }
 
     health = runtime.health()
 

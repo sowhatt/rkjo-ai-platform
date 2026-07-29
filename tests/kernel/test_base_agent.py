@@ -66,7 +66,12 @@ def test_base_agent_process_message():
     assert agent.health()["processed_messages"] == 0
     assert agent.health()["failed_messages"] == 0
 
-    agent._handle_message(message)
+    result = agent._handle_message(message)
+
+    assert result == {
+        "received_question": "Analyse le risque agricole.",
+        "status": "processed",
+    }
 
     health = agent.health()
 

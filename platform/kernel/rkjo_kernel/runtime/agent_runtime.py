@@ -157,7 +157,7 @@ class AgentRuntime:
     def _handle_message(
         self,
         message: AgentMessage,
-    ) -> None:
+    ) -> Any:
         """
         Encadre le traitement d'un message par l'agent.
 
@@ -178,9 +178,11 @@ class AgentRuntime:
         )
 
         try:
-            self.agent._handle_message(message)
+            result = self.agent._handle_message(message)
 
             self.total_runtime_messages += 1
+
+            return result
 
         except Exception as exc:
             self.last_error = str(exc)
