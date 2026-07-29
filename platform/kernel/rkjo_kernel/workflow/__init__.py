@@ -3,6 +3,7 @@
 from rkjo_kernel.workflow.agent_execution_adapter import AgentExecutionAdapter
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.execution_result import ExecutionResult
+from rkjo_kernel.workflow.executor import WorkflowExecutor
 from rkjo_kernel.workflow.navigator import WorkflowNavigator
 from rkjo_kernel.workflow.validator import WorkflowValidator
 from rkjo_kernel.workflow.exceptions import (
@@ -29,6 +30,7 @@ __all__ = [
     "WorkflowDefinition",
     "WorkflowDomainError",
     "WorkflowExecution",
+    "WorkflowExecutor",
     "WorkflowValidator",
     "WorkflowNavigator",
     "AgentExecutionAdapter",
