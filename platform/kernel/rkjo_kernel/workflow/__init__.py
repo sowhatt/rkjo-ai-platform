@@ -9,6 +9,9 @@ from rkjo_kernel.workflow.execution_result import ExecutionResult
 from rkjo_kernel.workflow.executor import WorkflowExecutor
 from rkjo_kernel.workflow.navigator import WorkflowNavigator
 from rkjo_kernel.workflow.runtime_execution_adapter import RuntimeExecutionAdapter
+from rkjo_kernel.workflow.orchestrator_runtime_execution_adapter import (
+    OrchestratorRuntimeExecutionAdapter,
+)
 from rkjo_kernel.workflow.validator import WorkflowValidator
 from rkjo_kernel.workflow.exceptions import (
     InvalidStepTransitionError,
@@ -41,6 +44,7 @@ __all__ = [
     "CapabilityRuntimeExecutionAdapter",
     "ExecutionResult",
     "RuntimeExecutionAdapter",
+    "OrchestratorRuntimeExecutionAdapter",
     "WorkflowEngine",
     "WorkflowStatus",
     "WorkflowStep",
