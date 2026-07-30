@@ -57,6 +57,23 @@ class MissionRequest:
 
 
 @dataclass(frozen=True)
+class DispatchPlan:
+    """
+    Plan de routage préparé sans publication.
+
+    Il contient :
+    - l'agent sélectionné ;
+    - le message construit ;
+    - la queue cible ;
+    - les informations de découverte.
+    """
+
+    message: AgentMessage
+    discovery: DiscoveryResult
+    queue_name: str
+
+
+@dataclass(frozen=True)
 class DispatchResult:
     """
     Résultat d'un envoi de mission.
@@ -122,19 +139,18 @@ class AgentOrchestrator:
             "rkjo.orchestrator"
         )
 
-    def dispatch(
+    def plan(
         self,
         request: MissionRequest,
-    ) -> DispatchResult:
+    ) -> DispatchPlan:
         """
-        Découvre le meilleur agent et lui transmet la mission.
+        Discover the best agent and build a dispatch plan.
 
-        Une exception explicite est levée si aucun agent
-        ne satisfait les contraintes.
+        This method does not publish the message.
         """
 
         self.logger.info(
-            "Discovering agent for capability '%s' "
+            "Planning agent dispatch for capability '%s' "
             "with correlation_id '%s'.",
             request.capability_name,
             request.correlation_id,
@@ -185,21 +201,37 @@ class AgentOrchestrator:
             },
         )
 
-        self.event_bus.publish_agent_message(
-            queue_name=selected_agent.queue_name,
+        return DispatchPlan(
             message=message,
+            discovery=discovery_result,
+            queue_name=selected_agent.queue_name,
+        )
+
+    def dispatch(
+        self,
+        request: MissionRequest,
+    ) -> DispatchResult:
+        """
+        Plan and publish a mission to the selected agent.
+        """
+
+        plan = self.plan(request)
+
+        self.event_bus.publish_agent_message(
+            queue_name=plan.queue_name,
+            message=plan.message,
         )
 
         self.logger.info(
             "Mission '%s' dispatched to agent '%s' "
             "through queue '%s'.",
-            message.message_id,
-            selected_agent.name,
-            selected_agent.queue_name,
+            plan.message.message_id,
+            plan.discovery.agent.name,
+            plan.queue_name,
         )
 
         return DispatchResult(
-            message=message,
-            discovery=discovery_result,
-            queue_name=selected_agent.queue_name,
+            message=plan.message,
+            discovery=plan.discovery,
+            queue_name=plan.queue_name,
         )

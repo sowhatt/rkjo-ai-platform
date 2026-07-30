@@ -197,3 +197,73 @@ def test_orchestrator_respects_region_filter():
         orchestrator.dispatch(request)
 
     assert event_bus.published_messages == []
+
+def test_orchestrator_plan_selects_agent_without_publishing():
+    service, event_bus, orchestrator = create_orchestrator()
+
+    service.register_agent(
+        create_climate_agent()
+    )
+
+    request = MissionRequest(
+        capability_name="drought_analysis",
+        product="ADIP",
+        region="france",
+        language="fr",
+        priority=7,
+        correlation_id="CORR-PLAN-001",
+        payload={
+            "department_code": "27",
+            "crop": "blé tendre",
+        },
+    )
+
+    plan = orchestrator.plan(request)
+
+    assert plan.discovery.agent.name == (
+        "adip.climate_agent"
+    )
+    assert plan.queue_name == "adip.climate"
+    assert plan.message.target == (
+        "adip.climate_agent"
+    )
+    assert plan.message.priority == 7
+    assert plan.message.correlation_id == (
+        "CORR-PLAN-001"
+    )
+    assert plan.message.metadata[
+        "requested_capability"
+    ] == "drought_analysis"
+
+    assert event_bus.published_messages == []
+
+
+def test_orchestrator_dispatch_uses_prepared_plan():
+    service, event_bus, orchestrator = create_orchestrator()
+
+    service.register_agent(
+        create_climate_agent()
+    )
+
+    request = MissionRequest(
+        capability_name="drought_analysis",
+        product="ADIP",
+        region="france",
+        payload={
+            "department_code": "27",
+        },
+    )
+
+    result = orchestrator.dispatch(request)
+
+    assert len(event_bus.published_messages) == 1
+
+    queue_name, message = (
+        event_bus.published_messages[0]
+    )
+
+    assert queue_name == result.queue_name
+    assert message is result.message
+    assert result.discovery.agent.name == (
+        "adip.climate_agent"
+    )
