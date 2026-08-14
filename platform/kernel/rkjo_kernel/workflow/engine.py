@@ -16,6 +16,7 @@ from rkjo_kernel.workflow.models.workflow_execution import (
 )
 from rkjo_kernel.workflow.models.workflow_step import WorkflowStep
 from rkjo_kernel.workflow.navigator import WorkflowNavigator
+from rkjo_kernel.workflow.repository import WorkflowRepository
 from rkjo_kernel.workflow.validator import WorkflowValidator
 
 
@@ -27,9 +28,11 @@ class WorkflowEngine:
         *,
         validator: WorkflowValidator | None = None,
         navigator: WorkflowNavigator | None = None,
+        repository: WorkflowRepository | None = None,
     ) -> None:
         self.validator = validator or WorkflowValidator()
         self.navigator = navigator or WorkflowNavigator()
+        self.repository = repository
 
     def create_execution(
         self,
@@ -58,7 +61,11 @@ class WorkflowEngine:
         if execution_id is not None:
             arguments["execution_id"] = execution_id
 
-        return WorkflowExecution(**arguments)
+        execution = WorkflowExecution(**arguments)
+
+        self._persist(execution)
+
+        return execution
 
     def start(
         self,
@@ -67,6 +74,9 @@ class WorkflowEngine:
         """Start a pending workflow execution."""
         self.validator.validate_can_start(execution)
         execution.start()
+
+        self._persist(execution)
+
         return execution
 
     def get_next_step(
@@ -88,6 +98,8 @@ class WorkflowEngine:
 
         execution.select_step(step.step_id)
         step.start()
+
+        self._persist(execution)
 
         return step
 
@@ -112,6 +124,8 @@ class WorkflowEngine:
         )
         execution.current_step_id = None
 
+        self._persist(execution)
+
         return step
 
     def fail_current_step(
@@ -135,6 +149,8 @@ class WorkflowEngine:
         if fail_workflow:
             execution.fail(error)
 
+        self._persist(execution)
+
         return step
 
     def complete(
@@ -144,6 +160,9 @@ class WorkflowEngine:
         """Complete a workflow whose steps are all terminal."""
         self.validator.validate_can_complete(execution)
         execution.complete()
+
+        self._persist(execution)
+
         return execution
 
     def fail(
@@ -154,6 +173,9 @@ class WorkflowEngine:
     ) -> WorkflowExecution:
         """Fail a running workflow execution."""
         execution.fail(error)
+
+        self._persist(execution)
+
         return execution
 
     def cancel(
@@ -162,4 +184,15 @@ class WorkflowEngine:
     ) -> WorkflowExecution:
         """Cancel a pending or running workflow execution."""
         execution.cancel()
+
+        self._persist(execution)
+
         return execution
+
+    def _persist(
+        self,
+        execution: WorkflowExecution,
+    ) -> None:
+        """Persist execution state when a repository is configured."""
+        if self.repository is not None:
+            self.repository.save(execution)
