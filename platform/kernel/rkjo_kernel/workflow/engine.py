@@ -67,6 +67,29 @@ class WorkflowEngine:
 
         return execution
 
+    def load_execution(
+        self,
+        execution_id: str,
+    ) -> WorkflowExecution:
+        """Load a persisted workflow execution."""
+        if self.repository is None:
+            raise RuntimeError(
+                "WorkflowEngine requires a repository "
+                "to load persisted executions."
+            )
+
+        execution = self.repository.get(
+            execution_id
+        )
+
+        if execution is None:
+            raise KeyError(
+                f"Unknown workflow execution: "
+                f"'{execution_id}'."
+            )
+
+        return execution
+
     def start(
         self,
         execution: WorkflowExecution,
