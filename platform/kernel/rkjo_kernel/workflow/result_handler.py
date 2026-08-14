@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.workflow.engine import WorkflowEngine
+from rkjo_kernel.workflow.idempotency import ProcessedMessageStore
 
 
 class WorkflowResultHandler:
@@ -13,8 +14,10 @@ class WorkflowResultHandler:
         self,
         *,
         engine: WorkflowEngine,
+        processed_messages: ProcessedMessageStore | None = None,
     ) -> None:
         self.engine = engine
+        self.processed_messages = processed_messages
 
     def handle(
         self,
@@ -27,6 +30,14 @@ class WorkflowResultHandler:
                 "Unsupported workflow result message type: "
                 f"'{message.message_type}'."
             )
+
+        if (
+            self.processed_messages is not None
+            and self.processed_messages.contains(
+                message.message_id
+            )
+        ):
+            return
 
         execution_id = message.metadata.get(
             "workflow_execution_id"
@@ -75,6 +86,10 @@ class WorkflowResultHandler:
                     execution
                 )
 
+            self._mark_processed(
+                message.message_id
+            )
+
             return
 
         error = str(
@@ -89,3 +104,17 @@ class WorkflowResultHandler:
             error=error,
             fail_workflow=True,
         )
+
+        self._mark_processed(
+            message.message_id
+        )
+
+
+    def _mark_processed(
+        self,
+        message_id: str,
+    ) -> None:
+        if self.processed_messages is not None:
+            self.processed_messages.mark_processed(
+                message_id
+            )
