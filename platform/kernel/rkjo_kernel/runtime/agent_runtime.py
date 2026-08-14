@@ -7,6 +7,7 @@ from rkjo_kernel.logging.logger import get_logger
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.registry.descriptor import AgentStatus
 from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
+from rkjo_kernel.runtime.retry_policy import RetryPolicy
 from rkjo_kernel.runtime.status import RuntimeStatus
 from rkjo_kernel.services.registry_service import RegistryService
 
@@ -39,6 +40,7 @@ class AgentRuntime:
         event_bus: EventBus,
         registry_service: RegistryService,
         result_publisher: AgentResultPublisher | None = None,
+        retry_policy: RetryPolicy | None = None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -54,6 +56,7 @@ class AgentRuntime:
         self.event_bus = event_bus
         self.registry_service = registry_service
         self.result_publisher = result_publisher
+        self.retry_policy = retry_policy
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -209,6 +212,39 @@ class AgentRuntime:
         except Exception as exc:
             self.last_error = str(exc)
             self._mark_agent_error()
+
+            if self.retry_policy is not None:
+                attempt = int(
+                    message.metadata.get(
+                        "attempt",
+                        1,
+                    )
+                )
+
+                decision = self.retry_policy.decide(
+                    error=exc,
+                    attempt=attempt,
+                )
+
+                message.metadata[
+                    "retry_should_retry"
+                ] = decision.should_retry
+
+                message.metadata[
+                    "retry_attempt"
+                ] = decision.attempt
+
+                message.metadata[
+                    "retry_max_attempts"
+                ] = decision.max_attempts
+
+                message.metadata[
+                    "retry_delay_seconds"
+                ] = decision.delay_seconds
+
+                message.metadata[
+                    "retry_reason"
+                ] = decision.reason
 
             if self.result_publisher is not None:
                 self.result_publisher.publish_failure(
