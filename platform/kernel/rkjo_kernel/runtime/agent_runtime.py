@@ -6,6 +6,7 @@ from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.logging.logger import get_logger
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.registry.descriptor import AgentStatus
+from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
 from rkjo_kernel.runtime.status import RuntimeStatus
 from rkjo_kernel.services.registry_service import RegistryService
 
@@ -37,6 +38,7 @@ class AgentRuntime:
         agent: BaseAgent,
         event_bus: EventBus,
         registry_service: RegistryService,
+        result_publisher: AgentResultPublisher | None = None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -51,6 +53,7 @@ class AgentRuntime:
         self.agent = agent
         self.event_bus = event_bus
         self.registry_service = registry_service
+        self.result_publisher = result_publisher
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -195,11 +198,24 @@ class AgentRuntime:
 
             self.total_runtime_messages += 1
 
+            if self.result_publisher is not None:
+                self.result_publisher.publish_success(
+                    request=message,
+                    result=result,
+                )
+
             return result
 
         except Exception as exc:
             self.last_error = str(exc)
             self._mark_agent_error()
+
+            if self.result_publisher is not None:
+                self.result_publisher.publish_failure(
+                    request=message,
+                    error=exc,
+                )
+
             raise
 
         finally:

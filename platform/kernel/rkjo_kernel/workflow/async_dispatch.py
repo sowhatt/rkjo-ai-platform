@@ -42,6 +42,7 @@ class AsyncWorkflowDispatcher:
         queue_name: str,
         execution_id: str,
         correlation_id: str | None = None,
+        reply_queue: str | None = None,
     ) -> AsyncDispatchResult:
         """Queue one workflow step for asynchronous execution."""
 
@@ -70,6 +71,7 @@ class AsyncWorkflowDispatcher:
                 "workflow_execution_id": execution_id,
                 "workflow_step_id": step.step_id,
                 "capability_name": step.capability_name,
+                "reply_queue": reply_queue,
             },
         )
 
