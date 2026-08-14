@@ -3,13 +3,31 @@ services:
     image: rabbitmq:3-management
     container_name: rkjo_rabbitmq
     ports:
-      - "5672:5672"     # Port utilisé par les applications Python
-      - "15672:15672"   # Interface web d'administration RabbitMQ
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: rkjo
       RABBITMQ_DEFAULT_PASS: rkjo_password
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
 
+  postgres:
+    image: postgres:16
+    container_name: rkjo_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: rkjo
+      POSTGRES_USER: rkjo
+      POSTGRES_PASSWORD: rkjo_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rkjo -d rkjo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
 volumes:
   rabbitmq_data:
+  postgres_data:
