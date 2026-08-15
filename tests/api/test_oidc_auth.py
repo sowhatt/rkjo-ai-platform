@@ -5,6 +5,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from rkjo_api.oidc_auth import (
+    _build_jwks_client,
     decode_oidc_token,
     get_oidc_configuration,
     resolve_oidc_identity,
@@ -92,6 +93,8 @@ def install_fake_jwks(
     monkeypatch,
     public_key,
 ):
+    _build_jwks_client.cache_clear()
+
     class FakeSigningKey:
         key = public_key
 
@@ -99,6 +102,7 @@ def install_fake_jwks(
         def __init__(
             self,
             url,
+            **kwargs,
         ):
             assert url == JWKS_URL
 
