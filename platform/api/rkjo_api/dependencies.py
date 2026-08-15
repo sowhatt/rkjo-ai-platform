@@ -5,6 +5,7 @@ from rkjo_kernel.rag.chunking import TextChunker
 from rkjo_kernel.rag.embedding_factory import (
     build_embedding_provider,
     get_embedding_dimensions,
+    get_embedding_space,
 )
 from rkjo_kernel.rag.ingestion import DocumentIngestionPipeline
 from rkjo_kernel.rag.loaders import CompositeDocumentLoader
@@ -103,6 +104,7 @@ def get_rag_ingestion_pipeline() -> DocumentIngestionPipeline:
         database_url=database_url,
         dimensions=dimensions,
         table_name="rag_chunks",
+        embedding_space=get_embedding_space(),
     )
 
     vector_store.initialize_schema()
@@ -143,6 +145,7 @@ def get_rag_search_service() -> SemanticSearchService:
         database_url=database_url,
         dimensions=dimensions,
         table_name="rag_chunks",
+        embedding_space=get_embedding_space(),
     )
 
     vector_store.initialize_schema()

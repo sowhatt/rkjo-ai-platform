@@ -11,6 +11,9 @@ from rkjo_kernel.rag.embedding import (
 from rkjo_kernel.rag.openai_embedding import (
     OpenAIEmbeddingProvider,
 )
+from rkjo_kernel.rag.embedding_space import (
+    EmbeddingSpace,
+)
 
 
 def get_embedding_dimensions() -> int:
@@ -35,6 +38,54 @@ def get_embedding_dimensions() -> int:
 
     return dimensions
 
+
+
+def get_embedding_space() -> EmbeddingSpace:
+    """Return the configured embedding-space identity."""
+
+    provider = os.getenv(
+        "RKJO_EMBEDDING_PROVIDER",
+        "deterministic",
+    ).strip().lower()
+
+    dimensions = get_embedding_dimensions()
+
+    if provider == "deterministic":
+        model = os.getenv(
+            "RKJO_EMBEDDING_MODEL",
+            "deterministic-v1",
+        ).strip()
+
+        if not model:
+            model = "deterministic-v1"
+
+        return EmbeddingSpace(
+            provider="deterministic",
+            model=model,
+            dimensions=dimensions,
+        )
+
+    if provider == "openai":
+        model = os.getenv(
+            "RKJO_EMBEDDING_MODEL",
+            "text-embedding-3-small",
+        ).strip()
+
+        if not model:
+            raise RuntimeError(
+                "RKJO_EMBEDDING_MODEL must not be empty."
+            )
+
+        return EmbeddingSpace(
+            provider="openai",
+            model=model,
+            dimensions=dimensions,
+        )
+
+    raise RuntimeError(
+        "Unsupported RKJO_EMBEDDING_PROVIDER: "
+        f"{provider}"
+    )
 
 def build_embedding_provider() -> EmbeddingProvider:
     provider = os.getenv(

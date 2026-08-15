@@ -15,6 +15,9 @@ from rkjo_kernel.rag.models import (
     DocumentChunk,
     RetrievedChunk,
 )
+from rkjo_kernel.rag.embedding_space import (
+    EmbeddingSpace,
+)
 from rkjo_kernel.rag.vector_store import VectorStore
 
 
@@ -27,6 +30,7 @@ class PostgresPgVectorStore(VectorStore):
         database_url: str,
         dimensions: int,
         table_name: str = "rag_chunks",
+        embedding_space: EmbeddingSpace | None = None,
     ) -> None:
         if not database_url.strip():
             raise ValueError(
@@ -46,6 +50,16 @@ class PostgresPgVectorStore(VectorStore):
         self.database_url = database_url
         self.dimensions = dimensions
         self.table_name = table_name.strip()
+        self.embedding_space = embedding_space
+
+        if (
+            embedding_space is not None
+            and embedding_space.dimensions != dimensions
+        ):
+            raise ValueError(
+                "Embedding-space dimensions must match "
+                "store dimensions."
+            )
 
     def initialize_schema(self) -> None:
         """Enable pgvector and create the persistent chunk table."""
@@ -89,6 +103,25 @@ class PostgresPgVectorStore(VectorStore):
                 )
             )
 
+            # Backward-compatible embedding-space migration.
+            #
+            # Existing rows remain NULL and therefore become legacy
+            # vectors. They are never silently treated as belonging
+            # to the currently configured embedding space.
+            connection.execute(
+                sql.SQL(
+                    """
+                    ALTER TABLE {}
+                    ADD COLUMN IF NOT EXISTS
+                        embedding_provider TEXT,
+                    ADD COLUMN IF NOT EXISTS
+                        embedding_model TEXT,
+                    ADD COLUMN IF NOT EXISTS
+                        embedding_dimensions INTEGER
+                    """
+                ).format(table)
+            )
+
             document_index = sql.Identifier(
                 f"{self.table_name}_document_idx"
             )
@@ -101,6 +134,26 @@ class PostgresPgVectorStore(VectorStore):
                     """
                 ).format(
                     document_index,
+                    table,
+                )
+            )
+
+            space_index = sql.Identifier(
+                f"{self.table_name}_embedding_space_idx"
+            )
+
+            connection.execute(
+                sql.SQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS {}
+                    ON {} (
+                        embedding_provider,
+                        embedding_model,
+                        embedding_dimensions
+                    )
+                    """
+                ).format(
+                    space_index,
                     table,
                 )
             )
@@ -146,9 +199,15 @@ class PostgresPgVectorStore(VectorStore):
                         content,
                         chunk_index,
                         metadata,
-                        embedding
+                        embedding,
+                        embedding_provider,
+                        embedding_model,
+                        embedding_dimensions
                     )
                     VALUES (
+                        %s,
+                        %s,
+                        %s,
                         %s,
                         %s,
                         %s,
@@ -162,7 +221,13 @@ class PostgresPgVectorStore(VectorStore):
                         content = EXCLUDED.content,
                         chunk_index = EXCLUDED.chunk_index,
                         metadata = EXCLUDED.metadata,
-                        embedding = EXCLUDED.embedding
+                        embedding = EXCLUDED.embedding,
+                        embedding_provider =
+                            EXCLUDED.embedding_provider,
+                        embedding_model =
+                            EXCLUDED.embedding_model,
+                        embedding_dimensions =
+                            EXCLUDED.embedding_dimensions
                     """
                 ).format(
                     sql.Identifier(
@@ -179,6 +244,21 @@ class PostgresPgVectorStore(VectorStore):
                     ),
                     Vector(
                         embedding
+                    ),
+                    (
+                        self.embedding_space.provider
+                        if self.embedding_space
+                        else None
+                    ),
+                    (
+                        self.embedding_space.model
+                        if self.embedding_space
+                        else None
+                    ),
+                    (
+                        self.embedding_space.dimensions
+                        if self.embedding_space
+                        else None
                     ),
                 ),
             )
@@ -205,34 +285,72 @@ class PostgresPgVectorStore(VectorStore):
         )
 
         with self._connect() as connection:
-            rows = connection.execute(
-                sql.SQL(
-                    """
-                    SELECT
-                        chunk_id,
-                        document_id,
-                        content,
-                        chunk_index,
-                        metadata,
-                        1 - (
+            if self.embedding_space is None:
+                rows = connection.execute(
+                    sql.SQL(
+                        """
+                        SELECT
+                            chunk_id,
+                            document_id,
+                            content,
+                            chunk_index,
+                            metadata,
+                            1 - (
+                                embedding <=> %s
+                            ) AS score
+                        FROM {}
+                        ORDER BY
                             embedding <=> %s
-                        ) AS score
-                    FROM {}
-                    ORDER BY
-                        embedding <=> %s
-                    LIMIT %s
-                    """
-                ).format(
-                    sql.Identifier(
-                        self.table_name
-                    )
-                ),
-                (
-                    query_vector,
-                    query_vector,
-                    limit,
-                ),
-            ).fetchall()
+                        LIMIT %s
+                        """
+                    ).format(
+                        sql.Identifier(
+                            self.table_name
+                        )
+                    ),
+                    (
+                        query_vector,
+                        query_vector,
+                        limit,
+                    ),
+                ).fetchall()
+
+            else:
+                rows = connection.execute(
+                    sql.SQL(
+                        """
+                        SELECT
+                            chunk_id,
+                            document_id,
+                            content,
+                            chunk_index,
+                            metadata,
+                            1 - (
+                                embedding <=> %s
+                            ) AS score
+                        FROM {}
+                        WHERE
+                            embedding_provider = %s
+                            AND embedding_model = %s
+                            AND embedding_dimensions = %s
+                        ORDER BY
+                            embedding <=> %s
+                        LIMIT %s
+                        """
+                    ).format(
+                        sql.Identifier(
+                            self.table_name
+                        )
+                    ),
+                    (
+                        query_vector,
+                        self.embedding_space.provider,
+                        self.embedding_space.model,
+                        self.embedding_space.dimensions,
+                        query_vector,
+                        limit,
+                    ),
+                ).fetchall()
 
         return [
             self._row_to_result(
