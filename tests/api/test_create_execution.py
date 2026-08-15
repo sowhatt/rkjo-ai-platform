@@ -26,7 +26,12 @@ def client(repository):
         get_workflow_engine
     ] = override_engine
 
-    with TestClient(app) as test_client:
+    with TestClient(
+        app,
+        headers={
+            "X-API-Key": "rkjo-test-api-key"
+        },
+    ) as test_client:
         yield test_client
 
     app.dependency_overrides.pop(

@@ -32,7 +32,12 @@ def client(metrics_registry):
         get_metrics_registry
     ] = override_metrics
 
-    with TestClient(app) as test_client:
+    with TestClient(
+        app,
+        headers={
+            "X-API-Key": "rkjo-test-api-key"
+        },
+    ) as test_client:
         yield test_client
 
     app.dependency_overrides.pop(

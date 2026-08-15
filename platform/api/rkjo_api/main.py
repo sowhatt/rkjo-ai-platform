@@ -1,7 +1,14 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from rkjo_api.security import (
+    API_KEY_HEADER,
+    is_protected_path,
+    verify_api_key,
+)
 
 from rkjo_api.dependencies import (
     get_async_dispatcher,
@@ -30,6 +37,58 @@ app = FastAPI(
     title="RKJO AI Platform API",
     version="0.1.0",
 )
+
+
+
+
+@app.middleware("http")
+async def api_key_security(
+    request: Request,
+    call_next,
+):
+    """Protect operational and workflow API resources."""
+
+    if not is_protected_path(
+        request.url.path
+    ):
+        return await call_next(
+            request
+        )
+
+    try:
+        authorized = verify_api_key(
+            request.headers.get(
+                API_KEY_HEADER
+            )
+        )
+
+    except RuntimeError:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": (
+                    "API authentication "
+                    "is not configured."
+                )
+            },
+        )
+
+    if not authorized:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "detail": (
+                    "Invalid or missing API key."
+                )
+            },
+            headers={
+                "WWW-Authenticate": "ApiKey"
+            },
+        )
+
+    return await call_next(
+        request
+    )
 
 
 class MetricsResponse(BaseModel):
