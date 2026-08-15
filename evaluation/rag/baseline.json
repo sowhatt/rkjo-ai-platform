@@ -1,0 +1,30 @@
+[
+  {
+    "case_id": "maize-yield-001",
+    "question": "Quels facteurs peuvent réduire le rendement du maïs ?",
+    "expected_document_ids": [
+      "openai-rag-002"
+    ],
+    "expected_concepts": [
+      "sécheresse",
+      "eau",
+      "sols",
+      "matière organique"
+    ],
+    "expect_answerable": true,
+    "limit": 5
+  },
+  {
+    "case_id": "maize-water-002",
+    "question": "Quel rôle joue la disponibilité en eau dans la productivité agricole ?",
+    "expected_document_ids": [
+      "openai-rag-002"
+    ],
+    "expected_concepts": [
+      "eau",
+      "productivité"
+    ],
+    "expect_answerable": true,
+    "limit": 5
+  }
+]
