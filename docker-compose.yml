@@ -25,7 +25,7 @@ services:
       start_period: 10s
 
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
     container_name: rkjo_postgres
     environment:
       POSTGRES_DB: rkjo

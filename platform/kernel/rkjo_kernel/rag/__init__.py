@@ -6,6 +6,9 @@ from rkjo_kernel.rag.models import (
     RetrievedChunk,
 )
 from rkjo_kernel.rag.retriever import Retriever
+from rkjo_kernel.rag.postgres_vector_store import (
+    PostgresPgVectorStore,
+)
 from rkjo_kernel.rag.vector_store import (
     InMemoryVectorStore,
     VectorStore,
@@ -20,4 +23,5 @@ __all__ = [
     "VectorStore",
     "InMemoryVectorStore",
     "Retriever",
+    "PostgresPgVectorStore",
 ]
