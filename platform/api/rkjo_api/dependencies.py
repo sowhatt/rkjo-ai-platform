@@ -1,3 +1,5 @@
+from rkjo_kernel.logging.logger import get_logger
+from rkjo_kernel.rag.observability import RAGObserver
 import os
 
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
@@ -222,5 +224,11 @@ def get_rag_answering_service() -> RAGAnsweringService:
         ),
         context_builder=CitationContextBuilder(
             max_characters=max_context_characters,
+        ),
+        observer=RAGObserver(
+            metrics=get_metrics_registry(),
+            logger=get_logger(
+                "rkjo.rag"
+            ),
         ),
     )
