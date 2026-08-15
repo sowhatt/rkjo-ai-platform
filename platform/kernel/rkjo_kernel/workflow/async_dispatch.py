@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.messages.agent_message import AgentMessage
+from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.workflow.models.workflow_context import WorkflowContext
 from rkjo_kernel.workflow.models.workflow_step import WorkflowStep
 
@@ -30,9 +31,11 @@ class AsyncWorkflowDispatcher:
         *,
         event_bus: EventBus,
         source: str = "rkjo.workflow",
+        metrics: MetricsRegistry | None = None,
     ) -> None:
         self.event_bus = event_bus
         self.source = source
+        self.metrics = metrics
 
     def dispatch(
         self,
@@ -79,6 +82,11 @@ class AsyncWorkflowDispatcher:
             queue_name=queue_name,
             message=message,
         )
+
+        if self.metrics is not None:
+            self.metrics.increment(
+                "workflow.dispatched"
+            )
 
         return AsyncDispatchResult(
             message_id=message.message_id,

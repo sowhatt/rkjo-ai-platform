@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 
+from rkjo_kernel.monitoring.metrics import MetricsRegistry
+
 from rkjo_kernel.workflow.models.workflow_context import (
     WorkflowContext,
 )
@@ -29,10 +31,12 @@ class WorkflowEngine:
         validator: WorkflowValidator | None = None,
         navigator: WorkflowNavigator | None = None,
         repository: WorkflowRepository | None = None,
+        metrics: MetricsRegistry | None = None,
     ) -> None:
         self.validator = validator or WorkflowValidator()
         self.navigator = navigator or WorkflowNavigator()
         self.repository = repository
+        self.metrics = metrics
 
     def create_execution(
         self,
@@ -64,6 +68,9 @@ class WorkflowEngine:
         execution = WorkflowExecution(**arguments)
 
         self._persist(execution)
+        self._increment_metric(
+            "workflow.created"
+        )
 
         return execution
 
@@ -99,6 +106,9 @@ class WorkflowEngine:
         execution.start()
 
         self._persist(execution)
+        self._increment_metric(
+            "workflow.started"
+        )
 
         return execution
 
@@ -174,6 +184,11 @@ class WorkflowEngine:
 
         self._persist(execution)
 
+        if fail_workflow:
+            self._increment_metric(
+                "workflow.failed"
+            )
+
         return step
 
     def complete(
@@ -185,6 +200,9 @@ class WorkflowEngine:
         execution.complete()
 
         self._persist(execution)
+        self._increment_metric(
+            "workflow.completed"
+        )
 
         return execution
 
@@ -198,6 +216,9 @@ class WorkflowEngine:
         execution.fail(error)
 
         self._persist(execution)
+        self._increment_metric(
+            "workflow.failed"
+        )
 
         return execution
 
@@ -211,6 +232,14 @@ class WorkflowEngine:
         self._persist(execution)
 
         return execution
+
+    def _increment_metric(
+        self,
+        name: str,
+    ) -> None:
+        """Increment an observability counter when configured."""
+        if self.metrics is not None:
+            self.metrics.increment(name)
 
     def _persist(
         self,

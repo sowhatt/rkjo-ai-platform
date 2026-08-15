@@ -5,6 +5,7 @@ from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.logging.logger import get_logger
 from rkjo_kernel.messages.agent_message import AgentMessage
+from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.registry.descriptor import AgentStatus
 from rkjo_kernel.runtime.dead_letter_publisher import DeadLetterPublisher
 from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
@@ -44,6 +45,7 @@ class AgentRuntime:
         result_publisher: AgentResultPublisher | None = None,
         retry_policy: RetryPolicy | None = None,
         dead_letter_publisher: DeadLetterPublisher | None = None,
+        metrics: MetricsRegistry | None = None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -61,6 +63,7 @@ class AgentRuntime:
         self.result_publisher = result_publisher
         self.retry_policy = retry_policy
         self.dead_letter_publisher = dead_letter_publisher
+        self.metrics = metrics
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -215,6 +218,10 @@ class AgentRuntime:
                     message=retry_message,
                 )
 
+                self._increment_metric(
+                    "runtime.retry"
+                )
+
                 self.logger.warning(
                     "Retrying message '%s' as '%s' "
                     "for agent '%s' (attempt %s).",
@@ -278,6 +285,9 @@ class AgentRuntime:
             result = self.agent._handle_message(message)
 
             self.total_runtime_messages += 1
+            self._increment_metric(
+                "runtime.success"
+            )
 
             if self.result_publisher is not None:
                 self.result_publisher.publish_success(
@@ -290,6 +300,9 @@ class AgentRuntime:
         except Exception as exc:
             self.last_error = str(exc)
             self._mark_agent_error()
+            self._increment_metric(
+                "runtime.failure"
+            )
 
             if self.retry_policy is not None:
                 attempt = int(
@@ -352,6 +365,14 @@ class AgentRuntime:
                     agent_name=self.agent.agent_name,
                     status=AgentStatus.AVAILABLE,
                 )
+
+    def _increment_metric(
+        self,
+        name: str,
+    ) -> None:
+        """Increment a runtime metric when monitoring is configured."""
+        if self.metrics is not None:
+            self.metrics.increment(name)
 
     def _mark_agent_error(self) -> None:
         """

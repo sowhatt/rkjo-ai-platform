@@ -29,7 +29,8 @@ def get_workflow_repository() -> PostgreSQLWorkflowRepository:
 
 def get_workflow_engine() -> WorkflowEngine:
     return WorkflowEngine(
-        repository=get_workflow_repository()
+        repository=get_workflow_repository(),
+        metrics=get_metrics_registry(),
     )
 
 
@@ -40,7 +41,8 @@ def get_event_bus() -> RabbitMQEventBus:
 
 def get_async_dispatcher() -> AsyncWorkflowDispatcher:
     return AsyncWorkflowDispatcher(
-        event_bus=get_event_bus()
+        event_bus=get_event_bus(),
+        metrics=get_metrics_registry(),
     )
 
 

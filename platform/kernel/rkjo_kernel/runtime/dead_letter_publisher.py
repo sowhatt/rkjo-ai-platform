@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.messages.agent_message import AgentMessage
+from rkjo_kernel.monitoring.metrics import MetricsRegistry
 
 
 class DeadLetterPublisher:
@@ -15,6 +16,7 @@ class DeadLetterPublisher:
         event_bus: EventBus,
         queue_name: str,
         source: str = "rkjo.runtime",
+        metrics: MetricsRegistry | None = None,
     ) -> None:
         if not queue_name or not queue_name.strip():
             raise ValueError(
@@ -24,6 +26,7 @@ class DeadLetterPublisher:
         self.event_bus = event_bus
         self.queue_name = queue_name
         self.source = source
+        self.metrics = metrics
 
     def publish(
         self,
@@ -73,5 +76,10 @@ class DeadLetterPublisher:
             queue_name=self.queue_name,
             message=dead_letter,
         )
+
+        if self.metrics is not None:
+            self.metrics.increment(
+                "runtime.dead_letter"
+            )
 
         return dead_letter
