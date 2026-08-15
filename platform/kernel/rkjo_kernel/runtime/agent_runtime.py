@@ -4,6 +4,7 @@ from typing import Any
 from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.logging.logger import get_logger
+from rkjo_kernel.logging.structured import structured_log
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.registry.descriptor import AgentStatus
@@ -222,6 +223,25 @@ class AgentRuntime:
                     "runtime.retry"
                 )
 
+                structured_log(
+                    self.logger,
+                    event="runtime.message.retry",
+                    message_id=message.message_id,
+                    retry_message_id=retry_message.message_id,
+                    correlation_id=message.correlation_id,
+                    execution_id=message.metadata.get(
+                        "workflow_execution_id"
+                    ),
+                    step_id=message.metadata.get(
+                        "workflow_step_id"
+                    ),
+                    agent_name=self.agent.agent_name,
+                    queue_name=self.agent.queue_name,
+                    attempt=retry_message.metadata.get(
+                        "attempt"
+                    ),
+                )
+
                 self.logger.warning(
                     "Retrying message '%s' as '%s' "
                     "for agent '%s' (attempt %s).",
@@ -276,6 +296,25 @@ class AgentRuntime:
 
         started_at = perf_counter()
 
+        structured_log(
+            self.logger,
+            event="runtime.message.received",
+            message_id=message.message_id,
+            correlation_id=message.correlation_id,
+            execution_id=message.metadata.get(
+                "workflow_execution_id"
+            ),
+            step_id=message.metadata.get(
+                "workflow_step_id"
+            ),
+            agent_name=self.agent.agent_name,
+            queue_name=self.agent.queue_name,
+            attempt=message.metadata.get(
+                "attempt",
+                1,
+            ),
+        )
+
         self.registry_service.update_agent_status(
             agent_name=self.agent.agent_name,
             status=AgentStatus.BUSY,
@@ -295,6 +334,25 @@ class AgentRuntime:
                     result=result,
                 )
 
+            structured_log(
+                self.logger,
+                event="runtime.message.succeeded",
+                message_id=message.message_id,
+                correlation_id=message.correlation_id,
+                execution_id=message.metadata.get(
+                    "workflow_execution_id"
+                ),
+                step_id=message.metadata.get(
+                    "workflow_step_id"
+                ),
+                agent_name=self.agent.agent_name,
+                queue_name=self.agent.queue_name,
+                attempt=message.metadata.get(
+                    "attempt",
+                    1,
+                ),
+            )
+
             return result
 
         except Exception as exc:
@@ -302,6 +360,26 @@ class AgentRuntime:
             self._mark_agent_error()
             self._increment_metric(
                 "runtime.failure"
+            )
+
+            structured_log(
+                self.logger,
+                event="runtime.message.failed",
+                message_id=message.message_id,
+                correlation_id=message.correlation_id,
+                execution_id=message.metadata.get(
+                    "workflow_execution_id"
+                ),
+                step_id=message.metadata.get(
+                    "workflow_step_id"
+                ),
+                agent_name=self.agent.agent_name,
+                queue_name=self.agent.queue_name,
+                attempt=message.metadata.get(
+                    "attempt",
+                    1,
+                ),
+                error=str(exc),
             )
 
             if self.retry_policy is not None:
@@ -358,6 +436,24 @@ class AgentRuntime:
         finally:
             elapsed_seconds = perf_counter() - started_at
             self.last_duration_ms = elapsed_seconds * 1000
+
+            structured_log(
+                self.logger,
+                event="runtime.message.duration",
+                message_id=message.message_id,
+                correlation_id=message.correlation_id,
+                execution_id=message.metadata.get(
+                    "workflow_execution_id"
+                ),
+                step_id=message.metadata.get(
+                    "workflow_step_id"
+                ),
+                agent_name=self.agent.agent_name,
+                duration_ms=round(
+                    self.last_duration_ms,
+                    3,
+                ),
+            )
 
             # Si aucune erreur n'est active, l'agent redevient disponible.
             if self.last_error is None:

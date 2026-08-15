@@ -6,6 +6,8 @@ from copy import deepcopy
 from typing import Any, Mapping
 
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
+from rkjo_kernel.logging.logger import get_logger
+from rkjo_kernel.logging.structured import structured_log
 
 from rkjo_kernel.workflow.models.workflow_context import (
     WorkflowContext,
@@ -37,6 +39,9 @@ class WorkflowEngine:
         self.navigator = navigator or WorkflowNavigator()
         self.repository = repository
         self.metrics = metrics
+        self.logger = get_logger(
+            "rkjo.workflow.engine"
+        )
 
     def create_execution(
         self,
@@ -70,6 +75,14 @@ class WorkflowEngine:
         self._persist(execution)
         self._increment_metric(
             "workflow.created"
+        )
+
+        structured_log(
+            self.logger,
+            event="workflow.created",
+            execution_id=execution.execution_id,
+            workflow_id=execution.definition.workflow_id,
+            status=execution.status.value,
         )
 
         return execution
@@ -108,6 +121,14 @@ class WorkflowEngine:
         self._persist(execution)
         self._increment_metric(
             "workflow.started"
+        )
+
+        structured_log(
+            self.logger,
+            event="workflow.started",
+            execution_id=execution.execution_id,
+            workflow_id=execution.definition.workflow_id,
+            status=execution.status.value,
         )
 
         return execution
@@ -204,6 +225,14 @@ class WorkflowEngine:
             "workflow.completed"
         )
 
+        structured_log(
+            self.logger,
+            event="workflow.completed",
+            execution_id=execution.execution_id,
+            workflow_id=execution.definition.workflow_id,
+            status=execution.status.value,
+        )
+
         return execution
 
     def fail(
@@ -218,6 +247,15 @@ class WorkflowEngine:
         self._persist(execution)
         self._increment_metric(
             "workflow.failed"
+        )
+
+        structured_log(
+            self.logger,
+            event="workflow.failed",
+            execution_id=execution.execution_id,
+            workflow_id=execution.definition.workflow_id,
+            status=execution.status.value,
+            error=error,
         )
 
         return execution

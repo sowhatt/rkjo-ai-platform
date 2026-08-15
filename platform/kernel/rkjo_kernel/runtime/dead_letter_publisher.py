@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from rkjo_kernel.events.event_bus import EventBus
+from rkjo_kernel.logging.logger import get_logger
+from rkjo_kernel.logging.structured import structured_log
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 
@@ -27,6 +29,9 @@ class DeadLetterPublisher:
         self.queue_name = queue_name
         self.source = source
         self.metrics = metrics
+        self.logger = get_logger(
+            "rkjo.runtime.dlq"
+        )
 
     def publish(
         self,
@@ -81,5 +86,25 @@ class DeadLetterPublisher:
             self.metrics.increment(
                 "runtime.dead_letter"
             )
+
+        structured_log(
+            self.logger,
+            event="runtime.dead_letter",
+            message_id=original_message.message_id,
+            dead_letter_message_id=dead_letter.message_id,
+            correlation_id=original_message.correlation_id,
+            execution_id=original_message.metadata.get(
+                "workflow_execution_id"
+            ),
+            step_id=original_message.metadata.get(
+                "workflow_step_id"
+            ),
+            queue_name=self.queue_name,
+            attempt=original_message.metadata.get(
+                "attempt",
+                1,
+            ),
+            reason=reason,
+        )
 
         return dead_letter

@@ -7,6 +7,8 @@ from typing import Any
 from uuid import uuid4
 
 from rkjo_kernel.events.event_bus import EventBus
+from rkjo_kernel.logging.logger import get_logger
+from rkjo_kernel.logging.structured import structured_log
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.workflow.models.workflow_context import WorkflowContext
@@ -36,6 +38,9 @@ class AsyncWorkflowDispatcher:
         self.event_bus = event_bus
         self.source = source
         self.metrics = metrics
+        self.logger = get_logger(
+            "rkjo.workflow.dispatch"
+        )
 
     def dispatch(
         self,
@@ -87,6 +92,17 @@ class AsyncWorkflowDispatcher:
             self.metrics.increment(
                 "workflow.dispatched"
             )
+
+        structured_log(
+            self.logger,
+            event="workflow.dispatched",
+            execution_id=execution_id,
+            step_id=step.step_id,
+            agent_name=step.routing_target,
+            queue_name=queue_name,
+            message_id=message.message_id,
+            correlation_id=message.correlation_id,
+        )
 
         return AsyncDispatchResult(
             message_id=message.message_id,
