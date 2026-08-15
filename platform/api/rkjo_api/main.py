@@ -4,9 +4,12 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
+    get_async_dispatcher,
     get_workflow_engine,
     get_workflow_repository,
 )
+from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
+from rkjo_kernel.workflow.exceptions import InvalidWorkflowTransitionError
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.models.workflow_definition import (
     WorkflowDefinition,
@@ -59,6 +62,16 @@ class CreateWorkflowExecutionRequest(BaseModel):
         default_factory=dict
     )
     execution_id: str | None = None
+
+
+class WorkflowDispatchResponse(BaseModel):
+    execution_id: str
+    workflow_id: str
+    status: str
+    step_id: str
+    queue_name: str
+    message_id: str
+    correlation_id: str
 
 
 class WorkflowExecutionResponse(BaseModel):
@@ -184,4 +197,75 @@ def create_execution(
         current_step_id=execution.current_step_id,
         error=execution.error,
         progress=execution.progress(),
+    )
+
+
+@app.post(
+    "/workflows/executions/{execution_id}/start",
+    response_model=WorkflowDispatchResponse,
+    status_code=202,
+)
+def start_execution(
+    execution_id: str,
+    engine: WorkflowEngine = Depends(
+        get_workflow_engine
+    ),
+    dispatcher: AsyncWorkflowDispatcher = Depends(
+        get_async_dispatcher
+    ),
+) -> WorkflowDispatchResponse:
+    try:
+        execution = engine.load_execution(
+            execution_id
+        )
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Workflow execution not found.",
+        ) from exc
+
+    try:
+        engine.start(execution)
+
+        step = engine.start_next_step(
+            execution
+        )
+
+        if step is None:
+            raise ValueError(
+                "Workflow has no executable step."
+            )
+
+        queue_name = step.agent_name
+
+        if not queue_name:
+            raise ValueError(
+                "Workflow step has no agent queue."
+            )
+
+        result = dispatcher.dispatch(
+            step=step,
+            context=execution.context,
+            queue_name=queue_name,
+            execution_id=execution.execution_id,
+            reply_queue="rkjo.workflow.results",
+        )
+
+    except (
+        ValueError,
+        InvalidWorkflowTransitionError,
+    ) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    return WorkflowDispatchResponse(
+        execution_id=execution.execution_id,
+        workflow_id=execution.definition.workflow_id,
+        status=execution.status.value,
+        step_id=result.step_id,
+        queue_name=result.queue_name,
+        message_id=result.message_id,
+        correlation_id=result.correlation_id,
     )
