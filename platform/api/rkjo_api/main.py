@@ -5,10 +5,12 @@ from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
     get_async_dispatcher,
+    get_metrics_registry,
     get_workflow_agent_router,
     get_workflow_engine,
     get_workflow_repository,
 )
+from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
 from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.exceptions import InvalidWorkflowTransitionError
@@ -28,6 +30,10 @@ app = FastAPI(
     title="RKJO AI Platform API",
     version="0.1.0",
 )
+
+
+class MetricsResponse(BaseModel):
+    counters: dict[str, int]
 
 
 class HealthResponse(BaseModel):
@@ -270,4 +276,18 @@ def start_execution(
         queue_name=result.queue_name,
         message_id=result.message_id,
         correlation_id=result.correlation_id,
+    )
+
+
+@app.get(
+    "/metrics",
+    response_model=MetricsResponse,
+)
+def metrics(
+    registry: MetricsRegistry = Depends(
+        get_metrics_registry
+    ),
+) -> MetricsResponse:
+    return MetricsResponse(
+        counters=registry.snapshot()
     )

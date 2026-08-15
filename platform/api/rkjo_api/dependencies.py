@@ -1,6 +1,7 @@
 import os
 
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
+from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.services.registry_service import RegistryService
 from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
@@ -58,3 +59,11 @@ def get_workflow_agent_router() -> WorkflowAgentRouter:
     return WorkflowAgentRouter(
         registry_service=get_registry_service()
     )
+
+
+
+_metrics_registry = MetricsRegistry()
+
+
+def get_metrics_registry() -> MetricsRegistry:
+    return _metrics_registry
