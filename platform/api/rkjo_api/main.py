@@ -4,8 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from rkjo_api.jwt_auth import (
-    resolve_jwt_role,
+from rkjo_api.bearer_auth import (
+    resolve_bearer_identity,
 )
 
 from rkjo_api.security import (
@@ -80,7 +80,7 @@ async def api_key_security(
 
         try:
             subject, role = (
-                resolve_jwt_role(
+                resolve_bearer_identity(
                     token
                 )
             )
