@@ -4,6 +4,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from rkjo_api.jwt_auth import (
+    resolve_jwt_role,
+)
+
 from rkjo_api.security import (
     API_KEY_HEADER,
     is_protected_path,
@@ -57,36 +61,82 @@ async def api_key_security(
             request
         )
 
-    try:
-        role = resolve_api_role(
-            request.headers.get(
-                API_KEY_HEADER
+    role = None
+    subject = None
+
+    authorization = request.headers.get(
+        "Authorization"
+    )
+
+    if (
+        authorization
+        and authorization.startswith(
+            "Bearer "
+        )
+    ):
+        token = authorization[
+            len("Bearer "):
+        ].strip()
+
+        try:
+            subject, role = (
+                resolve_jwt_role(
+                    token
+                )
             )
-        )
 
-    except RuntimeError:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "detail": (
-                    "API authentication "
-                    "is not configured."
-                )
-            },
-        )
+        except RuntimeError:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": (
+                        "JWT authentication "
+                        "is not configured."
+                    )
+                },
+            )
 
-    if role is None:
-        return JSONResponse(
-            status_code=401,
-            content={
-                "detail": (
-                    "Invalid or missing API key."
+        except Exception:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "detail": (
+                        "Invalid or expired JWT."
+                    )
+                },
+                headers={
+                    "WWW-Authenticate": "Bearer"
+                },
+            )
+
+    else:
+        try:
+            role = resolve_api_role(
+                request.headers.get(
+                    API_KEY_HEADER
                 )
-            },
-            headers={
-                "WWW-Authenticate": "ApiKey"
-            },
-        )
+            )
+
+        except RuntimeError:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": (
+                        "API authentication "
+                        "is not configured."
+                    )
+                },
+            )
+
+        if role is None:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "detail": (
+                        "Invalid or missing credentials."
+                    )
+                },
+            )
 
     required_role = (
         required_role_for_request(
@@ -109,6 +159,9 @@ async def api_key_security(
         )
 
     request.state.api_role = role.value
+
+    if subject is not None:
+        request.state.api_subject = subject
 
     return await call_next(
         request

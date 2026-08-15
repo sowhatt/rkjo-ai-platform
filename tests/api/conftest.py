@@ -25,3 +25,9 @@ def configured_api_keys(
         "RKJO_ADMIN_API_KEY",
         "rkjo-admin-key",
     )
+
+
+    monkeypatch.setenv(
+        "RKJO_JWT_SECRET",
+        "rkjo-test-jwt-secret-with-sufficient-length-123456",
+    )

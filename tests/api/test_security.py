@@ -65,7 +65,7 @@ def test_metrics_requires_api_key(
 
     assert response.json() == {
         "detail": (
-            "Invalid or missing API key."
+            "Invalid or missing credentials."
         )
     }
 
