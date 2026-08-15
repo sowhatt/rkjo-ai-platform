@@ -1,0 +1,77 @@
+"""Dead-letter publishing for failed agent messages."""
+
+from __future__ import annotations
+
+from rkjo_kernel.events.event_bus import EventBus
+from rkjo_kernel.messages.agent_message import AgentMessage
+
+
+class DeadLetterPublisher:
+    """Publish permanently failed messages to a DLQ."""
+
+    def __init__(
+        self,
+        *,
+        event_bus: EventBus,
+        queue_name: str,
+        source: str = "rkjo.runtime",
+    ) -> None:
+        if not queue_name or not queue_name.strip():
+            raise ValueError(
+                "queue_name must not be empty."
+            )
+
+        self.event_bus = event_bus
+        self.queue_name = queue_name
+        self.source = source
+
+    def publish(
+        self,
+        *,
+        original_message: AgentMessage,
+        reason: str,
+    ) -> AgentMessage:
+        """Publish a dead-letter message."""
+
+        dead_letter = AgentMessage(
+            source=self.source,
+            target="rkjo.dlq",
+            message_type="workflow.step.dead_letter",
+            correlation_id=original_message.correlation_id,
+            payload={
+                "original_message": (
+                    original_message.model_dump(
+                        mode="json"
+                    )
+                ),
+                "reason": reason,
+            },
+            metadata={
+                "original_message_id": (
+                    original_message.message_id
+                ),
+                "workflow_execution_id": (
+                    original_message.metadata.get(
+                        "workflow_execution_id"
+                    )
+                ),
+                "workflow_step_id": (
+                    original_message.metadata.get(
+                        "workflow_step_id"
+                    )
+                ),
+                "attempt": (
+                    original_message.metadata.get(
+                        "attempt",
+                        1,
+                    )
+                ),
+            },
+        )
+
+        self.event_bus.publish_agent_message(
+            queue_name=self.queue_name,
+            message=dead_letter,
+        )
+
+        return dead_letter
