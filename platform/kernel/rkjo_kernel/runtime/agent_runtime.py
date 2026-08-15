@@ -6,7 +6,9 @@ from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.logging.logger import get_logger
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.registry.descriptor import AgentStatus
+from rkjo_kernel.runtime.dead_letter_publisher import DeadLetterPublisher
 from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
+from rkjo_kernel.runtime.retry_message import build_retry_message
 from rkjo_kernel.runtime.retry_policy import RetryPolicy
 from rkjo_kernel.runtime.status import RuntimeStatus
 from rkjo_kernel.services.registry_service import RegistryService
@@ -41,6 +43,7 @@ class AgentRuntime:
         registry_service: RegistryService,
         result_publisher: AgentResultPublisher | None = None,
         retry_policy: RetryPolicy | None = None,
+        dead_letter_publisher: DeadLetterPublisher | None = None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -57,6 +60,7 @@ class AgentRuntime:
         self.registry_service = registry_service
         self.result_publisher = result_publisher
         self.retry_policy = retry_policy
+        self.dead_letter_publisher = dead_letter_publisher
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -108,7 +112,7 @@ class AgentRuntime:
 
             self.event_bus.consume_agent_messages(
                 queue_name=self.agent.queue_name,
-                callback=self.execute,
+                callback=self._consume_message,
             )
 
         except Exception as exc:
@@ -172,6 +176,80 @@ class AgentRuntime:
         centralized in the internal runtime pipeline.
         """
         return self._handle_message(message)
+
+    def _consume_message(
+        self,
+        message: AgentMessage,
+    ) -> Any:
+        """Consume one broker message with controlled retry/DLQ.
+
+        execute() keeps synchronous semantics and raises failures.
+
+        This consumer boundary converts failures already classified by
+        RetryPolicy into explicit retry or dead-letter messages. Once
+        routing succeeds, the exception is intentionally not propagated,
+        allowing EventBus to ACK the original physical message.
+        """
+
+        try:
+            return self.execute(message)
+
+        except Exception:
+            if self.retry_policy is None:
+                raise
+
+            should_retry = bool(
+                message.metadata.get(
+                    "retry_should_retry",
+                    False,
+                )
+            )
+
+            if should_retry:
+                retry_message = build_retry_message(
+                    original_message=message
+                )
+
+                self.event_bus.publish_agent_message(
+                    queue_name=self.agent.queue_name,
+                    message=retry_message,
+                )
+
+                self.logger.warning(
+                    "Retrying message '%s' as '%s' "
+                    "for agent '%s' (attempt %s).",
+                    message.message_id,
+                    retry_message.message_id,
+                    self.agent.agent_name,
+                    retry_message.metadata.get(
+                        "attempt"
+                    ),
+                )
+
+                return None
+
+            if self.dead_letter_publisher is None:
+                raise
+
+            reason = str(
+                message.metadata.get(
+                    "retry_reason",
+                    "agent_execution_failed",
+                )
+            )
+
+            self.dead_letter_publisher.publish(
+                original_message=message,
+                reason=reason,
+            )
+
+            self.logger.error(
+                "Message '%s' moved to DLQ "
+                "after terminal agent failure.",
+                message.message_id,
+            )
+
+            return None
 
     def _handle_message(
         self,
@@ -246,7 +324,17 @@ class AgentRuntime:
                     "retry_reason"
                 ] = decision.reason
 
-            if self.result_publisher is not None:
+            should_retry = bool(
+                message.metadata.get(
+                    "retry_should_retry",
+                    False,
+                )
+            )
+
+            if (
+                self.result_publisher is not None
+                and not should_retry
+            ):
                 self.result_publisher.publish_failure(
                     request=message,
                     error=exc,
