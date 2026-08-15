@@ -1,32 +1,146 @@
 services:
+
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rkjo_rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: rkjo
       RABBITMQ_DEFAULT_PASS: rkjo_password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "rabbitmq-diagnostics",
+          "-q",
+          "ping"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   postgres:
     image: postgres:16
     container_name: rkjo_postgres
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_DB: rkjo
       POSTGRES_USER: rkjo
       POSTGRES_PASSWORD: rkjo_password
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rkjo -d rkjo"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U rkjo -d rkjo"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rkjo_api
+    command:
+      [
+        "uvicorn",
+        "rkjo_api.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ]
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+
+      RABBITMQ_URL: >-
+        amqp://rkjo:rkjo_password@rabbitmq:5672/
+
+      DATABASE_URL: >-
+        postgresql://rkjo:rkjo_password@postgres:5432/rkjo
+
+      RKJO_DATABASE_URL: >-
+        postgresql://rkjo:rkjo_password@postgres:5432/rkjo
+
+      RKJO_API_KEY: >-
+        docker-development-admin-key
+
+      RKJO_JWT_SECRET: >-
+        docker-development-jwt-secret-change-in-production
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8000/health"
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rkjo_worker
+    command:
+      [
+        "python",
+        "-m",
+        "rkjo_worker.main"
+      ]
+
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+
+      RABBITMQ_URL: >-
+        amqp://rkjo:rkjo_password@rabbitmq:5672/
+
+      DATABASE_URL: >-
+        postgresql://rkjo:rkjo_password@postgres:5432/rkjo
+
+      RKJO_WORKER_AGENT_NAME: >-
+        rkjo.platform.worker
+
+      RKJO_WORKER_QUEUE: >-
+        rkjo.platform.worker
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
 
 volumes:
   rabbitmq_data:
