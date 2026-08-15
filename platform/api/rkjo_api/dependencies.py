@@ -1,6 +1,9 @@
 import os
 
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
+from rkjo_kernel.registry.registry import AgentRegistry
+from rkjo_kernel.services.registry_service import RegistryService
+from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.repository.postgres import (
@@ -37,4 +40,21 @@ def get_event_bus() -> RabbitMQEventBus:
 def get_async_dispatcher() -> AsyncWorkflowDispatcher:
     return AsyncWorkflowDispatcher(
         event_bus=get_event_bus()
+    )
+
+
+
+def get_agent_registry() -> AgentRegistry:
+    return AgentRegistry()
+
+
+def get_registry_service() -> RegistryService:
+    return RegistryService(
+        registry=get_agent_registry()
+    )
+
+
+def get_workflow_agent_router() -> WorkflowAgentRouter:
+    return WorkflowAgentRouter(
+        registry_service=get_registry_service()
     )

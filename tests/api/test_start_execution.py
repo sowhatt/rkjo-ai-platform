@@ -4,10 +4,18 @@ from fastapi.testclient import TestClient
 
 from rkjo_api.dependencies import (
     get_async_dispatcher,
+    get_workflow_agent_router,
     get_workflow_engine,
 )
 from rkjo_api.main import app
 from rkjo_kernel.events.event_bus import EventBus
+from rkjo_kernel.registry.descriptor import (
+    AgentDescriptor,
+    AgentStatus,
+)
+from rkjo_kernel.registry.registry import AgentRegistry
+from rkjo_kernel.services.registry_service import RegistryService
+from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.async_dispatch import (
     AsyncWorkflowDispatcher,
 )
@@ -79,9 +87,33 @@ def engine(repository):
 
 
 @pytest.fixture
+def router():
+    registry = AgentRegistry()
+
+    service = RegistryService(
+        registry=registry
+    )
+
+    service.register_agent(
+        AgentDescriptor(
+            name="weather.agent",
+            display_name="Weather Agent",
+            product="ADIP",
+            queue_name="weather.queue",
+            status=AgentStatus.AVAILABLE,
+        )
+    )
+
+    return WorkflowAgentRouter(
+        registry_service=service
+    )
+
+
+@pytest.fixture
 def client(
     engine,
     event_bus,
+    router,
 ):
     def override_engine():
         return engine
@@ -91,6 +123,9 @@ def client(
             event_bus=event_bus
         )
 
+    def override_router():
+        return router
+
     app.dependency_overrides[
         get_workflow_engine
     ] = override_engine
@@ -98,6 +133,10 @@ def client(
     app.dependency_overrides[
         get_async_dispatcher
     ] = override_dispatcher
+
+    app.dependency_overrides[
+        get_workflow_agent_router
+    ] = override_router
 
     with TestClient(app) as test_client:
         yield test_client
@@ -113,6 +152,12 @@ def client(
     )
 
 
+    app.dependency_overrides.pop(
+        get_workflow_agent_router,
+        None,
+    )
+
+
 def create_execution(
     engine,
 ):
@@ -123,7 +168,7 @@ def create_execution(
             WorkflowStep(
                 step_id="weather",
                 name="Weather",
-                agent_name="weather.queue",
+                agent_name="weather.agent",
             )
         ],
     )
@@ -180,7 +225,7 @@ def test_start_execution_dispatches_first_step(
     assert queue_name == "weather.queue"
 
     assert message.target == (
-        "weather.queue"
+        "weather.agent"
     )
 
     assert message.message_type == (

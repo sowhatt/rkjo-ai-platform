@@ -5,10 +5,12 @@ from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
     get_async_dispatcher,
+    get_workflow_agent_router,
     get_workflow_engine,
     get_workflow_repository,
 )
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
+from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.exceptions import InvalidWorkflowTransitionError
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.models.workflow_definition import (
@@ -213,6 +215,9 @@ def start_execution(
     dispatcher: AsyncWorkflowDispatcher = Depends(
         get_async_dispatcher
     ),
+    router: WorkflowAgentRouter = Depends(
+        get_workflow_agent_router
+    ),
 ) -> WorkflowDispatchResponse:
     try:
         execution = engine.load_execution(
@@ -236,17 +241,14 @@ def start_execution(
                 "Workflow has no executable step."
             )
 
-        queue_name = step.agent_name
-
-        if not queue_name:
-            raise ValueError(
-                "Workflow step has no agent queue."
-            )
+        route = router.resolve(
+            step
+        )
 
         result = dispatcher.dispatch(
             step=step,
             context=execution.context,
-            queue_name=queue_name,
+            queue_name=route.queue_name,
             execution_id=execution.execution_id,
             reply_queue="rkjo.workflow.results",
         )
