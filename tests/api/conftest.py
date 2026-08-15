@@ -1,3 +1,6 @@
+from fastapi.testclient import TestClient
+from rkjo_api.main import app
+
 import pytest
 
 
@@ -31,3 +34,9 @@ def configured_api_keys(
         "RKJO_JWT_SECRET",
         "rkjo-test-jwt-secret-with-sufficient-length-123456",
     )
+
+
+@pytest.fixture
+def client():
+    with TestClient(app) as test_client:
+        yield test_client

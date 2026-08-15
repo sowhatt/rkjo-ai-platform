@@ -8,3 +8,4 @@ PyJWT[crypto]
 httpx
 pgvector
 pypdf
+python-multipart

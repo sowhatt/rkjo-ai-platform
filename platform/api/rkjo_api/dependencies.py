@@ -1,6 +1,21 @@
 import os
 
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
+from rkjo_kernel.rag.chunking import TextChunker
+from rkjo_kernel.rag.embedding import DeterministicEmbeddingProvider
+from rkjo_kernel.rag.ingestion import DocumentIngestionPipeline
+from rkjo_kernel.rag.loaders import CompositeDocumentLoader
+from rkjo_kernel.rag.postgres_deduplication import (
+    PostgresDocumentHashRegistry,
+)
+from rkjo_kernel.rag.postgres_vector_store import (
+    PostgresPgVectorStore,
+)
+from rkjo_kernel.rag.privacy import (
+    RuleBasedPIISanitizer,
+    SanitizationMode,
+)
+from rkjo_kernel.rag.retriever import Retriever
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.services.registry_service import RegistryService
@@ -69,3 +84,44 @@ _metrics_registry = MetricsRegistry()
 
 def get_metrics_registry() -> MetricsRegistry:
     return _metrics_registry
+
+
+def get_rag_ingestion_pipeline() -> DocumentIngestionPipeline:
+    """Build the production RAG ingestion pipeline."""
+
+    database_url = get_database_url()
+
+    vector_store = PostgresPgVectorStore(
+        database_url=database_url,
+        dimensions=16,
+        table_name="rag_chunks",
+    )
+
+    vector_store.initialize_schema()
+
+    hash_registry = PostgresDocumentHashRegistry(
+        database_url=database_url,
+        table_name="rag_document_hashes",
+    )
+
+    hash_registry.initialize_schema()
+
+    return DocumentIngestionPipeline(
+        loader=CompositeDocumentLoader(),
+        retriever=Retriever(
+            chunker=TextChunker(
+                chunk_size=1000,
+                overlap=150,
+            ),
+            embedding_provider=(
+                DeterministicEmbeddingProvider(
+                    dimensions=16
+                )
+            ),
+            vector_store=vector_store,
+        ),
+        hash_registry=hash_registry,
+        sanitizer=RuleBasedPIISanitizer(
+            mode=SanitizationMode.REDACT
+        ),
+    )

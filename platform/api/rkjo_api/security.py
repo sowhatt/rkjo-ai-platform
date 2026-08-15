@@ -28,6 +28,7 @@ ROLE_PRIORITY = {
 PROTECTED_PATH_PREFIXES = (
     "/workflows",
     "/metrics",
+    "/rag",
 )
 
 
@@ -172,6 +173,22 @@ def required_role_for_request(
     # by the lowest authenticated role.
     if path == "/metrics":
         return ApiRole.VIEWER
+
+    if path.startswith(
+        "/rag"
+    ):
+        if normalized_method == "GET":
+            return ApiRole.VIEWER
+
+        if normalized_method in {
+            "POST",
+            "PUT",
+            "PATCH",
+        }:
+            return ApiRole.OPERATOR
+
+        if normalized_method == "DELETE":
+            return ApiRole.ADMIN
 
     if path.startswith(
         "/workflows"

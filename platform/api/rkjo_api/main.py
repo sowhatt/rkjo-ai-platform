@@ -8,6 +8,10 @@ from rkjo_api.bearer_auth import (
     resolve_bearer_identity,
 )
 
+from rkjo_api.rag import (
+    router as rag_router,
+)
+
 from rkjo_api.security import (
     API_KEY_HEADER,
     is_protected_path,
@@ -42,6 +46,11 @@ from rkjo_kernel.workflow.repository.postgres import (
 app = FastAPI(
     title="RKJO AI Platform API",
     version="0.1.0",
+)
+
+
+app.include_router(
+    rag_router
 )
 
 
