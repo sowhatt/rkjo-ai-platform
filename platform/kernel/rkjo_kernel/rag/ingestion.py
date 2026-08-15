@@ -8,6 +8,10 @@ from rkjo_kernel.rag.hashing import compute_content_hash
 from rkjo_kernel.rag.ingestion_models import IngestionResult
 from rkjo_kernel.rag.loaders import CompositeDocumentLoader
 from rkjo_kernel.rag.models import Document
+from rkjo_kernel.rag.privacy import (
+    DocumentSanitizer,
+    NoOpDocumentSanitizer,
+)
 from rkjo_kernel.rag.retriever import Retriever
 
 
@@ -19,10 +23,15 @@ class DocumentIngestionPipeline:
         loader: CompositeDocumentLoader,
         retriever: Retriever,
         hash_registry: DocumentHashRegistry,
+        sanitizer: DocumentSanitizer | None = None,
     ) -> None:
         self.loader = loader
         self.retriever = retriever
         self.hash_registry = hash_registry
+        self.sanitizer = (
+            sanitizer
+            or NoOpDocumentSanitizer()
+        )
 
     def ingest_file(
         self,
@@ -33,8 +42,18 @@ class DocumentIngestionPipeline:
     ) -> IngestionResult:
         loaded = self.loader.load(path)
 
-        content_hash = compute_content_hash(
+        sanitized = self.sanitizer.sanitize(
             loaded.content
+        )
+
+        if not sanitized.content.strip():
+            raise ValueError(
+                "Sanitization removed all document content."
+            )
+
+        # Hash the SAFE content, not the raw source.
+        content_hash = compute_content_hash(
+            sanitized.content
         )
 
         resolved_document_id = (
@@ -60,11 +79,20 @@ class DocumentIngestionPipeline:
             ),
             "source_type": loaded.source_type,
             "content_hash": content_hash,
+            "sanitization_mode": (
+                sanitized.mode.value
+            ),
+            "pii_detection_count": (
+                sanitized.detection_count
+            ),
+            "pii_categories": list(
+                sanitized.categories
+            ),
         }
 
         document = Document(
             document_id=resolved_document_id,
-            content=loaded.content,
+            content=sanitized.content,
             metadata=merged_metadata,
         )
 
