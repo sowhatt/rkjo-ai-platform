@@ -19,6 +19,7 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
+    get_rag_answering_service,
     get_rag_ingestion_pipeline,
     get_rag_search_service,
 )
@@ -27,6 +28,9 @@ from rkjo_kernel.rag.ingestion import (
 )
 from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
+)
+from rkjo_kernel.rag.rag_answering import (
+    RAGAnsweringService,
 )
 
 
@@ -84,6 +88,31 @@ class SemanticSearchApiResponse(BaseModel):
         SemanticSearchItemResponse
     ]
 
+
+
+class RAGAnswerRequest(BaseModel):
+    question: str = Field(
+        min_length=1,
+        max_length=4000,
+    )
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+    )
+
+
+class RAGAnswerSourceResponse(BaseModel):
+    citation: int
+    document_id: str
+    chunk_id: str
+    score: float
+
+
+class RAGAnswerApiResponse(BaseModel):
+    answer: str
+    sanitized_query: str
+    sources: list[RAGAnswerSourceResponse]
 
 def parse_metadata(
     raw_metadata: str | None,
@@ -317,5 +346,44 @@ def semantic_search(
                 metadata=item.metadata,
             )
             for item in result.results
+        ],
+    )
+
+
+@router.post(
+    "/answer",
+    response_model=RAGAnswerApiResponse,
+)
+def rag_answer(
+    request: RAGAnswerRequest,
+    service: RAGAnsweringService = Depends(
+        get_rag_answering_service
+    ),
+) -> RAGAnswerApiResponse:
+    """Generate a grounded answer with explicit source citations."""
+
+    try:
+        result = service.answer(
+            request.question,
+            limit=request.limit,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    return RAGAnswerApiResponse(
+        answer=result.answer,
+        sanitized_query=result.sanitized_query,
+        sources=[
+            RAGAnswerSourceResponse(
+                citation=source.citation,
+                document_id=source.document_id,
+                chunk_id=source.chunk_id,
+                score=source.score,
+            )
+            for source in result.sources
         ],
     )

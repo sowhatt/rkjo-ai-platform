@@ -20,6 +20,10 @@ from rkjo_kernel.rag.privacy import (
     SanitizationMode,
 )
 from rkjo_kernel.rag.retriever import Retriever
+
+from rkjo_kernel.rag.context_builder import CitationContextBuilder
+from rkjo_kernel.rag.openai_generation import OpenAIAnswerGenerator
+from rkjo_kernel.rag.rag_answering import RAGAnsweringService
 from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
 )
@@ -165,5 +169,58 @@ def get_rag_search_service() -> SemanticSearchService:
         retriever=retriever,
         sanitizer=RuleBasedPIISanitizer(
             mode=SanitizationMode.REDACT
+        ),
+    )
+
+
+def get_rag_answering_service() -> RAGAnsweringService:
+    """Build grounded production RAG answer generation."""
+
+    api_key = os.getenv(
+        "OPENAI_API_KEY",
+        "",
+    ).strip()
+
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is required for RAG generation."
+        )
+
+    model = os.getenv(
+        "RKJO_GENERATION_MODEL",
+        "gpt-5-mini",
+    ).strip()
+
+    timeout_seconds = float(
+        os.getenv(
+            "RKJO_GENERATION_TIMEOUT_SECONDS",
+            "20",
+        )
+    )
+
+    max_retries = int(
+        os.getenv(
+            "RKJO_GENERATION_MAX_RETRIES",
+            "2",
+        )
+    )
+
+    max_context_characters = int(
+        os.getenv(
+            "RKJO_RAG_MAX_CONTEXT_CHARACTERS",
+            "12000",
+        )
+    )
+
+    return RAGAnsweringService(
+        search_service=get_rag_search_service(),
+        generator=OpenAIAnswerGenerator(
+            api_key=api_key,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+        ),
+        context_builder=CitationContextBuilder(
+            max_characters=max_context_characters,
         ),
     )

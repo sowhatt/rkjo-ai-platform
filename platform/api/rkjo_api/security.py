@@ -182,6 +182,13 @@ def required_role_for_request(
     ):
         return ApiRole.VIEWER
 
+    # Grounded RAG answering is also read-only.
+    if (
+        path == "/rag/answer"
+        and normalized_method == "POST"
+    ):
+        return ApiRole.VIEWER
+
     if path.startswith(
         "/rag"
     ):
