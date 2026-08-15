@@ -19,6 +19,9 @@ from rkjo_kernel.rag.privacy import (
     SanitizationMode,
 )
 from rkjo_kernel.rag.retriever import Retriever
+from rkjo_kernel.rag.semantic_search import (
+    SemanticSearchService,
+)
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.services.registry_service import RegistryService
@@ -124,6 +127,39 @@ def get_rag_ingestion_pipeline() -> DocumentIngestionPipeline:
             vector_store=vector_store,
         ),
         hash_registry=hash_registry,
+        sanitizer=RuleBasedPIISanitizer(
+            mode=SanitizationMode.REDACT
+        ),
+    )
+
+
+def get_rag_search_service() -> SemanticSearchService:
+    """Build the production privacy-aware RAG search service."""
+
+    database_url = get_database_url()
+    dimensions = get_embedding_dimensions()
+
+    vector_store = PostgresPgVectorStore(
+        database_url=database_url,
+        dimensions=dimensions,
+        table_name="rag_chunks",
+    )
+
+    vector_store.initialize_schema()
+
+    retriever = Retriever(
+        chunker=TextChunker(
+            chunk_size=1000,
+            overlap=150,
+        ),
+        embedding_provider=(
+            build_embedding_provider()
+        ),
+        vector_store=vector_store,
+    )
+
+    return SemanticSearchService(
+        retriever=retriever,
         sanitizer=RuleBasedPIISanitizer(
             mode=SanitizationMode.REDACT
         ),

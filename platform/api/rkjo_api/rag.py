@@ -16,13 +16,17 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
     get_rag_ingestion_pipeline,
+    get_rag_search_service,
 )
 from rkjo_kernel.rag.ingestion import (
     DocumentIngestionPipeline,
+)
+from rkjo_kernel.rag.semantic_search import (
+    SemanticSearchService,
 )
 
 
@@ -51,6 +55,34 @@ class DocumentIngestionResponse(
     content_hash: str
     chunk_count: int
     duplicate: bool
+
+
+class SemanticSearchRequest(BaseModel):
+    query: str = Field(
+        min_length=1,
+        max_length=4000,
+    )
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+    )
+
+
+class SemanticSearchItemResponse(BaseModel):
+    chunk_id: str
+    document_id: str
+    content: str
+    score: float
+    metadata: dict[str, Any]
+
+
+class SemanticSearchApiResponse(BaseModel):
+    sanitized_query: str
+    result_count: int
+    results: list[
+        SemanticSearchItemResponse
+    ]
 
 
 def parse_metadata(
@@ -240,4 +272,50 @@ async def ingest_document(
         content_hash=result.content_hash,
         chunk_count=result.chunk_count,
         duplicate=result.duplicate,
+    )
+
+
+@router.post(
+    "/search",
+    response_model=SemanticSearchApiResponse,
+)
+def semantic_search(
+    request: SemanticSearchRequest,
+    service: SemanticSearchService = Depends(
+        get_rag_search_service
+    ),
+) -> SemanticSearchApiResponse:
+    """Search sanitized knowledge using vector similarity."""
+
+    try:
+        result = service.search(
+            request.query,
+            limit=request.limit,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    return SemanticSearchApiResponse(
+        sanitized_query=(
+            result.sanitized_query
+        ),
+        result_count=(
+            result.result_count
+        ),
+        results=[
+            SemanticSearchItemResponse(
+                chunk_id=item.chunk_id,
+                document_id=(
+                    item.document_id
+                ),
+                content=item.content,
+                score=item.score,
+                metadata=item.metadata,
+            )
+            for item in result.results
+        ],
     )
