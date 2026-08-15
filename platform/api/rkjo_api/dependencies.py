@@ -2,7 +2,10 @@ import os
 
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
 from rkjo_kernel.rag.chunking import TextChunker
-from rkjo_kernel.rag.embedding import DeterministicEmbeddingProvider
+from rkjo_kernel.rag.embedding_factory import (
+    build_embedding_provider,
+    get_embedding_dimensions,
+)
 from rkjo_kernel.rag.ingestion import DocumentIngestionPipeline
 from rkjo_kernel.rag.loaders import CompositeDocumentLoader
 from rkjo_kernel.rag.postgres_deduplication import (
@@ -91,9 +94,11 @@ def get_rag_ingestion_pipeline() -> DocumentIngestionPipeline:
 
     database_url = get_database_url()
 
+    dimensions = get_embedding_dimensions()
+
     vector_store = PostgresPgVectorStore(
         database_url=database_url,
-        dimensions=16,
+        dimensions=dimensions,
         table_name="rag_chunks",
     )
 
@@ -114,9 +119,7 @@ def get_rag_ingestion_pipeline() -> DocumentIngestionPipeline:
                 overlap=150,
             ),
             embedding_provider=(
-                DeterministicEmbeddingProvider(
-                    dimensions=16
-                )
+                build_embedding_provider()
             ),
             vector_store=vector_store,
         ),

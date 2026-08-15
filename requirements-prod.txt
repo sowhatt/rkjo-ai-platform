@@ -9,3 +9,4 @@ httpx
 pgvector
 pypdf
 python-multipart
+openai
