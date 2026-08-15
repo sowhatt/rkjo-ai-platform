@@ -7,7 +7,9 @@ from pydantic import BaseModel, Field
 from rkjo_api.security import (
     API_KEY_HEADER,
     is_protected_path,
-    verify_api_key,
+    required_role_for_request,
+    resolve_api_role,
+    role_allows,
 )
 
 from rkjo_api.dependencies import (
@@ -56,7 +58,7 @@ async def api_key_security(
         )
 
     try:
-        authorized = verify_api_key(
+        role = resolve_api_role(
             request.headers.get(
                 API_KEY_HEADER
             )
@@ -73,7 +75,7 @@ async def api_key_security(
             },
         )
 
-    if not authorized:
+    if role is None:
         return JSONResponse(
             status_code=401,
             content={
@@ -85,6 +87,28 @@ async def api_key_security(
                 "WWW-Authenticate": "ApiKey"
             },
         )
+
+    required_role = (
+        required_role_for_request(
+            method=request.method,
+            path=request.url.path,
+        )
+    )
+
+    if not role_allows(
+        actual_role=role,
+        required_role=required_role,
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": (
+                    "Insufficient permissions."
+                )
+            },
+        )
+
+    request.state.api_role = role.value
 
     return await call_next(
         request

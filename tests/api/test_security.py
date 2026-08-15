@@ -112,10 +112,16 @@ def test_missing_server_configuration_fails_closed(
     client,
     monkeypatch,
 ):
-    monkeypatch.delenv(
+    for variable in (
         "RKJO_API_KEY",
-        raising=False,
-    )
+        "RKJO_VIEWER_API_KEY",
+        "RKJO_OPERATOR_API_KEY",
+        "RKJO_ADMIN_API_KEY",
+    ):
+        monkeypatch.delenv(
+            variable,
+            raising=False,
+        )
 
     response = client.get(
         "/metrics",

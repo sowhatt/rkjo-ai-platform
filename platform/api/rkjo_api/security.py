@@ -1,12 +1,29 @@
-"""API-key security primitives for RKJO API."""
+"""Authentication and RBAC primitives for RKJO API."""
 
 from __future__ import annotations
 
 import os
 import secrets
+from enum import StrEnum
 
 
 API_KEY_HEADER = "X-API-Key"
+
+
+class ApiRole(StrEnum):
+    """API authorization roles ordered by privilege."""
+
+    VIEWER = "viewer"
+    OPERATOR = "operator"
+    ADMIN = "admin"
+
+
+ROLE_PRIORITY = {
+    ApiRole.VIEWER: 1,
+    ApiRole.OPERATOR: 2,
+    ApiRole.ADMIN: 3,
+}
+
 
 PROTECTED_PATH_PREFIXES = (
     "/workflows",
@@ -14,10 +31,10 @@ PROTECTED_PATH_PREFIXES = (
 )
 
 
-def get_configured_api_key() -> str | None:
-    """Return the configured API key without providing a default."""
-
-    value = os.getenv("RKJO_API_KEY")
+def _read_secret(
+    name: str,
+) -> str | None:
+    value = os.getenv(name)
 
     if value is None:
         return None
@@ -27,10 +44,48 @@ def get_configured_api_key() -> str | None:
     return value or None
 
 
+def get_configured_api_key() -> str | None:
+    """Return the legacy admin API key."""
+
+    return _read_secret(
+        "RKJO_API_KEY"
+    )
+
+
+def get_configured_role_keys(
+) -> dict[ApiRole, str]:
+    """Return configured RBAC API keys."""
+
+    result: dict[ApiRole, str] = {}
+
+    viewer = _read_secret(
+        "RKJO_VIEWER_API_KEY"
+    )
+
+    operator = _read_secret(
+        "RKJO_OPERATOR_API_KEY"
+    )
+
+    admin = _read_secret(
+        "RKJO_ADMIN_API_KEY"
+    )
+
+    if viewer:
+        result[ApiRole.VIEWER] = viewer
+
+    if operator:
+        result[ApiRole.OPERATOR] = operator
+
+    if admin:
+        result[ApiRole.ADMIN] = admin
+
+    return result
+
+
 def is_protected_path(
     path: str,
 ) -> bool:
-    """Return whether an API path requires authentication."""
+    """Return whether authentication is required."""
 
     return any(
         path == prefix
@@ -41,24 +96,112 @@ def is_protected_path(
     )
 
 
-def verify_api_key(
+def resolve_api_role(
     provided_api_key: str | None,
-) -> bool:
-    """Validate a provided key using constant-time comparison."""
+) -> ApiRole | None:
+    """Resolve an authenticated API key to its role."""
 
-    configured_api_key = (
+    configured = (
+        get_configured_role_keys()
+    )
+
+    legacy_api_key = (
         get_configured_api_key()
     )
 
-    if configured_api_key is None:
+    if (
+        not configured
+        and legacy_api_key is None
+    ):
         raise RuntimeError(
-            "RKJO_API_KEY is not configured."
+            "No RKJO API authentication key "
+            "is configured."
         )
 
     if provided_api_key is None:
-        return False
+        return None
 
-    return secrets.compare_digest(
-        provided_api_key,
-        configured_api_key,
+    # Backward compatibility:
+    # RKJO_API_KEY always maps to ADMIN,
+    # even when RKJO_ADMIN_API_KEY also exists.
+    if (
+        legacy_api_key is not None
+        and secrets.compare_digest(
+            provided_api_key,
+            legacy_api_key,
+        )
+    ):
+        return ApiRole.ADMIN
+
+    # Check role-specific credentials.
+    for role, configured_key in (
+        configured.items()
+    ):
+        if secrets.compare_digest(
+            provided_api_key,
+            configured_key,
+        ):
+            return role
+
+    return None
+
+
+def verify_api_key(
+    provided_api_key: str | None,
+) -> bool:
+    """Backward-compatible authentication check."""
+
+    return (
+        resolve_api_role(
+            provided_api_key
+        )
+        is not None
+    )
+
+
+def required_role_for_request(
+    *,
+    method: str,
+    path: str,
+) -> ApiRole:
+    """Return the minimum role required by an API operation."""
+
+    normalized_method = method.upper()
+
+    # Operational metrics are readable
+    # by the lowest authenticated role.
+    if path == "/metrics":
+        return ApiRole.VIEWER
+
+    if path.startswith(
+        "/workflows"
+    ):
+        if normalized_method == "GET":
+            return ApiRole.VIEWER
+
+        if normalized_method in {
+            "POST",
+            "PUT",
+            "PATCH",
+        }:
+            return ApiRole.OPERATOR
+
+        if normalized_method == "DELETE":
+            return ApiRole.ADMIN
+
+    # Protected resources default to
+    # the safest privilege.
+    return ApiRole.ADMIN
+
+
+def role_allows(
+    *,
+    actual_role: ApiRole,
+    required_role: ApiRole,
+) -> bool:
+    """Return whether a role satisfies a required privilege."""
+
+    return (
+        ROLE_PRIORITY[actual_role]
+        >= ROLE_PRIORITY[required_role]
     )
