@@ -1,11 +1,19 @@
 from fastapi import Depends, FastAPI, HTTPException
-from pydantic import BaseModel
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
     get_workflow_engine,
     get_workflow_repository,
 )
 from rkjo_kernel.workflow.engine import WorkflowEngine
+from rkjo_kernel.workflow.models.workflow_definition import (
+    WorkflowDefinition,
+)
+from rkjo_kernel.workflow.models.workflow_step import (
+    WorkflowStep,
+)
 from rkjo_kernel.workflow.repository.postgres import (
     PostgreSQLWorkflowRepository,
 )
@@ -19,6 +27,38 @@ app = FastAPI(
 
 class HealthResponse(BaseModel):
     status: str
+
+
+
+
+class WorkflowStepRequest(BaseModel):
+    step_id: str
+    name: str
+    agent_name: str | None = None
+    capability_name: str | None = None
+    description: str | None = None
+    position: int = 0
+    input_mapping: dict[str, Any] = Field(
+        default_factory=dict
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict
+    )
+
+
+class CreateWorkflowExecutionRequest(BaseModel):
+    workflow_id: str
+    name: str
+    version: str = "1.0.0"
+    description: str | None = None
+    steps: list[WorkflowStepRequest]
+    input_data: dict[str, Any] = Field(
+        default_factory=dict
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict
+    )
+    execution_id: str | None = None
 
 
 class WorkflowExecutionResponse(BaseModel):
@@ -80,6 +120,61 @@ def get_execution(
         raise HTTPException(
             status_code=404,
             detail="Workflow execution not found.",
+        ) from exc
+
+    return WorkflowExecutionResponse(
+        execution_id=execution.execution_id,
+        workflow_id=execution.definition.workflow_id,
+        status=execution.status.value,
+        current_step_id=execution.current_step_id,
+        error=execution.error,
+        progress=execution.progress(),
+    )
+
+
+@app.post(
+    "/workflows/executions",
+    response_model=WorkflowExecutionResponse,
+    status_code=201,
+)
+def create_execution(
+    request: CreateWorkflowExecutionRequest,
+    engine: WorkflowEngine = Depends(
+        get_workflow_engine
+    ),
+) -> WorkflowExecutionResponse:
+    try:
+        definition = WorkflowDefinition(
+            workflow_id=request.workflow_id,
+            name=request.name,
+            version=request.version,
+            description=request.description,
+            steps=[
+                WorkflowStep(
+                    step_id=step.step_id,
+                    name=step.name,
+                    agent_name=step.agent_name,
+                    capability_name=step.capability_name,
+                    description=step.description,
+                    position=step.position,
+                    input_mapping=step.input_mapping,
+                    metadata=step.metadata,
+                )
+                for step in request.steps
+            ],
+        )
+
+        execution = engine.create_execution(
+            definition,
+            input_data=request.input_data,
+            metadata=request.metadata,
+            execution_id=request.execution_id,
+        )
+
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
         ) from exc
 
     return WorkflowExecutionResponse(

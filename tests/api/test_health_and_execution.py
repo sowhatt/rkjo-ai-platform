@@ -1,4 +1,5 @@
 
+import pytest
 from fastapi.testclient import TestClient
 
 from rkjo_api.dependencies import (
@@ -47,32 +48,42 @@ def make_engine():
     return engine
 
 
-def override_engine():
-    return make_engine()
-
-
 class ReadyRepository:
     def initialize_schema(self):
         return None
 
 
-def override_repository():
-    return ReadyRepository()
+@pytest.fixture
+def client():
+    def override_engine():
+        return make_engine()
+
+    def override_repository():
+        return ReadyRepository()
+
+    app.dependency_overrides[
+        get_workflow_engine
+    ] = override_engine
+
+    app.dependency_overrides[
+        get_workflow_repository
+    ] = override_repository
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+    app.dependency_overrides.pop(
+        get_workflow_engine,
+        None,
+    )
+
+    app.dependency_overrides.pop(
+        get_workflow_repository,
+        None,
+    )
 
 
-app.dependency_overrides[
-    get_workflow_engine
-] = override_engine
-
-app.dependency_overrides[
-    get_workflow_repository
-] = override_repository
-
-
-client = TestClient(app)
-
-
-def test_health():
+def test_health(client):
     response = client.get(
         "/health"
     )
@@ -84,7 +95,7 @@ def test_health():
     }
 
 
-def test_ready():
+def test_ready(client):
     response = client.get(
         "/ready"
     )
@@ -96,7 +107,7 @@ def test_ready():
     }
 
 
-def test_get_execution():
+def test_get_execution(client):
     response = client.get(
         "/workflows/executions/api-exec-001"
     )
@@ -122,7 +133,9 @@ def test_get_execution():
     ] == 0.0
 
 
-def test_get_unknown_execution_returns_404():
+def test_get_unknown_execution_returns_404(
+    client,
+):
     response = client.get(
         "/workflows/executions/unknown"
     )
