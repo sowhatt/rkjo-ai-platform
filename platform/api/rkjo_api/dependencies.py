@@ -22,6 +22,11 @@ from rkjo_kernel.rag.privacy import (
     SanitizationMode,
 )
 from rkjo_kernel.rag.retriever import Retriever
+from rkjo_kernel.rag.reranking_factory import (
+    build_relevance_filter,
+    build_reranker,
+    get_reranking_candidate_multiplier,
+)
 
 from rkjo_kernel.rag.context_builder import CitationContextBuilder
 from rkjo_kernel.rag.openai_generation import OpenAIAnswerGenerator
@@ -171,6 +176,13 @@ def get_rag_search_service() -> SemanticSearchService:
         retriever=retriever,
         sanitizer=RuleBasedPIISanitizer(
             mode=SanitizationMode.REDACT
+        ),
+        reranker=build_reranker(),
+        relevance_filter=(
+            build_relevance_filter()
+        ),
+        candidate_multiplier=(
+            get_reranking_candidate_multiplier()
         ),
     )
 
