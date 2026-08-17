@@ -25,3 +25,28 @@ class IngestionResult:
     content_hash: str
     chunk_count: int
     duplicate: bool
+
+
+
+from rkjo_kernel.rag.models import DocumentChunk
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedChunk:
+    """One chunk whose embedding is fully computed."""
+
+    chunk: DocumentChunk
+    embedding: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedIngestion:
+    """Document fully prepared before persistent writes."""
+
+    document_id: str
+    content_hash: str
+    chunks: tuple[PreparedChunk, ...]
+
+    @property
+    def chunk_count(self) -> int:
+        return len(self.chunks)
