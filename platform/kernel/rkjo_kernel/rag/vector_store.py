@@ -10,6 +10,9 @@ from rkjo_kernel.rag.models import (
     DocumentChunk,
     RetrievedChunk,
 )
+from rkjo_kernel.rag.retrieval_filters import (
+    RetrievalFilters,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +39,7 @@ class VectorStore(ABC):
         *,
         query_embedding: list[float],
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> list[RetrievedChunk]:
         raise NotImplementedError
 
@@ -75,6 +79,7 @@ class InMemoryVectorStore(
         *,
         query_embedding: list[float],
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> list[RetrievedChunk]:
         if not query_embedding:
             raise ValueError(
@@ -86,6 +91,11 @@ class InMemoryVectorStore(
                 "Search limit must be greater than 0."
             )
 
+        active_filters = (
+            filters
+            or RetrievalFilters()
+        )
+
         scored = [
             RetrievedChunk(
                 chunk=record.chunk,
@@ -95,6 +105,9 @@ class InMemoryVectorStore(
                 ),
             )
             for record in self._records
+            if active_filters.matches(
+                record.chunk.metadata
+            )
         ]
 
         return sorted(

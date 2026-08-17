@@ -19,6 +19,9 @@ from rkjo_kernel.rag.embedding_space import (
     EmbeddingSpace,
 )
 from rkjo_kernel.rag.vector_store import VectorStore
+from rkjo_kernel.rag.retrieval_filters import (
+    RetrievalFilters,
+)
 
 
 class PostgresPgVectorStore(VectorStore):
@@ -268,6 +271,7 @@ class PostgresPgVectorStore(VectorStore):
         *,
         query_embedding: list[float],
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> list[RetrievedChunk]:
         """Return nearest chunks using cosine similarity."""
 
@@ -282,6 +286,14 @@ class PostgresPgVectorStore(VectorStore):
 
         query_vector = Vector(
             query_embedding
+        )
+
+        metadata_filter = Jsonb(
+            (
+                filters.metadata
+                if filters is not None
+                else {}
+            )
         )
 
         with self._connect() as connection:
@@ -299,6 +311,8 @@ class PostgresPgVectorStore(VectorStore):
                                 embedding <=> %s
                             ) AS score
                         FROM {}
+                        WHERE
+                            metadata @> %s
                         ORDER BY
                             embedding <=> %s
                         LIMIT %s
@@ -310,6 +324,7 @@ class PostgresPgVectorStore(VectorStore):
                     ),
                     (
                         query_vector,
+                        metadata_filter,
                         query_vector,
                         limit,
                     ),
@@ -333,6 +348,7 @@ class PostgresPgVectorStore(VectorStore):
                             embedding_provider = %s
                             AND embedding_model = %s
                             AND embedding_dimensions = %s
+                            AND metadata @> %s
                         ORDER BY
                             embedding <=> %s
                         LIMIT %s
@@ -347,6 +363,7 @@ class PostgresPgVectorStore(VectorStore):
                         self.embedding_space.provider,
                         self.embedding_space.model,
                         self.embedding_space.dimensions,
+                        metadata_filter,
                         query_vector,
                         limit,
                     ),

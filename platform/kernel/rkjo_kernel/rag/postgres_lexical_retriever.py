@@ -6,6 +6,7 @@ from typing import Any
 
 import psycopg
 from psycopg import sql
+from psycopg.types.json import Jsonb
 
 from rkjo_kernel.rag.embedding_space import (
     EmbeddingSpace,
@@ -13,6 +14,9 @@ from rkjo_kernel.rag.embedding_space import (
 from rkjo_kernel.rag.models import (
     DocumentChunk,
     RetrievedChunk,
+)
+from rkjo_kernel.rag.retrieval_filters import (
+    RetrievalFilters,
 )
 
 
@@ -78,6 +82,7 @@ class PostgresLexicalRetriever:
         query: str,
         *,
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> list[RetrievedChunk]:
         if not query.strip():
             raise ValueError(
@@ -92,6 +97,12 @@ class PostgresLexicalRetriever:
 
         table = sql.Identifier(
             self.table_name
+        )
+
+        metadata_filter = (
+            filters.metadata
+            if filters is not None
+            else {}
         )
 
         with psycopg.connect(
@@ -130,6 +141,7 @@ class PostgresLexicalRetriever:
                                 content
                             )
                             @@ lexical_query.query
+                            AND metadata @> %s
                         ORDER BY
                             score DESC,
                             chunk_id ASC
@@ -138,6 +150,7 @@ class PostgresLexicalRetriever:
                     ).format(table),
                     (
                         query,
+                        Jsonb(metadata_filter),
                         limit,
                     ),
                 ).fetchall()
@@ -174,6 +187,7 @@ class PostgresLexicalRetriever:
                                 content
                             )
                             @@ lexical_query.query
+                            AND metadata @> %s
                             AND embedding_provider = %s
                             AND embedding_model = %s
                             AND embedding_dimensions = %s
@@ -185,6 +199,7 @@ class PostgresLexicalRetriever:
                     ).format(table),
                     (
                         query,
+                        Jsonb(metadata_filter),
                         self.embedding_space.provider,
                         self.embedding_space.model,
                         self.embedding_space.dimensions,

@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from rkjo_kernel.rag.models import (
     RetrievedChunk,
 )
+from rkjo_kernel.rag.retrieval_filters import (
+    RetrievalFilters,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +151,7 @@ class HybridRetriever:
         query: str,
         *,
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> list[RetrievedChunk]:
         if not query.strip():
             raise ValueError(
@@ -160,19 +164,37 @@ class HybridRetriever:
                 "greater than 0."
             )
 
-        vector_results = (
-            self.vector_retriever.retrieve(
-                query,
-                limit=limit,
+        if filters is None:
+            vector_results = (
+                self.vector_retriever.retrieve(
+                    query,
+                    limit=limit,
+                )
             )
-        )
 
-        lexical_results = (
-            self.lexical_retriever.retrieve(
-                query,
-                limit=limit,
+            lexical_results = (
+                self.lexical_retriever.retrieve(
+                    query,
+                    limit=limit,
+                )
             )
-        )
+
+        else:
+            vector_results = (
+                self.vector_retriever.retrieve(
+                    query,
+                    limit=limit,
+                    filters=filters,
+                )
+            )
+
+            lexical_results = (
+                self.lexical_retriever.retrieve(
+                    query,
+                    limit=limit,
+                    filters=filters,
+                )
+            )
 
         return self.fusion.fuse(
             vector_results=vector_results,

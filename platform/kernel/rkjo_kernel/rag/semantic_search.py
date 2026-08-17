@@ -19,6 +19,9 @@ from rkjo_kernel.rag.reranker import (
 from rkjo_kernel.rag.relevance_filter import (
     RelevanceFilter,
 )
+from rkjo_kernel.rag.retrieval_filters import (
+    RetrievalFilters,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +83,7 @@ class SemanticSearchService:
         query: str,
         *,
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> SemanticSearchResponse:
         if not query.strip():
             raise ValueError(
@@ -105,10 +109,17 @@ class SemanticSearchService:
             100,
         )
 
-        candidates = self.retriever.retrieve(
-            sanitized.content,
-            limit=candidate_limit,
-        )
+        if filters is None:
+            candidates = self.retriever.retrieve(
+                sanitized.content,
+                limit=candidate_limit,
+            )
+        else:
+            candidates = self.retriever.retrieve(
+                sanitized.content,
+                limit=candidate_limit,
+                filters=filters,
+            )
 
         reranked = self.reranker.rerank(
             sanitized.content,

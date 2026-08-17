@@ -9,6 +9,9 @@ from rkjo_kernel.rag.models import (
     RetrievedChunk,
 )
 from rkjo_kernel.rag.vector_store import VectorStore
+from rkjo_kernel.rag.retrieval_filters import (
+    RetrievalFilters,
+)
 
 
 class Retriever:
@@ -55,6 +58,7 @@ class Retriever:
         query: str,
         *,
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> list[RetrievedChunk]:
         if not query.strip():
             raise ValueError(
@@ -68,7 +72,14 @@ class Retriever:
             )
         )
 
+        if filters is None:
+            return self.vector_store.search(
+                query_embedding=query_embedding,
+                limit=limit,
+            )
+
         return self.vector_store.search(
             query_embedding=query_embedding,
             limit=limit,
+            filters=filters,
         )
