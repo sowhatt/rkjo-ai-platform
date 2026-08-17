@@ -13,6 +13,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Request,
     Response,
     UploadFile,
 )
@@ -25,6 +26,10 @@ from rkjo_api.dependencies import (
 )
 from rkjo_api.rag_filters import (
     RAGMetadataFilters,
+)
+from rkjo_api.identity import (
+    bind_identity_tenant,
+    get_authenticated_identity,
 )
 from rkjo_kernel.rag.ingestion import (
     DocumentIngestionPipeline,
@@ -315,6 +320,7 @@ async def ingest_document(
 )
 def semantic_search(
     request: SemanticSearchRequest,
+    http_request: Request,
     service: SemanticSearchService = Depends(
         get_rag_search_service
     ),
@@ -326,6 +332,15 @@ def semantic_search(
             request.filters.to_retrieval_filters()
             if request.filters is not None
             else None
+        )
+
+        identity = get_authenticated_identity(
+            http_request
+        )
+
+        filters = bind_identity_tenant(
+            identity=identity,
+            filters=filters,
         )
 
         result = service.search(
@@ -368,6 +383,7 @@ def semantic_search(
 )
 def rag_answer(
     request: RAGAnswerRequest,
+    http_request: Request,
     service: RAGAnsweringService = Depends(
         get_rag_answering_service
     ),
@@ -379,6 +395,15 @@ def rag_answer(
             request.filters.to_retrieval_filters()
             if request.filters is not None
             else None
+        )
+
+        identity = get_authenticated_identity(
+            http_request
+        )
+
+        filters = bind_identity_tenant(
+            identity=identity,
+            filters=filters,
         )
 
         result = service.answer(

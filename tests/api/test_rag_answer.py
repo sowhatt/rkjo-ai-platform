@@ -134,14 +134,20 @@ def test_viewer_can_generate_grounded_answer(
         == 1
     )
 
-    assert service.calls == [
-        (
-            "Quels facteurs réduisent "
-            "le rendement du maïs ?",
-            3,
-            None,
-        )
-    ]
+    assert len(service.calls) == 1
+
+    question, limit, filters = service.calls[0]
+
+    assert question == (
+        "Quels facteurs réduisent "
+        "le rendement du maïs ?"
+    )
+
+    assert limit == 3
+
+    assert filters.metadata == {
+        "tenant_id": "tenant-a"
+    }
 
 
 def test_answer_response_exposes_sanitized_query(

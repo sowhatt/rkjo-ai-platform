@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from rkjo_api.bearer_auth import (
-    resolve_bearer_identity,
+    resolve_bearer_identity_with_tenant,
 )
 
 from rkjo_api.rag import (
@@ -17,6 +17,7 @@ from rkjo_api.security import (
     is_protected_path,
     required_role_for_request,
     resolve_api_role,
+    resolve_api_tenant,
     role_allows,
 )
 
@@ -72,6 +73,7 @@ async def api_key_security(
 
     role = None
     subject = None
+    tenant_id = None
 
     authorization = request.headers.get(
         "Authorization"
@@ -88,8 +90,12 @@ async def api_key_security(
         ].strip()
 
         try:
-            subject, role = (
-                resolve_bearer_identity(
+            (
+                subject,
+                role,
+                tenant_id,
+            ) = (
+                resolve_bearer_identity_with_tenant(
                     token
                 )
             )
@@ -120,10 +126,18 @@ async def api_key_security(
 
     else:
         try:
-            role = resolve_api_role(
+            provided_api_key = (
                 request.headers.get(
                     API_KEY_HEADER
                 )
+            )
+
+            role = resolve_api_role(
+                provided_api_key
+            )
+
+            tenant_id = resolve_api_tenant(
+                provided_api_key
             )
 
         except RuntimeError:
@@ -171,6 +185,9 @@ async def api_key_security(
 
     if subject is not None:
         request.state.api_subject = subject
+
+    if tenant_id is not None:
+        request.state.api_tenant_id = tenant_id
 
     return await call_next(
         request

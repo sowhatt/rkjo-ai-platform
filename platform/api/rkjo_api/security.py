@@ -237,3 +237,45 @@ def role_allows(
         ROLE_PRIORITY[actual_role]
         >= ROLE_PRIORITY[required_role]
     )
+
+
+
+def resolve_api_tenant(
+    provided_api_key: str | None,
+) -> str | None:
+    """Resolve optional tenant binding for an API key."""
+
+    if provided_api_key is None:
+        return None
+
+    legacy = get_configured_api_key()
+
+    if (
+        legacy is not None
+        and secrets.compare_digest(
+            provided_api_key,
+            legacy,
+        )
+    ):
+        return _read_secret(
+            "RKJO_API_TENANT_ID"
+        )
+
+    role_keys = get_configured_role_keys()
+
+    tenant_env = {
+        ApiRole.VIEWER: "RKJO_VIEWER_TENANT_ID",
+        ApiRole.OPERATOR: "RKJO_OPERATOR_TENANT_ID",
+        ApiRole.ADMIN: "RKJO_ADMIN_TENANT_ID",
+    }
+
+    for role, configured_key in role_keys.items():
+        if secrets.compare_digest(
+            provided_api_key,
+            configured_key,
+        ):
+            return _read_secret(
+                tenant_env[role]
+            )
+
+    return None

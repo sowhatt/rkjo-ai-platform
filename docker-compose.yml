@@ -77,8 +77,17 @@ services:
       RKJO_API_KEY: >-
         docker-development-admin-key
 
+      RKJO_VIEWER_API_KEY: ${RKJO_VIEWER_API_KEY:-rkjo-viewer-key}
+      RKJO_OPERATOR_API_KEY: ${RKJO_OPERATOR_API_KEY:-rkjo-operator-key}
+      RKJO_ADMIN_API_KEY: ${RKJO_ADMIN_API_KEY:-rkjo-admin-key}
+
       RKJO_JWT_SECRET: >-
         docker-development-jwt-secret-change-in-production
+
+      RKJO_API_TENANT_ID: ${RKJO_API_TENANT_ID:-}
+      RKJO_VIEWER_TENANT_ID: ${RKJO_VIEWER_TENANT_ID:-}
+      RKJO_OPERATOR_TENANT_ID: ${RKJO_OPERATOR_TENANT_ID:-}
+      RKJO_ADMIN_TENANT_ID: ${RKJO_ADMIN_TENANT_ID:-}
 
       RKJO_EMBEDDING_PROVIDER: ${RKJO_EMBEDDING_PROVIDER:-deterministic}
       RKJO_EMBEDDING_MODEL: ${RKJO_EMBEDDING_MODEL:-text-embedding-3-small}

@@ -31,6 +31,7 @@ def create_access_token(
     *,
     subject: str,
     role: ApiRole,
+    tenant_id: str | None = None,
     expires_in_seconds: int = 3600,
 ) -> str:
     """Create a signed RKJO access token."""
@@ -64,6 +65,16 @@ def create_access_token(
             seconds=expires_in_seconds
         ),
     }
+
+    if tenant_id is not None:
+        normalized_tenant = tenant_id.strip()
+
+        if not normalized_tenant:
+            raise ValueError(
+                "JWT tenant_id must not be empty."
+            )
+
+        payload["tenant_id"] = normalized_tenant
 
     return jwt.encode(
         payload,
@@ -129,3 +140,38 @@ def resolve_jwt_role(
         ) from exc
 
     return subject, role
+
+
+
+def resolve_jwt_identity(
+    token: str,
+) -> tuple[str, ApiRole, str | None]:
+    """Return subject, role and optional tenant."""
+
+    payload = decode_access_token(token)
+
+    subject = str(payload["sub"])
+
+    try:
+        role = ApiRole(payload["role"])
+    except ValueError as exc:
+        raise ValueError(
+            "JWT contains an invalid role."
+        ) from exc
+
+    tenant_raw = payload.get(
+        "tenant_id"
+    )
+
+    tenant_id = (
+        str(tenant_raw).strip()
+        if tenant_raw is not None
+        else None
+    )
+
+    if tenant_id == "":
+        raise ValueError(
+            "JWT contains an invalid tenant_id."
+        )
+
+    return subject, role, tenant_id

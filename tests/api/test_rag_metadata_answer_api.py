@@ -70,6 +70,7 @@ def test_answer_api_propagates_filters(
         "country": "benin",
         "domain": "agriculture",
         "year": 2026,
+        "tenant_id": "tenant-a",
     }
 
 
