@@ -20,9 +20,14 @@ class FakeSearchService:
         query,
         *,
         limit=5,
+        filters=None,
     ):
         self.calls.append(
-            (query, limit)
+            (
+                query,
+                limit,
+                filters,
+            )
         )
 
         return SemanticSearchResponse(

@@ -20,9 +20,14 @@ class FakeAnsweringService:
         question,
         *,
         limit=5,
+        filters=None,
     ):
         self.calls.append(
-            (question, limit)
+            (
+                question,
+                limit,
+                filters,
+            )
         )
 
         return RAGAnswer(
@@ -134,6 +139,7 @@ def test_viewer_can_generate_grounded_answer(
             "Quels facteurs réduisent "
             "le rendement du maïs ?",
             3,
+            None,
         )
     ]
 

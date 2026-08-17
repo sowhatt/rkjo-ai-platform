@@ -23,6 +23,9 @@ from rkjo_api.dependencies import (
     get_rag_ingestion_pipeline,
     get_rag_search_service,
 )
+from rkjo_api.rag_filters import (
+    RAGMetadataFilters,
+)
 from rkjo_kernel.rag.ingestion import (
     DocumentIngestionPipeline,
 )
@@ -71,6 +74,7 @@ class SemanticSearchRequest(BaseModel):
         ge=1,
         le=20,
     )
+    filters: RAGMetadataFilters | None = None
 
 
 class SemanticSearchItemResponse(BaseModel):
@@ -100,6 +104,7 @@ class RAGAnswerRequest(BaseModel):
         ge=1,
         le=20,
     )
+    filters: RAGMetadataFilters | None = None
 
 
 class RAGAnswerSourceResponse(BaseModel):
@@ -317,9 +322,16 @@ def semantic_search(
     """Search sanitized knowledge using vector similarity."""
 
     try:
+        filters = (
+            request.filters.to_retrieval_filters()
+            if request.filters is not None
+            else None
+        )
+
         result = service.search(
             request.query,
             limit=request.limit,
+            filters=filters,
         )
 
     except ValueError as exc:
@@ -363,9 +375,16 @@ def rag_answer(
     """Generate a grounded answer with explicit source citations."""
 
     try:
+        filters = (
+            request.filters.to_retrieval_filters()
+            if request.filters is not None
+            else None
+        )
+
         result = service.answer(
             request.question,
             limit=request.limit,
+            filters=filters,
         )
 
     except ValueError as exc:

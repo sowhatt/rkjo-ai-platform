@@ -40,3 +40,10 @@ def configured_api_keys(
 def client():
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def viewer_headers():
+    return {
+        "X-API-Key": "rkjo-viewer-key"
+    }

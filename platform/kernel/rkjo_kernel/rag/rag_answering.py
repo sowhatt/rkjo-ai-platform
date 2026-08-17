@@ -15,6 +15,9 @@ from rkjo_kernel.rag.generation_models import (
 from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
 )
+from rkjo_kernel.rag.retrieval_filters import (
+    RetrievalFilters,
+)
 from rkjo_kernel.rag.observability import (
     RAGObserver,
     RAGTiming,
@@ -43,6 +46,7 @@ class RAGAnsweringService:
         question: str,
         *,
         limit: int = 5,
+        filters: RetrievalFilters | None = None,
     ) -> RAGAnswer:
         if not question.strip():
             raise ValueError(
@@ -53,10 +57,17 @@ class RAGAnsweringService:
 
         retrieval_started = perf_counter()
 
-        search = self.search_service.search(
-            question,
-            limit=limit,
-        )
+        if filters is None:
+            search = self.search_service.search(
+                question,
+                limit=limit,
+            )
+        else:
+            search = self.search_service.search(
+                question,
+                limit=limit,
+                filters=filters,
+            )
 
         retrieval_ms = int(
             (
