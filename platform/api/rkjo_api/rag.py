@@ -28,6 +28,7 @@ from rkjo_api.rag_filters import (
     RAGMetadataFilters,
 )
 from rkjo_api.identity import (
+    bind_identity_metadata_tenant,
     bind_identity_tenant,
     get_authenticated_identity,
 )
@@ -258,6 +259,7 @@ async def persist_upload_temporarily(
 )
 async def ingest_document(
     response: Response,
+    http_request: Request,
     file: UploadFile = File(...),
     document_id: str | None = Form(
         default=None
@@ -271,6 +273,17 @@ async def ingest_document(
 ) -> DocumentIngestionResponse:
     parsed_metadata = parse_metadata(
         metadata
+    )
+
+    identity = get_authenticated_identity(
+        http_request
+    )
+
+    parsed_metadata = (
+        bind_identity_metadata_tenant(
+            identity=identity,
+            metadata=parsed_metadata,
+        )
     )
 
     temporary_path = (

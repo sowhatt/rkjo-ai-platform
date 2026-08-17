@@ -95,3 +95,63 @@ def bind_identity_tenant(
     return RetrievalFilters(
         metadata=metadata
     )
+
+
+
+def bind_identity_metadata_tenant(
+    *,
+    identity: AuthenticatedIdentity,
+    metadata: dict,
+) -> dict:
+    """Enforce authenticated tenant on document metadata."""
+
+    tenant_id = identity.tenant_id
+
+    # Backward-compatible identities remain unbound.
+    if tenant_id is None:
+        return dict(metadata)
+
+    result = dict(metadata)
+
+    requested_tenant = result.get(
+        "tenant_id"
+    )
+
+    if requested_tenant is not None:
+        if not isinstance(
+            requested_tenant,
+            str,
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "metadata.tenant_id "
+                    "must be a string."
+                ),
+            )
+
+        requested_tenant = (
+            requested_tenant.strip()
+        )
+
+        if not requested_tenant:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "metadata.tenant_id "
+                    "must not be empty."
+                ),
+            )
+
+        if requested_tenant != tenant_id:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Cross-tenant ingestion "
+                    "is not permitted."
+                ),
+            )
+
+    result["tenant_id"] = tenant_id
+
+    return result
