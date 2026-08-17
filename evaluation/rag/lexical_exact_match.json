@@ -1,0 +1,32 @@
+[
+  {
+    "case_id": "exact-2024",
+    "query": "AGRIREF2024",
+    "expected_document_id": "lexical-agri-2024",
+    "limit": 5
+  },
+  {
+    "case_id": "exact-2025",
+    "query": "AGRIREF2025",
+    "expected_document_id": "lexical-agri-2025",
+    "limit": 5
+  },
+  {
+    "case_id": "exact-2026",
+    "query": "AGRIREF2026",
+    "expected_document_id": "lexical-agri-2026",
+    "limit": 5
+  },
+  {
+    "case_id": "exact-2027",
+    "query": "AGRIREF2027",
+    "expected_document_id": "lexical-agri-2027",
+    "limit": 5
+  },
+  {
+    "case_id": "near-code",
+    "query": "AGRIREX2026",
+    "expected_document_id": "lexical-agrirex-2026",
+    "limit": 5
+  }
+]
