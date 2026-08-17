@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from rkjo_api.dependencies import (
     get_rag_answering_service,
     get_rag_document_lifecycle_service,
+    get_rag_document_replacement_service,
     get_rag_ingestion_pipeline,
     get_rag_search_service,
 )
@@ -38,6 +39,9 @@ from rkjo_kernel.rag.ingestion import (
 )
 from rkjo_kernel.rag.document_lifecycle import (
     DocumentLifecycleService,
+)
+from rkjo_kernel.rag.document_replacement import (
+    DocumentReplacementService,
 )
 from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
@@ -81,6 +85,17 @@ class DocumentDeletionResponse(BaseModel):
     document_id: str
     deleted_chunk_count: int
     deleted_hash_count: int
+
+
+
+
+
+class DocumentReplacementResponse(BaseModel):
+    document_id: str
+    old_deleted_chunk_count: int
+    old_deleted_hash_count: int
+    content_hash: str
+    chunk_count: int
 
 
 class SemanticSearchRequest(BaseModel):
@@ -341,6 +356,96 @@ async def ingest_document(
 
 
 
+
+
+
+
+
+@router.put(
+    "/documents/{document_id}",
+    response_model=DocumentReplacementResponse,
+)
+async def replace_document(
+    document_id: str,
+    http_request: Request,
+    file: UploadFile = File(...),
+    metadata: str | None = Form(
+        default=None
+    ),
+    service: DocumentReplacementService = Depends(
+        get_rag_document_replacement_service
+    ),
+) -> DocumentReplacementResponse:
+    """Replace and reindex one tenant-scoped document."""
+
+    parsed_metadata = parse_metadata(
+        metadata
+    )
+
+    identity = get_authenticated_identity(
+        http_request
+    )
+
+    parsed_metadata = (
+        bind_identity_metadata_tenant(
+            identity=identity,
+            metadata=parsed_metadata,
+        )
+    )
+
+    filters = bind_identity_tenant(
+        identity=identity,
+        filters=None,
+    )
+
+    temporary_path = (
+        await persist_upload_temporarily(
+            file
+        )
+    )
+
+    try:
+        result = service.replace_document(
+            document_id,
+            temporary_path,
+            metadata={
+                **parsed_metadata,
+                "original_filename": (
+                    file.filename
+                    or ""
+                ),
+            },
+            filters=filters,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    finally:
+        temporary_path.unlink(
+            missing_ok=True
+        )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    return DocumentReplacementResponse(
+        document_id=result.document_id,
+        old_deleted_chunk_count=(
+            result.old_deleted_chunk_count
+        ),
+        old_deleted_hash_count=(
+            result.old_deleted_hash_count
+        ),
+        content_hash=result.content_hash,
+        chunk_count=result.chunk_count,
+    )
 
 
 @router.delete(

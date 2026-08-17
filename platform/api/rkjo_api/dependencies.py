@@ -13,6 +13,9 @@ from rkjo_kernel.rag.ingestion import DocumentIngestionPipeline
 from rkjo_kernel.rag.document_lifecycle import (
     DocumentLifecycleService,
 )
+from rkjo_kernel.rag.document_replacement import (
+    DocumentReplacementService,
+)
 from rkjo_kernel.rag.loaders import CompositeDocumentLoader
 from rkjo_kernel.rag.postgres_deduplication import (
     PostgresDocumentHashRegistry,
@@ -189,6 +192,23 @@ def get_rag_document_lifecycle_service(
     return DocumentLifecycleService(
         vector_store=vector_store,
         hash_registry=hash_registry,
+    )
+
+
+
+
+
+def get_rag_document_replacement_service(
+) -> DocumentReplacementService:
+    """Build production RAG document replacement service."""
+
+    return DocumentReplacementService(
+        lifecycle_service=(
+            get_rag_document_lifecycle_service()
+        ),
+        ingestion_pipeline=(
+            get_rag_ingestion_pipeline()
+        ),
     )
 
 
