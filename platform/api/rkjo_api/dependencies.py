@@ -10,6 +10,9 @@ from rkjo_kernel.rag.embedding_factory import (
     get_embedding_space,
 )
 from rkjo_kernel.rag.ingestion import DocumentIngestionPipeline
+from rkjo_kernel.rag.document_lifecycle import (
+    DocumentLifecycleService,
+)
 from rkjo_kernel.rag.loaders import CompositeDocumentLoader
 from rkjo_kernel.rag.postgres_deduplication import (
     PostgresDocumentHashRegistry,
@@ -154,6 +157,38 @@ def get_rag_ingestion_pipeline() -> DocumentIngestionPipeline:
         sanitizer=RuleBasedPIISanitizer(
             mode=SanitizationMode.REDACT
         ),
+    )
+
+
+
+
+
+def get_rag_document_lifecycle_service(
+) -> DocumentLifecycleService:
+    """Build production RAG document lifecycle service."""
+
+    database_url = get_database_url()
+    dimensions = get_embedding_dimensions()
+
+    vector_store = PostgresPgVectorStore(
+        database_url=database_url,
+        dimensions=dimensions,
+        table_name="rag_chunks",
+        embedding_space=get_embedding_space(),
+    )
+
+    vector_store.initialize_schema()
+
+    hash_registry = PostgresDocumentHashRegistry(
+        database_url=database_url,
+        table_name="rag_document_hashes",
+    )
+
+    hash_registry.initialize_schema()
+
+    return DocumentLifecycleService(
+        vector_store=vector_store,
+        hash_registry=hash_registry,
     )
 
 

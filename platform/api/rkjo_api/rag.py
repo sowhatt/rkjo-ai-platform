@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
     get_rag_answering_service,
+    get_rag_document_lifecycle_service,
     get_rag_ingestion_pipeline,
     get_rag_search_service,
 )
@@ -34,6 +35,9 @@ from rkjo_api.identity import (
 )
 from rkjo_kernel.rag.ingestion import (
     DocumentIngestionPipeline,
+)
+from rkjo_kernel.rag.document_lifecycle import (
+    DocumentLifecycleService,
 )
 from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
@@ -68,6 +72,15 @@ class DocumentIngestionResponse(
     content_hash: str
     chunk_count: int
     duplicate: bool
+
+
+
+
+
+class DocumentDeletionResponse(BaseModel):
+    document_id: str
+    deleted_chunk_count: int
+    deleted_hash_count: int
 
 
 class SemanticSearchRequest(BaseModel):
@@ -324,6 +337,62 @@ async def ingest_document(
         content_hash=result.content_hash,
         chunk_count=result.chunk_count,
         duplicate=result.duplicate,
+    )
+
+
+
+
+
+@router.delete(
+    "/documents/{document_id}",
+    response_model=DocumentDeletionResponse,
+)
+def delete_document(
+    document_id: str,
+    http_request: Request,
+    service: DocumentLifecycleService = Depends(
+        get_rag_document_lifecycle_service
+    ),
+) -> DocumentDeletionResponse:
+    """Delete one document inside the authenticated tenant scope."""
+
+    identity = get_authenticated_identity(
+        http_request
+    )
+
+    filters = bind_identity_tenant(
+        identity=identity,
+        filters=None,
+    )
+
+    try:
+        result = service.delete_document(
+            document_id,
+            filters=filters,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    # Deliberately return 404 both for a truly missing
+    # document and for a document outside the tenant scope.
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    return DocumentDeletionResponse(
+        document_id=result.document_id,
+        deleted_chunk_count=(
+            result.deleted_chunk_count
+        ),
+        deleted_hash_count=(
+            result.deleted_hash_count
+        ),
     )
 
 

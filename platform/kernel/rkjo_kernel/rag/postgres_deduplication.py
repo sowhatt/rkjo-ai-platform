@@ -189,6 +189,46 @@ class PostgresDocumentHashRegistry(
             row[0]
         )
 
+
+
+
+    def delete_document(
+        self,
+        document_id: str,
+    ) -> int:
+        """Delete every registered hash for one document."""
+
+        normalized_document_id = (
+            document_id.strip()
+        )
+
+        if not normalized_document_id:
+            raise ValueError(
+                "document_id must not be empty."
+            )
+
+        with psycopg.connect(
+            self.database_url,
+            autocommit=True,
+        ) as connection:
+            cursor = connection.execute(
+                sql.SQL(
+                    """
+                    DELETE FROM {}
+                    WHERE document_id = %s
+                    """
+                ).format(
+                    sql.Identifier(
+                        self.table_name
+                    )
+                ),
+                (
+                    normalized_document_id,
+                ),
+            )
+
+            return cursor.rowcount
+
     def count(self) -> int:
         """Return number of registered unique documents."""
 

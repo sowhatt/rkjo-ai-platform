@@ -379,13 +379,27 @@ class PostgresPgVectorStore(VectorStore):
     def delete_document(
         self,
         document_id: str,
+        *,
+        filters: RetrievalFilters | None = None,
     ) -> int:
-        """Delete every chunk belonging to one document."""
+        """Delete document chunks within an optional metadata scope."""
 
-        if not document_id.strip():
+        normalized_document_id = (
+            document_id.strip()
+        )
+
+        if not normalized_document_id:
             raise ValueError(
                 "document_id must not be empty."
             )
+
+        metadata_filter = Jsonb(
+            (
+                filters.metadata
+                if filters is not None
+                else {}
+            )
+        )
 
         with self._connect() as connection:
             cursor = connection.execute(
@@ -393,6 +407,7 @@ class PostgresPgVectorStore(VectorStore):
                     """
                     DELETE FROM {}
                     WHERE document_id = %s
+                      AND metadata @> %s
                     """
                 ).format(
                     sql.Identifier(
@@ -400,7 +415,8 @@ class PostgresPgVectorStore(VectorStore):
                     )
                 ),
                 (
-                    document_id,
+                    normalized_document_id,
+                    metadata_filter,
                 ),
             )
 
