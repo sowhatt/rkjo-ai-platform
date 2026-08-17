@@ -5,11 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from rkjo_kernel.rag.document_lifecycle import (
-    DocumentLifecycleService,
-)
 from rkjo_kernel.rag.ingestion import (
     DocumentIngestionPipeline,
+)
+from rkjo_kernel.rag.postgres_document_replacement import (
+    PostgresDocumentReplacementRepository,
 )
 from rkjo_kernel.rag.retrieval_filters import (
     RetrievalFilters,
@@ -26,16 +26,20 @@ class DocumentReplacementResult:
 
 
 class DocumentReplacementService:
-    """Replace and reindex a tenant-scoped RAG document."""
+    """Prepare then atomically replace one RAG document."""
 
     def __init__(
         self,
         *,
-        lifecycle_service: DocumentLifecycleService,
         ingestion_pipeline: DocumentIngestionPipeline,
+        replacement_repository: (
+            PostgresDocumentReplacementRepository
+        ),
     ) -> None:
-        self.lifecycle_service = lifecycle_service
         self.ingestion_pipeline = ingestion_pipeline
+        self.replacement_repository = (
+            replacement_repository
+        )
 
     def replace_document(
         self,
@@ -54,40 +58,41 @@ class DocumentReplacementService:
                 "document_id must not be empty."
             )
 
-        deletion = (
-            self.lifecycle_service.delete_document(
-                normalized_document_id,
-                filters=filters,
-            )
-        )
-
-        # Missing and cross-tenant documents are deliberately
-        # indistinguishable.
-        if deletion is None:
-            return None
-
-        ingestion = (
-            self.ingestion_pipeline.ingest_file(
+        # Load, sanitize, chunk and EMBED first.
+        # No persistent state has changed yet.
+        prepared = (
+            self.ingestion_pipeline.prepare_file(
                 path,
                 document_id=normalized_document_id,
                 metadata=metadata,
             )
         )
 
-        if ingestion.duplicate:
-            raise ValueError(
-                "Replacement content duplicates "
-                "an existing document."
+        # Only after successful preparation do we enter
+        # the atomic PostgreSQL swap.
+        deleted = (
+            self.replacement_repository.replace(
+                prepared,
+                filters=filters,
             )
+        )
+
+        if deleted is None:
+            return None
+
+        (
+            deleted_chunks,
+            deleted_hashes,
+        ) = deleted
 
         return DocumentReplacementResult(
-            document_id=normalized_document_id,
+            document_id=prepared.document_id,
             old_deleted_chunk_count=(
-                deletion.deleted_chunk_count
+                deleted_chunks
             ),
             old_deleted_hash_count=(
-                deletion.deleted_hash_count
+                deleted_hashes
             ),
-            content_hash=ingestion.content_hash,
-            chunk_count=ingestion.chunk_count,
+            content_hash=prepared.content_hash,
+            chunk_count=prepared.chunk_count,
         )

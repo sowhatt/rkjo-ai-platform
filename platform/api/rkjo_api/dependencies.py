@@ -20,6 +20,9 @@ from rkjo_kernel.rag.loaders import CompositeDocumentLoader
 from rkjo_kernel.rag.postgres_deduplication import (
     PostgresDocumentHashRegistry,
 )
+from rkjo_kernel.rag.postgres_document_replacement import (
+    PostgresDocumentReplacementRepository,
+)
 from rkjo_kernel.rag.postgres_vector_store import (
     PostgresPgVectorStore,
 )
@@ -200,14 +203,23 @@ def get_rag_document_lifecycle_service(
 
 def get_rag_document_replacement_service(
 ) -> DocumentReplacementService:
-    """Build production RAG document replacement service."""
+    """Build atomic production RAG replacement service."""
 
     return DocumentReplacementService(
-        lifecycle_service=(
-            get_rag_document_lifecycle_service()
-        ),
         ingestion_pipeline=(
             get_rag_ingestion_pipeline()
+        ),
+        replacement_repository=(
+            PostgresDocumentReplacementRepository(
+                database_url=get_database_url(),
+                chunk_table_name="rag_chunks",
+                hash_table_name=(
+                    "rag_document_hashes"
+                ),
+                embedding_space=(
+                    get_embedding_space()
+                ),
+            )
         ),
     )
 

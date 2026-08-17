@@ -2,53 +2,57 @@ from pathlib import Path
 
 import pytest
 
-from rkjo_kernel.rag.document_lifecycle import (
-    DocumentDeletionResult,
-)
 from rkjo_kernel.rag.document_replacement import (
     DocumentReplacementService,
 )
 from rkjo_kernel.rag.ingestion_models import (
-    IngestionResult,
+    PreparedChunk,
+    PreparedIngestion,
+)
+from rkjo_kernel.rag.models import (
+    DocumentChunk,
 )
 from rkjo_kernel.rag.retrieval_filters import (
     RetrievalFilters,
 )
 
 
-class FakeLifecycleService:
-    def __init__(
-        self,
-        result,
-    ):
-        self.result = result
-        self.calls = []
-
-    def delete_document(
-        self,
-        document_id,
-        *,
-        filters=None,
-    ):
-        self.calls.append(
-            (
-                document_id,
-                filters,
-            )
-        )
-        return self.result
+def prepared():
+    return PreparedIngestion(
+        document_id="doc-1",
+        content_hash="b" * 64,
+        chunks=(
+            PreparedChunk(
+                chunk=DocumentChunk(
+                    document_id="doc-1",
+                    chunk_id="chunk-new",
+                    content="new content",
+                    chunk_index=0,
+                    metadata={
+                        "tenant_id": "tenant-a",
+                        "content_hash": "b" * 64,
+                    },
+                ),
+                embedding=(
+                    1.0,
+                    0.0,
+                    0.0,
+                ),
+            ),
+        ),
+    )
 
 
 class FakePipeline:
     def __init__(
         self,
         *,
-        duplicate=False,
+        fail=False,
     ):
-        self.duplicate = duplicate
+        self.fail = fail
         self.calls = []
 
-    def ingest_file(
+    def prepare_file(
         self,
         path,
         *,
@@ -63,38 +67,51 @@ class FakePipeline:
             )
         )
 
-        return IngestionResult(
-            document_id=document_id,
-            content_hash="b" * 64,
-            chunk_count=2,
-            duplicate=self.duplicate,
+        if self.fail:
+            raise RuntimeError(
+                "embedding failure"
+            )
+
+        return prepared()
+
+
+class FakeRepository:
+    def __init__(
+        self,
+        result=(1, 1),
+    ):
+        self.result = result
+        self.calls = []
+
+    def replace(
+        self,
+        prepared,
+        *,
+        filters=None,
+    ):
+        self.calls.append(
+            (
+                prepared,
+                filters,
+            )
         )
+        return self.result
 
 
-def deletion():
-    return DocumentDeletionResult(
-        document_id="doc-1",
-        deleted_chunk_count=3,
-        deleted_hash_count=1,
-    )
-
-
-def test_replace_deletes_then_reingests(
+def test_replace_prepares_then_atomically_swaps(
     tmp_path,
 ):
-    lifecycle = FakeLifecycleService(
-        deletion()
-    )
     pipeline = FakePipeline()
+    repository = FakeRepository()
 
     service = DocumentReplacementService(
-        lifecycle_service=lifecycle,
         ingestion_pipeline=pipeline,
+        replacement_repository=repository,
     )
 
-    path = tmp_path / "new.txt"
-    path.write_text(
-        "new content",
+    source = tmp_path / "new.txt"
+    source.write_text(
+        "new",
         encoding="utf-8",
     )
 
@@ -106,83 +123,71 @@ def test_replace_deletes_then_reingests(
 
     result = service.replace_document(
         "doc-1",
-        path,
-        metadata={
-            "tenant_id": "tenant-a"
-        },
+        source,
         filters=filters,
     )
 
     assert result.document_id == "doc-1"
-    assert result.old_deleted_chunk_count == 3
+    assert result.old_deleted_chunk_count == 1
     assert result.old_deleted_hash_count == 1
-    assert result.chunk_count == 2
-
-    assert lifecycle.calls == [
-        (
-            "doc-1",
-            filters,
-        )
-    ]
-
-    assert pipeline.calls[0][1] == "doc-1"
+    assert result.chunk_count == 1
+    assert len(repository.calls) == 1
 
 
-def test_replace_missing_scoped_document_returns_none(
+def test_preparation_failure_never_calls_repository(
     tmp_path,
 ):
-    lifecycle = FakeLifecycleService(
-        None
-    )
-    pipeline = FakePipeline()
-
-    service = DocumentReplacementService(
-        lifecycle_service=lifecycle,
-        ingestion_pipeline=pipeline,
-    )
-
-    path = tmp_path / "new.txt"
-    path.write_text(
-        "new content",
-        encoding="utf-8",
-    )
-
-    result = service.replace_document(
-        "doc-1",
-        path,
-    )
-
-    assert result is None
-    assert pipeline.calls == []
-
-
-def test_duplicate_replacement_is_rejected(
-    tmp_path,
-):
-    lifecycle = FakeLifecycleService(
-        deletion()
-    )
-
     pipeline = FakePipeline(
-        duplicate=True
+        fail=True
     )
+    repository = FakeRepository()
 
     service = DocumentReplacementService(
-        lifecycle_service=lifecycle,
         ingestion_pipeline=pipeline,
+        replacement_repository=repository,
     )
 
-    path = tmp_path / "new.txt"
-    path.write_text(
-        "duplicate",
+    source = tmp_path / "new.txt"
+    source.write_text(
+        "new",
         encoding="utf-8",
     )
 
     with pytest.raises(
-        ValueError,
-        match="duplicates",
+        RuntimeError,
+        match="embedding failure",
     ):
         service.replace_document(
             "doc-1",
-            path,
+            source,
         )
+
+    assert repository.calls == []
+
+
+def test_missing_scoped_document_returns_none(
+    tmp_path,
+):
+    pipeline = FakePipeline()
+    repository = FakeRepository(
+        result=None
+    )
+
+    service = DocumentReplacementService(
+        ingestion_pipeline=pipeline,
+        replacement_repository=repository,
+    )
+
+    source = tmp_path / "new.txt"
+    source.write_text(
+        "new",
+        encoding="utf-8",
+    )
+
+    assert (
+        service.replace_document(
+            "doc-1",
+            source,
+        )
+        is None
+    )
