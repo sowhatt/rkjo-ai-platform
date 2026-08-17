@@ -1,0 +1,56 @@
+[
+  {
+    "case_id": "lfpb-07",
+    "query": "LFPB-DEC-07-2026",
+    "expected_document_id": "adv-lfpb-07",
+    "limit": 5
+  },
+  {
+    "case_id": "lfpb-08",
+    "query": "LFPB-DEC-08-2026",
+    "expected_document_id": "adv-lfpb-08",
+    "limit": 5
+  },
+  {
+    "case_id": "lfpb-09",
+    "query": "LFPB-DEC-09-2026",
+    "expected_document_id": "adv-lfpb-09",
+    "limit": 5
+  },
+  {
+    "case_id": "sante-p7",
+    "query": "BEN-SANTE-X9K2P7",
+    "expected_document_id": "adv-sante-p7",
+    "limit": 5
+  },
+  {
+    "case_id": "sante-p8",
+    "query": "BEN-SANTE-X9K2P8",
+    "expected_document_id": "adv-sante-p8",
+    "limit": 5
+  },
+  {
+    "case_id": "sante-p9",
+    "query": "BEN-SANTE-X9K2P9",
+    "expected_document_id": "adv-sante-p9",
+    "limit": 5
+  },
+  {
+    "case_id": "dsn-a",
+    "query": "DSN-ENT-88421-A",
+    "expected_document_id": "adv-dsn-a",
+    "limit": 5
+  },
+  {
+    "case_id": "dsn-b",
+    "query": "DSN-ENT-88421-B",
+    "expected_document_id": "adv-dsn-b",
+    "limit": 5
+  },
+  {
+    "case_id": "dsn-c",
+    "query": "DSN-ENT-88421-C",
+    "expected_document_id": "adv-dsn-c",
+    "limit": 5
+  }
+]
