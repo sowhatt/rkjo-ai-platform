@@ -9,6 +9,7 @@ from psycopg import sql
 
 from rkjo_kernel.rag.document_versioning import (
     DocumentVersion,
+    DocumentVersionChunk,
     DocumentVersionState,
 )
 
@@ -22,6 +23,9 @@ class PostgresDocumentVersionRepository:
         database_url: str,
         document_table_name: str = "rag_documents",
         version_table_name: str = "rag_document_versions",
+        version_chunk_table_name: str = (
+            "rag_document_version_chunks"
+        ),
     ) -> None:
         if not database_url.strip():
             raise ValueError(
@@ -35,6 +39,9 @@ class PostgresDocumentVersionRepository:
         self.version_table_name = (
             version_table_name.strip()
         )
+        self.version_chunk_table_name = (
+            version_chunk_table_name.strip()
+        )
 
         if not self.document_table_name:
             raise ValueError(
@@ -44,6 +51,11 @@ class PostgresDocumentVersionRepository:
         if not self.version_table_name:
             raise ValueError(
                 "version_table_name must not be empty."
+            )
+
+        if not self.version_chunk_table_name:
+            raise ValueError(
+                "version_chunk_table_name must not be empty."
             )
 
     def initialize_schema(self) -> None:
@@ -56,6 +68,9 @@ class PostgresDocumentVersionRepository:
             )
             versions = sql.Identifier(
                 self.version_table_name
+            )
+            version_chunks = sql.Identifier(
+                self.version_chunk_table_name
             )
 
             connection.execute(
@@ -99,6 +114,52 @@ class PostgresDocumentVersionRepository:
                     )
                     """
                 ).format(versions)
+            )
+
+            connection.execute(
+                sql.SQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS {} (
+                        version_id UUID NOT NULL,
+                        document_id TEXT NOT NULL,
+                        tenant_id TEXT NOT NULL,
+                        chunk_id TEXT NOT NULL,
+                        chunk_index INTEGER NOT NULL,
+                        content TEXT NOT NULL,
+                        metadata JSONB NOT NULL
+                            DEFAULT '{{}}'::jsonb,
+                        embedding DOUBLE PRECISION[] NOT NULL,
+                        embedding_provider TEXT,
+                        embedding_model TEXT,
+                        embedding_dimensions INTEGER,
+                        created_at TIMESTAMPTZ NOT NULL
+                            DEFAULT NOW(),
+                        PRIMARY KEY (
+                            version_id,
+                            chunk_id
+                        )
+                    )
+                    """
+                ).format(version_chunks)
+            )
+
+            connection.execute(
+                sql.SQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS {}
+                    ON {} (
+                        tenant_id,
+                        document_id,
+                        version_id,
+                        chunk_index
+                    )
+                    """
+                ).format(
+                    sql.Identifier(
+                        f"{self.version_chunk_table_name}_lookup_idx"
+                    ),
+                    version_chunks,
+                )
             )
 
             connection.execute(
@@ -268,11 +329,100 @@ class PostgresDocumentVersionRepository:
             created_at=row[5],
         )
 
+
+
+    def list_version_chunks(
+        self,
+        *,
+        document_id: str,
+        tenant_id: str,
+        version_id: str,
+    ) -> list[DocumentVersionChunk]:
+        """Return archived chunks for one tenant-scoped version."""
+
+        with psycopg.connect(
+            self.database_url
+        ) as connection:
+            rows = connection.execute(
+                sql.SQL(
+                    """
+                    SELECT
+                        version_id,
+                        document_id,
+                        tenant_id,
+                        chunk_id,
+                        chunk_index,
+                        content,
+                        metadata,
+                        embedding,
+                        embedding_provider,
+                        embedding_model,
+                        embedding_dimensions
+                    FROM {}
+                    WHERE document_id = %s
+                      AND tenant_id = %s
+                      AND version_id = %s
+                    ORDER BY chunk_index
+                    """
+                ).format(
+                    sql.Identifier(
+                        self.version_chunk_table_name
+                    )
+                ),
+                (
+                    document_id,
+                    tenant_id,
+                    version_id,
+                ),
+            ).fetchall()
+
+        return [
+            DocumentVersionChunk(
+                version_id=str(row[0]),
+                document_id=str(row[1]),
+                tenant_id=str(row[2]),
+                chunk_id=str(row[3]),
+                chunk_index=int(row[4]),
+                content=str(row[5]),
+                metadata=dict(row[6]),
+                embedding=tuple(
+                    float(value)
+                    for value in row[7]
+                ),
+                embedding_provider=(
+                    str(row[8])
+                    if row[8] is not None
+                    else None
+                ),
+                embedding_model=(
+                    str(row[9])
+                    if row[9] is not None
+                    else None
+                ),
+                embedding_dimensions=(
+                    int(row[10])
+                    if row[10] is not None
+                    else None
+                ),
+            )
+            for row in rows
+        ]
+
     def drop_schema(self) -> None:
         with psycopg.connect(
             self.database_url,
             autocommit=True,
         ) as connection:
+            connection.execute(
+                sql.SQL(
+                    "DROP TABLE IF EXISTS {}"
+                ).format(
+                    sql.Identifier(
+                        self.version_chunk_table_name
+                    )
+                )
+            )
+
             connection.execute(
                 sql.SQL(
                     "DROP TABLE IF EXISTS {}"

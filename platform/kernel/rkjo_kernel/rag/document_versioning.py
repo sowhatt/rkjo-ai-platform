@@ -23,3 +23,19 @@ class DocumentVersionState:
     current_version: int
     created_at: datetime
     updated_at: datetime
+
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentVersionChunk:
+    version_id: str
+    document_id: str
+    tenant_id: str
+    chunk_id: str
+    chunk_index: int
+    content: str
+    metadata: dict
+    embedding: tuple[float, ...]
+    embedding_provider: str | None
+    embedding_model: str | None
+    embedding_dimensions: int | None

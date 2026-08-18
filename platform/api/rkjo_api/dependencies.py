@@ -220,6 +220,9 @@ def get_rag_document_replacement_service(
             version_table_name=(
                 "rag_document_versions"
             ),
+            version_chunk_table_name=(
+                "rag_document_version_chunks"
+            ),
         )
     )
 
@@ -241,6 +244,9 @@ def get_rag_document_replacement_service(
                 ),
                 version_table_name=(
                     "rag_document_versions"
+                ),
+                version_chunk_table_name=(
+                    "rag_document_version_chunks"
                 ),
                 embedding_space=(
                     get_embedding_space()
@@ -265,6 +271,9 @@ def get_rag_document_version_history_service(
             ),
             version_table_name=(
                 "rag_document_versions"
+            ),
+            version_chunk_table_name=(
+                "rag_document_version_chunks"
             ),
         )
     )
