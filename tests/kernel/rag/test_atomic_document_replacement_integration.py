@@ -20,6 +20,9 @@ from rkjo_kernel.rag.postgres_deduplication import (
 from rkjo_kernel.rag.postgres_document_replacement import (
     PostgresDocumentReplacementRepository,
 )
+from rkjo_kernel.rag.postgres_document_versioning import (
+    PostgresDocumentVersionRepository,
+)
 from rkjo_kernel.rag.postgres_vector_store import (
     PostgresPgVectorStore,
 )
@@ -86,6 +89,12 @@ def test_database_failure_rolls_back_old_document():
     hash_table = (
         f"rag_atomic_hashes_{suffix}"
     )
+    document_table = (
+        f"rag_atomic_documents_{suffix}"
+    )
+    version_table = (
+        f"rag_atomic_versions_{suffix}"
+    )
 
     space = EmbeddingSpace(
         provider="openai",
@@ -105,8 +114,15 @@ def test_database_failure_rolls_back_old_document():
         table_name=hash_table,
     )
 
+    versions = PostgresDocumentVersionRepository(
+        database_url=DATABASE_URL,
+        document_table_name=document_table,
+        version_table_name=version_table,
+    )
+
     store.initialize_schema()
     hashes.initialize_schema()
+    versions.initialize_schema()
 
     try:
         old_hash = "a" * 64
@@ -138,6 +154,8 @@ def test_database_failure_rolls_back_old_document():
             database_url=DATABASE_URL,
             chunk_table_name=chunk_table,
             hash_table_name=hash_table,
+            document_table_name=document_table,
+            version_table_name=version_table,
             embedding_space=space,
         )
 
@@ -197,6 +215,7 @@ def test_database_failure_rolls_back_old_document():
     finally:
         store.drop_schema()
         hashes.drop_schema()
+        versions.drop_schema()
 
 
 def test_atomic_replace_commits_new_document():
@@ -207,6 +226,12 @@ def test_atomic_replace_commits_new_document():
     )
     hash_table = (
         f"rag_atomic_hashes_{suffix}"
+    )
+    document_table = (
+        f"rag_atomic_documents_{suffix}"
+    )
+    version_table = (
+        f"rag_atomic_versions_{suffix}"
     )
 
     space = EmbeddingSpace(
@@ -227,8 +252,15 @@ def test_atomic_replace_commits_new_document():
         table_name=hash_table,
     )
 
+    versions = PostgresDocumentVersionRepository(
+        database_url=DATABASE_URL,
+        document_table_name=document_table,
+        version_table_name=version_table,
+    )
+
     store.initialize_schema()
     hashes.initialize_schema()
+    versions.initialize_schema()
 
     try:
         old_hash = "a" * 64
@@ -262,6 +294,8 @@ def test_atomic_replace_commits_new_document():
                 database_url=DATABASE_URL,
                 chunk_table_name=chunk_table,
                 hash_table_name=hash_table,
+                document_table_name=document_table,
+                version_table_name=version_table,
                 embedding_space=space,
             )
         )
@@ -318,3 +352,4 @@ def test_atomic_replace_commits_new_document():
     finally:
         store.drop_schema()
         hashes.drop_schema()
+        versions.drop_schema()

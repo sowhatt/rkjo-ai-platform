@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import psycopg
 from pgvector import Vector
 from pgvector.psycopg import register_vector
@@ -28,6 +30,8 @@ class PostgresDocumentReplacementRepository:
         database_url: str,
         chunk_table_name: str = "rag_chunks",
         hash_table_name: str = "rag_document_hashes",
+        document_table_name: str = "rag_documents",
+        version_table_name: str = "rag_document_versions",
         embedding_space: EmbeddingSpace | None = None,
     ) -> None:
         if not database_url.strip():
@@ -42,6 +46,12 @@ class PostgresDocumentReplacementRepository:
         self.hash_table_name = (
             hash_table_name.strip()
         )
+        self.document_table_name = (
+            document_table_name.strip()
+        )
+        self.version_table_name = (
+            version_table_name.strip()
+        )
         self.embedding_space = embedding_space
 
     def replace(
@@ -52,13 +62,29 @@ class PostgresDocumentReplacementRepository:
     ) -> tuple[int, int] | None:
         """Atomically replace chunks and deduplication hash."""
 
-        metadata_filter = Jsonb(
-            (
-                filters.metadata
-                if filters is not None
-                else {}
-            )
+        filter_metadata = (
+            filters.metadata
+            if filters is not None
+            else {}
         )
+
+        metadata_filter = Jsonb(
+            filter_metadata
+        )
+
+        tenant_id = filter_metadata.get(
+            "tenant_id"
+        )
+
+        if not isinstance(
+            tenant_id,
+            str,
+        ) or not tenant_id.strip():
+            raise ValueError(
+                "Tenant-scoped replacement requires tenant_id."
+            )
+
+        tenant_id = tenant_id.strip()
 
         with psycopg.connect(
             self.database_url
@@ -90,6 +116,34 @@ class PostgresDocumentReplacementRepository:
 
                 if not existing_rows:
                     return None
+
+                old_hash_row = connection.execute(
+                    sql.SQL(
+                        """
+                        SELECT content_hash
+                        FROM {}
+                        WHERE document_id = %s
+                        LIMIT 1
+                        FOR UPDATE
+                        """
+                    ).format(
+                        sql.Identifier(
+                            self.hash_table_name
+                        )
+                    ),
+                    (
+                        prepared.document_id,
+                    ),
+                ).fetchone()
+
+                if old_hash_row is None:
+                    raise RuntimeError(
+                        "Existing document has no registered hash."
+                    )
+
+                old_content_hash = str(
+                    old_hash_row[0]
+                )
 
                 duplicate = connection.execute(
                     sql.SQL(
@@ -195,6 +249,14 @@ class PostgresDocumentReplacementRepository:
                     ),
                 )
 
+                self._register_versions(
+                    connection,
+                    document_id=prepared.document_id,
+                    tenant_id=tenant_id,
+                    old_content_hash=old_content_hash,
+                    new_content_hash=prepared.content_hash,
+                )
+
                 return (
                     deleted_chunks,
                     deleted_hashes,
@@ -262,3 +324,126 @@ class PostgresDocumentReplacementRepository:
                     ),
                 ),
             )
+
+
+    def _register_versions(
+        self,
+        connection,
+        *,
+        document_id: str,
+        tenant_id: str,
+        old_content_hash: str,
+        new_content_hash: str,
+    ) -> None:
+        """Register historical/current version inside swap transaction."""
+
+        documents = sql.Identifier(
+            self.document_table_name
+        )
+        versions = sql.Identifier(
+            self.version_table_name
+        )
+
+        state = connection.execute(
+            sql.SQL(
+                """
+                SELECT current_version
+                FROM {}
+                WHERE document_id = %s
+                  AND tenant_id = %s
+                FOR UPDATE
+                """
+            ).format(documents),
+            (
+                document_id,
+                tenant_id,
+            ),
+        ).fetchone()
+
+        if state is None:
+            # First replacement:
+            # current persisted document becomes v1.
+            connection.execute(
+                sql.SQL(
+                    """
+                    INSERT INTO {} (
+                        document_id,
+                        tenant_id,
+                        current_version
+                    )
+                    VALUES (%s, %s, 2)
+                    """
+                ).format(documents),
+                (
+                    document_id,
+                    tenant_id,
+                ),
+            )
+
+            connection.execute(
+                sql.SQL(
+                    """
+                    INSERT INTO {} (
+                        version_id,
+                        document_id,
+                        tenant_id,
+                        version_number,
+                        content_hash
+                    )
+                    VALUES (%s, %s, %s, 1, %s)
+                    """
+                ).format(versions),
+                (
+                    str(uuid4()),
+                    document_id,
+                    tenant_id,
+                    old_content_hash,
+                ),
+            )
+
+            next_version = 2
+
+        else:
+            next_version = (
+                int(state[0]) + 1
+            )
+
+            connection.execute(
+                sql.SQL(
+                    """
+                    UPDATE {}
+                    SET
+                        current_version = %s,
+                        updated_at = NOW()
+                    WHERE document_id = %s
+                      AND tenant_id = %s
+                    """
+                ).format(documents),
+                (
+                    next_version,
+                    document_id,
+                    tenant_id,
+                ),
+            )
+
+        connection.execute(
+            sql.SQL(
+                """
+                INSERT INTO {} (
+                    version_id,
+                    document_id,
+                    tenant_id,
+                    version_number,
+                    content_hash
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                """
+            ).format(versions),
+            (
+                str(uuid4()),
+                document_id,
+                tenant_id,
+                next_version,
+                new_content_hash,
+            ),
+        )

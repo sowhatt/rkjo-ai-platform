@@ -23,6 +23,9 @@ from rkjo_kernel.rag.postgres_deduplication import (
 from rkjo_kernel.rag.postgres_document_replacement import (
     PostgresDocumentReplacementRepository,
 )
+from rkjo_kernel.rag.postgres_document_versioning import (
+    PostgresDocumentVersionRepository,
+)
 from rkjo_kernel.rag.postgres_vector_store import (
     PostgresPgVectorStore,
 )
@@ -205,16 +208,36 @@ def get_rag_document_replacement_service(
 ) -> DocumentReplacementService:
     """Build atomic production RAG replacement service."""
 
+    database_url = get_database_url()
+
+    version_repository = (
+        PostgresDocumentVersionRepository(
+            database_url=database_url,
+            document_table_name="rag_documents",
+            version_table_name=(
+                "rag_document_versions"
+            ),
+        )
+    )
+
+    version_repository.initialize_schema()
+
     return DocumentReplacementService(
         ingestion_pipeline=(
             get_rag_ingestion_pipeline()
         ),
         replacement_repository=(
             PostgresDocumentReplacementRepository(
-                database_url=get_database_url(),
+                database_url=database_url,
                 chunk_table_name="rag_chunks",
                 hash_table_name=(
                     "rag_document_hashes"
+                ),
+                document_table_name=(
+                    "rag_documents"
+                ),
+                version_table_name=(
+                    "rag_document_versions"
                 ),
                 embedding_space=(
                     get_embedding_space()
