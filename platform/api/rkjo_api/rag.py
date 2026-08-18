@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
@@ -23,6 +24,7 @@ from rkjo_api.dependencies import (
     get_rag_answering_service,
     get_rag_document_lifecycle_service,
     get_rag_document_replacement_service,
+    get_rag_document_version_history_service,
     get_rag_ingestion_pipeline,
     get_rag_search_service,
 )
@@ -42,6 +44,9 @@ from rkjo_kernel.rag.document_lifecycle import (
 )
 from rkjo_kernel.rag.document_replacement import (
     DocumentReplacementService,
+)
+from rkjo_kernel.rag.document_version_history import (
+    DocumentVersionHistoryService,
 )
 from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
@@ -96,6 +101,24 @@ class DocumentReplacementResponse(BaseModel):
     old_deleted_hash_count: int
     content_hash: str
     chunk_count: int
+
+
+
+
+
+class DocumentVersionItemResponse(BaseModel):
+    version_id: str
+    version_number: int
+    content_hash: str
+    created_at: datetime
+
+
+class DocumentVersionHistoryResponse(BaseModel):
+    document_id: str
+    current_version: int
+    versions: list[
+        DocumentVersionItemResponse
+    ]
 
 
 class SemanticSearchRequest(BaseModel):
@@ -359,6 +382,81 @@ async def ingest_document(
 
 
 
+
+
+
+
+
+@router.get(
+    "/documents/{document_id}/versions",
+    response_model=DocumentVersionHistoryResponse,
+)
+def get_document_versions(
+    document_id: str,
+    http_request: Request,
+    service: DocumentVersionHistoryService = Depends(
+        get_rag_document_version_history_service
+    ),
+) -> DocumentVersionHistoryResponse:
+    """Return tenant-scoped document version history."""
+
+    identity = get_authenticated_identity(
+        http_request
+    )
+
+    tenant_id = identity.tenant_id
+
+    # Version registry is tenant-keyed.
+    # Unbound identities cannot enumerate it.
+    if tenant_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    try:
+        history = service.get_history(
+            document_id=document_id,
+            tenant_id=tenant_id,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    # Missing and cross-tenant documents are
+    # deliberately indistinguishable.
+    if history is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    return DocumentVersionHistoryResponse(
+        document_id=history.document_id,
+        current_version=(
+            history.current_version
+        ),
+        versions=[
+            DocumentVersionItemResponse(
+                version_id=(
+                    version.version_id
+                ),
+                version_number=(
+                    version.version_number
+                ),
+                content_hash=(
+                    version.content_hash
+                ),
+                created_at=(
+                    version.created_at
+                ),
+            )
+            for version in history.versions
+        ],
+    )
 
 
 @router.put(

@@ -16,6 +16,9 @@ from rkjo_kernel.rag.document_lifecycle import (
 from rkjo_kernel.rag.document_replacement import (
     DocumentReplacementService,
 )
+from rkjo_kernel.rag.document_version_history import (
+    DocumentVersionHistoryService,
+)
 from rkjo_kernel.rag.loaders import CompositeDocumentLoader
 from rkjo_kernel.rag.postgres_deduplication import (
     PostgresDocumentHashRegistry,
@@ -244,6 +247,32 @@ def get_rag_document_replacement_service(
                 ),
             )
         ),
+    )
+
+
+
+
+
+def get_rag_document_version_history_service(
+) -> DocumentVersionHistoryService:
+    """Build production document version history service."""
+
+    repository = (
+        PostgresDocumentVersionRepository(
+            database_url=get_database_url(),
+            document_table_name=(
+                "rag_documents"
+            ),
+            version_table_name=(
+                "rag_document_versions"
+            ),
+        )
+    )
+
+    repository.initialize_schema()
+
+    return DocumentVersionHistoryService(
+        repository=repository
     )
 
 
