@@ -210,6 +210,64 @@ class PostgresDocumentVersionRepository:
             for row in rows
         ]
 
+
+
+    def get_version(
+        self,
+        *,
+        document_id: str,
+        tenant_id: str,
+        version_number: int,
+    ) -> DocumentVersion | None:
+        """Return one exact tenant-scoped document version."""
+
+        if version_number < 1:
+            raise ValueError(
+                "version_number must be greater than or equal to 1."
+            )
+
+        with psycopg.connect(
+            self.database_url
+        ) as connection:
+            row = connection.execute(
+                sql.SQL(
+                    """
+                    SELECT
+                        version_id,
+                        document_id,
+                        tenant_id,
+                        version_number,
+                        content_hash,
+                        created_at
+                    FROM {}
+                    WHERE document_id = %s
+                      AND tenant_id = %s
+                      AND version_number = %s
+                    """
+                ).format(
+                    sql.Identifier(
+                        self.version_table_name
+                    )
+                ),
+                (
+                    document_id,
+                    tenant_id,
+                    version_number,
+                ),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return DocumentVersion(
+            version_id=str(row[0]),
+            document_id=str(row[1]),
+            tenant_id=str(row[2]),
+            version_number=int(row[3]),
+            content_hash=str(row[4]),
+            created_at=row[5],
+        )
+
     def drop_schema(self) -> None:
         with psycopg.connect(
             self.database_url,

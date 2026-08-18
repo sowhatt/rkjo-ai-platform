@@ -113,6 +113,18 @@ class DocumentVersionItemResponse(BaseModel):
     created_at: datetime
 
 
+
+
+
+class DocumentVersionDetailResponse(BaseModel):
+    document_id: str
+    version_id: str
+    version_number: int
+    content_hash: str
+    created_at: datetime
+    is_current: bool
+
+
 class DocumentVersionHistoryResponse(BaseModel):
     document_id: str
     current_version: int
@@ -385,6 +397,70 @@ async def ingest_document(
 
 
 
+
+
+
+
+
+@router.get(
+    "/documents/{document_id}/versions/{version_number}",
+    response_model=DocumentVersionDetailResponse,
+)
+def get_document_version(
+    document_id: str,
+    version_number: int,
+    http_request: Request,
+    service: DocumentVersionHistoryService = Depends(
+        get_rag_document_version_history_service
+    ),
+) -> DocumentVersionDetailResponse:
+    """Return metadata for one exact tenant-scoped version."""
+
+    identity = get_authenticated_identity(
+        http_request
+    )
+
+    tenant_id = identity.tenant_id
+
+    if tenant_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document version not found.",
+        )
+
+    try:
+        detail = service.get_version(
+            document_id=document_id,
+            tenant_id=tenant_id,
+            version_number=version_number,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    # Missing document, missing version and cross-tenant
+    # lookups are deliberately indistinguishable.
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document version not found.",
+        )
+
+    version = detail.version
+
+    return DocumentVersionDetailResponse(
+        document_id=detail.document_id,
+        version_id=version.version_id,
+        version_number=(
+            version.version_number
+        ),
+        content_hash=version.content_hash,
+        created_at=version.created_at,
+        is_current=detail.is_current,
+    )
 
 
 @router.get(
