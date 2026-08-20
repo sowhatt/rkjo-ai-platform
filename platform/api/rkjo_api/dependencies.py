@@ -16,6 +16,9 @@ from rkjo_kernel.rag.document_lifecycle import (
 from rkjo_kernel.rag.document_replacement import (
     DocumentReplacementService,
 )
+from rkjo_kernel.rag.postgres_document_restore import (
+    PostgresDocumentRestoreRepository,
+)
 from rkjo_kernel.rag.document_version_history import (
     DocumentVersionHistoryService,
 )
@@ -282,6 +285,38 @@ def get_rag_document_version_history_service(
 
     return DocumentVersionHistoryService(
         repository=repository
+    )
+
+
+def get_rag_document_restore_repository(
+) -> PostgresDocumentRestoreRepository:
+    """Build production document restore repository."""
+
+    database_url = get_database_url()
+
+    version_repository = (
+        PostgresDocumentVersionRepository(
+            database_url=database_url,
+            document_table_name="rag_documents",
+            version_table_name="rag_document_versions",
+            version_chunk_table_name=(
+                "rag_document_version_chunks"
+            ),
+        )
+    )
+
+    version_repository.initialize_schema()
+
+    return PostgresDocumentRestoreRepository(
+        database_url=database_url,
+        chunk_table_name="rag_chunks",
+        hash_table_name="rag_document_hashes",
+        document_table_name="rag_documents",
+        version_table_name="rag_document_versions",
+        version_chunk_table_name=(
+            "rag_document_version_chunks"
+        ),
+        embedding_space=get_embedding_space(),
     )
 
 

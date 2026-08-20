@@ -24,6 +24,7 @@ from rkjo_api.dependencies import (
     get_rag_answering_service,
     get_rag_document_lifecycle_service,
     get_rag_document_replacement_service,
+    get_rag_document_restore_repository,
     get_rag_document_version_history_service,
     get_rag_ingestion_pipeline,
     get_rag_search_service,
@@ -44,6 +45,9 @@ from rkjo_kernel.rag.document_lifecycle import (
 )
 from rkjo_kernel.rag.document_replacement import (
     DocumentReplacementService,
+)
+from rkjo_kernel.rag.postgres_document_restore import (
+    PostgresDocumentRestoreRepository,
 )
 from rkjo_kernel.rag.document_version_history import (
     DocumentVersionHistoryService,
@@ -114,6 +118,17 @@ class DocumentVersionItemResponse(BaseModel):
 
 
 
+
+
+
+
+
+class DocumentRestoreResponse(BaseModel):
+    document_id: str
+    restored_from_version: int
+    new_version: int
+    content_hash: str
+    chunk_count: int
 
 
 class DocumentVersionDetailResponse(BaseModel):
@@ -400,6 +415,65 @@ async def ingest_document(
 
 
 
+
+
+
+
+
+@router.post(
+    "/documents/{document_id}/versions/{version_number}/restore",
+    response_model=DocumentRestoreResponse,
+)
+def restore_document_version(
+    document_id: str,
+    version_number: int,
+    http_request: Request,
+    repository: PostgresDocumentRestoreRepository = Depends(
+        get_rag_document_restore_repository
+    ),
+) -> DocumentRestoreResponse:
+    """Restore one historical version as a new current version."""
+
+    identity = get_authenticated_identity(
+        http_request
+    )
+
+    tenant_id = identity.tenant_id
+
+    if tenant_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document version not found.",
+        )
+
+    try:
+        result = repository.restore(
+            document_id=document_id,
+            tenant_id=tenant_id,
+            version_number=version_number,
+        )
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Document version not found.",
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    return DocumentRestoreResponse(
+        document_id=result.document_id,
+        restored_from_version=(
+            result.restored_from_version
+        ),
+        new_version=result.new_version,
+        content_hash=result.content_hash,
+        chunk_count=result.chunk_count,
+    )
 
 
 @router.get(
