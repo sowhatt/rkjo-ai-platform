@@ -13,6 +13,8 @@ from rkjo_kernel.rag.semantic_search import (
 class BuiltContext:
     content: str
     results: list[SemanticSearchResult]
+    character_count: int
+    truncated: bool
 
 
 class CitationContextBuilder:
@@ -20,13 +22,20 @@ class CitationContextBuilder:
         self,
         *,
         max_characters: int = 12000,
+        max_chunks: int = 5,
     ) -> None:
         if max_characters <= 0:
             raise ValueError(
                 "max_characters must be greater than 0."
             )
 
+        if max_chunks <= 0:
+            raise ValueError(
+                "max_chunks must be greater than 0."
+            )
+
         self.max_characters = max_characters
+        self.max_chunks = max_chunks
 
     def build(
         self,
@@ -34,9 +43,24 @@ class CitationContextBuilder:
     ) -> BuiltContext:
         selected: list[SemanticSearchResult] = []
         blocks: list[str] = []
+        seen: set[tuple[str, str]] = set()
+
         current_size = 0
+        truncated = False
 
         for result in results:
+            deduplication_key = (
+                result.document_id,
+                result.content,
+            )
+
+            if deduplication_key in seen:
+                continue
+
+            if len(selected) >= self.max_chunks:
+                truncated = True
+                break
+
             citation = len(selected) + 1
 
             block = (
@@ -55,13 +79,19 @@ class CitationContextBuilder:
                 current_size + extra_size
                 > self.max_characters
             ):
-                break
+                truncated = True
+                continue
 
+            seen.add(deduplication_key)
             blocks.append(block)
             selected.append(result)
             current_size += extra_size
 
+        content = "\n\n".join(blocks)
+
         return BuiltContext(
-            content="\n\n".join(blocks),
+            content=content,
             results=selected,
+            character_count=len(content),
+            truncated=truncated,
         )
