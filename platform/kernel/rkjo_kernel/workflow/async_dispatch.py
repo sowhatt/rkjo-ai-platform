@@ -51,6 +51,7 @@ class AsyncWorkflowDispatcher:
         execution_id: str,
         correlation_id: str | None = None,
         reply_queue: str | None = None,
+        target_agent_name: str | None = None,
     ) -> AsyncDispatchResult:
         """Queue one workflow step for asynchronous execution."""
 
@@ -66,7 +67,10 @@ class AsyncWorkflowDispatcher:
 
         message = AgentMessage(
             source=self.source,
-            target=step.routing_target,
+            target=(
+                target_agent_name
+                or step.routing_target
+            ),
             message_type="workflow.step.execute",
             correlation_id=correlation,
             payload={
@@ -98,7 +102,7 @@ class AsyncWorkflowDispatcher:
             event="workflow.dispatched",
             execution_id=execution_id,
             step_id=step.step_id,
-            agent_name=step.routing_target,
+            agent_name=message.target,
             queue_name=queue_name,
             message_id=message.message_id,
             correlation_id=message.correlation_id,

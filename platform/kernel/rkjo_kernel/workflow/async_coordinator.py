@@ -57,6 +57,7 @@ class AsyncWorkflowCoordinator:
                 execution_id=execution.execution_id,
                 correlation_id=correlation_id,
                 reply_queue=self.reply_queue,
+                target_agent_name=route.agent_name,
             )
         except Exception:
             # start_next_step() has already persisted the RUNNING step.

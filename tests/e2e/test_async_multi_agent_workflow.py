@@ -110,6 +110,17 @@ class TutorAgent(BaseAgent):
         }
 
 
+class CapabilityTutorAgent(BaseAgent):
+    def process(
+        self,
+        message: AgentMessage,
+    ) -> dict[str, Any]:
+        return {
+            "lesson": "addition-with-carry",
+            "explanation": "27 + 18 = 45",
+        }
+
+
 class ExerciseAgent(BaseAgent):
     def process(
         self,
@@ -363,3 +374,185 @@ def test_async_three_agent_workflow_auto_continues() -> None:
         runtime.total_runtime_messages == 1
         for runtime in runtimes
     )
+
+
+def test_async_workflow_routes_capability_to_concrete_agent() -> None:
+    bus = InMemoryEventBus()
+
+    repository = InMemoryWorkflowRepository()
+
+    engine = WorkflowEngine(
+        repository=repository
+    )
+
+    registry = AgentRegistry()
+
+    registry_service = RegistryService(
+        registry=registry
+    )
+
+    from rkjo_kernel.registry.capability import AgentCapability
+
+    capability = AgentCapability(
+        name="education.tutoring",
+        description="Education tutoring capability.",
+    )
+
+    registry_service.register_agent(
+        AgentDescriptor(
+            name="education.tutor.low",
+            display_name="Low priority tutor",
+            product="RKJO Education",
+            queue_name="education.tutor.low.queue",
+            status=AgentStatus.AVAILABLE,
+            priority=3,
+            capabilities=[capability],
+        )
+    )
+
+    registry_service.register_agent(
+        AgentDescriptor(
+            name="education.tutor.high",
+            display_name="High priority tutor",
+            product="RKJO Education",
+            queue_name="education.tutor.high.queue",
+            status=AgentStatus.AVAILABLE,
+            priority=9,
+            capabilities=[capability],
+        )
+    )
+
+    low_agent = CapabilityTutorAgent(
+        agent_name="education.tutor.low",
+        queue_name="education.tutor.low.queue",
+        event_bus=bus,
+    )
+
+    high_agent = CapabilityTutorAgent(
+        agent_name="education.tutor.high",
+        queue_name="education.tutor.high.queue",
+        event_bus=bus,
+    )
+
+    low_runtime = AgentRuntime(
+        agent=low_agent,
+        event_bus=bus,
+        registry_service=registry_service,
+        result_publisher=AgentResultPublisher(
+            event_bus=bus,
+            source=low_agent.agent_name,
+        ),
+    )
+
+    high_runtime = AgentRuntime(
+        agent=high_agent,
+        event_bus=bus,
+        registry_service=registry_service,
+        result_publisher=AgentResultPublisher(
+            event_bus=bus,
+            source=high_agent.agent_name,
+        ),
+    )
+
+    bus.consume_agent_messages(
+        queue_name="education.tutor.low.queue",
+        callback=low_runtime.execute,
+    )
+
+    bus.consume_agent_messages(
+        queue_name="education.tutor.high.queue",
+        callback=high_runtime.execute,
+    )
+
+    definition = WorkflowDefinition(
+        workflow_id="education-capability-e2e",
+        name="Education Capability Routing E2E",
+        steps=[
+            WorkflowStep(
+                step_id="tutoring",
+                name="Tutoring",
+                capability_name="education.tutoring",
+                position=0,
+            ),
+        ],
+    )
+
+    execution = engine.create_execution(
+        definition,
+        execution_id="education-capability-e2e-001",
+        input_data={
+            "student_id": "student-001",
+            "subject": "mathematics",
+        },
+    )
+
+    engine.start(execution)
+
+    coordinator = AsyncWorkflowCoordinator(
+        engine=engine,
+        router=WorkflowAgentRouter(
+            registry_service=registry_service
+        ),
+        dispatcher=AsyncWorkflowDispatcher(
+            event_bus=bus
+        ),
+        reply_queue="rkjo.workflow.results",
+    )
+
+    result_handler = WorkflowResultHandler(
+        engine=engine,
+        coordinator=coordinator,
+    )
+
+    bus.consume_agent_messages(
+        queue_name="rkjo.workflow.results",
+        callback=result_handler.handle,
+    )
+
+    coordinator.dispatch_next(
+        execution,
+        correlation_id="corr-capability-001",
+    )
+
+    assert len(
+        bus.published_messages[
+            "education.tutor.low.queue"
+        ]
+    ) == 0
+
+    assert len(
+        bus.published_messages[
+            "education.tutor.high.queue"
+        ]
+    ) == 1
+
+    dispatched = bus.published_messages[
+        "education.tutor.high.queue"
+    ][0]
+
+    assert dispatched.target == "education.tutor.high"
+
+    assert (
+        dispatched.metadata["capability_name"]
+        == "education.tutoring"
+    )
+
+    assert (
+        dispatched.correlation_id
+        == "corr-capability-001"
+    )
+
+    assert low_runtime.total_runtime_messages == 0
+    assert high_runtime.total_runtime_messages == 1
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.status == WorkflowStatus.COMPLETED
+
+    assert restored.context.outputs["tutoring"] == {
+        "lesson": "addition-with-carry",
+        "explanation": "27 + 18 = 45",
+    }
