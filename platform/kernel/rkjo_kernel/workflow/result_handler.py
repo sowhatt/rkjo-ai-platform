@@ -88,6 +88,29 @@ class WorkflowResultHandler:
             )
 
             if already_applied:
+                workflow_running = (
+                    getattr(
+                        execution.status,
+                        "value",
+                        execution.status,
+                    )
+                    == "running"
+                )
+
+                continuation_interrupted = (
+                    workflow_running
+                    and execution.current_step_id is None
+                    and self.coordinator is not None
+                    and self.engine.get_next_step(execution)
+                    is not None
+                )
+
+                if continuation_interrupted:
+                    self.coordinator.dispatch_next(
+                        execution,
+                        correlation_id=message.correlation_id,
+                    )
+
                 self._mark_processed(message.message_id)
                 return
 
