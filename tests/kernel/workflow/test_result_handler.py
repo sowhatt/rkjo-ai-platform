@@ -268,3 +268,181 @@ def test_success_result_dispatches_next_step_with_coordinator():
             "level": "beginner",
         }
     }
+
+
+def _make_two_step_execution(
+    execution_id: str,
+):
+    repository = InMemoryWorkflowRepository()
+    engine = WorkflowEngine(repository=repository)
+
+    definition = WorkflowDefinition(
+        workflow_id=f"{execution_id}-workflow",
+        name="Idempotency Workflow",
+        steps=[
+            WorkflowStep(
+                step_id="step-1",
+                name="Step 1",
+                agent_name="agent.one",
+                position=0,
+            ),
+            WorkflowStep(
+                step_id="step-2",
+                name="Step 2",
+                agent_name="agent.two",
+                position=1,
+            ),
+        ],
+    )
+
+    execution = engine.create_execution(
+        definition,
+        execution_id=execution_id,
+    )
+    engine.start(execution)
+    engine.start_next_step(execution)
+
+    return engine, repository, execution
+
+
+def _result_message(
+    execution_id: str,
+    *,
+    message_id: str,
+    result: dict,
+) -> AgentMessage:
+    return AgentMessage(
+        message_id=message_id,
+        correlation_id="corr-idempotency",
+        source="agent.one",
+        target="rkjo.workflow",
+        message_type="workflow.step.result",
+        payload={
+            "success": True,
+            "result": result,
+        },
+        metadata={
+            "workflow_execution_id": execution_id,
+            "workflow_step_id": "step-1",
+        },
+    )
+
+
+def test_duplicate_step_result_is_ignored_when_already_processed():
+    from rkjo_kernel.workflow.idempotency import (
+        InMemoryProcessedMessageStore,
+    )
+
+    engine, repository, execution = (
+        _make_two_step_execution(
+            "duplicate-result-execution"
+        )
+    )
+
+    processed = InMemoryProcessedMessageStore()
+    handler = WorkflowResultHandler(
+        engine=engine,
+        processed_messages=processed,
+    )
+
+    message = _result_message(
+        execution.execution_id,
+        message_id="duplicate-result-001",
+        result={"value": "result-1"},
+    )
+
+    handler.handle(message)
+    handler.handle(message)
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.context.outputs["step-1"] == {
+        "value": "result-1"
+    }
+
+
+def test_redelivery_of_completed_step_result_is_idempotent():
+    engine, repository, execution = (
+        _make_two_step_execution(
+            "crash-window-execution"
+        )
+    )
+
+    result = {
+        "value": "step-1-result",
+    }
+
+    engine.complete_current_step(
+        execution,
+        output=result,
+    )
+    engine.start_next_step(execution)
+
+    handler = WorkflowResultHandler(
+        engine=engine,
+    )
+
+    message = _result_message(
+        execution.execution_id,
+        message_id="redelivery-result-001",
+        result=result,
+    )
+
+    handler.handle(message)
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.current_step_id == "step-2"
+    assert restored.context.outputs["step-1"] == result
+
+
+def test_stale_completed_step_with_conflicting_result_is_rejected():
+    import pytest
+
+    engine, repository, execution = (
+        _make_two_step_execution(
+            "conflicting-result-execution"
+        )
+    )
+
+    original = {
+        "value": "original-result",
+    }
+
+    engine.complete_current_step(
+        execution,
+        output=original,
+    )
+    engine.start_next_step(execution)
+
+    handler = WorkflowResultHandler(
+        engine=engine,
+    )
+
+    message = _result_message(
+        execution.execution_id,
+        message_id="conflicting-result-001",
+        result={
+            "value": "different-result",
+        },
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Workflow result does not match",
+    ):
+        handler.handle(message)
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.current_step_id == "step-2"
+    assert restored.context.outputs["step-1"] == original

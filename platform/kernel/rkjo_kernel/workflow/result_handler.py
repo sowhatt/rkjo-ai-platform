@@ -65,6 +65,32 @@ class WorkflowResultHandler:
         )
 
         if execution.current_step_id != step_id:
+            matching_step = next(
+                (
+                    step
+                    for step in execution.definition.steps
+                    if step.step_id == step_id
+                ),
+                None,
+            )
+
+            already_applied = (
+                matching_step is not None
+                and getattr(
+                    matching_step.status,
+                    "value",
+                    matching_step.status,
+                )
+                == "completed"
+                and bool(message.payload.get("success"))
+                and matching_step.output
+                == message.payload.get("result")
+            )
+
+            if already_applied:
+                self._mark_processed(message.message_id)
+                return
+
             raise RuntimeError(
                 "Workflow result does not match the "
                 "currently running step."
