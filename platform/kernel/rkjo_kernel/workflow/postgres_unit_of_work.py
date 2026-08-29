@@ -244,7 +244,8 @@ class PostgreSQLTransactionalOutboxStore:
                 FROM workflow_outbox
                 WHERE published_at IS NULL
                 ORDER BY created_at ASC
-                LIMIT %s;
+                LIMIT %s
+                FOR UPDATE SKIP LOCKED;
                 """,
                 (limit,),
             )

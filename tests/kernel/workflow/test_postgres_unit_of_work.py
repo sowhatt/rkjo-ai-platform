@@ -300,3 +300,72 @@ def test_mark_published_is_transactional(
         DATABASE_URL
     ) as verification:
         assert verification.outbox.pending() == []
+
+
+def test_pending_skips_rows_locked_by_another_transaction(
+    uow,
+):
+    """Concurrent outbox publishers must not claim the same row."""
+
+    first_message = make_outbox_message(
+        "outbox-concurrent-001"
+    )
+
+    second_message = make_outbox_message(
+        "outbox-concurrent-002"
+    )
+
+    with uow:
+        uow.outbox.add(
+            first_message
+        )
+        uow.outbox.add(
+            second_message
+        )
+        uow.commit()
+
+    first_worker = PostgreSQLWorkflowUnitOfWork(
+        DATABASE_URL
+    )
+
+    second_worker = PostgreSQLWorkflowUnitOfWork(
+        DATABASE_URL
+    )
+
+    with first_worker:
+        first_pending = (
+            first_worker.outbox.pending(
+                limit=1
+            )
+        )
+
+        assert len(first_pending) == 1
+
+        first_id = (
+            first_pending[0].outbox_id
+        )
+
+        # first_worker keeps its PostgreSQL transaction
+        # open here, so its selected row remains locked.
+        with second_worker:
+            second_pending = (
+                second_worker.outbox.pending(
+                    limit=1
+                )
+            )
+
+            assert len(second_pending) == 1
+
+            second_id = (
+                second_pending[0].outbox_id
+            )
+
+            assert second_id != first_id
+
+            assert {
+                first_id,
+                second_id,
+            } == {
+                "outbox-concurrent-001",
+                "outbox-concurrent-002",
+            }
