@@ -166,3 +166,76 @@ def test_dispatch_next_returns_none_when_no_step_remains():
 
     assert result is None
     assert len(bus.published) == 2
+
+
+def test_prepare_next_starts_and_prepares_without_publishing():
+    engine, coordinator, bus = make_coordinator()
+    execution = make_execution(engine)
+
+    prepared = coordinator.prepare_next(
+        execution,
+        correlation_id="corr-prepare-001",
+    )
+
+    assert prepared is not None
+    assert prepared.step_id == "diagnostic"
+    assert prepared.queue_name == "education.diagnostic"
+
+    assert prepared.message.target == "diagnostic.agent"
+    assert (
+        prepared.message.correlation_id
+        == "corr-prepare-001"
+    )
+    assert (
+        prepared.message.message_type
+        == "workflow.step.execute"
+    )
+
+    assert prepared.message.metadata[
+        "workflow_execution_id"
+    ] == "education-001"
+
+    assert prepared.message.metadata[
+        "workflow_step_id"
+    ] == "diagnostic"
+
+    assert prepared.message.metadata[
+        "reply_queue"
+    ] == "rkjo.workflow.results"
+
+    assert execution.current_step_id == "diagnostic"
+
+    # prepare_next() must not publish externally.
+    assert bus.published == []
+
+
+def test_prepare_next_returns_none_when_no_step_remains():
+    engine, coordinator, bus = make_coordinator()
+    execution = make_execution(engine)
+
+    first = coordinator.prepare_next(execution)
+
+    assert first is not None
+    assert first.step_id == "diagnostic"
+
+    engine.complete_current_step(
+        execution,
+        output={"level": "beginner"},
+    )
+
+    second = coordinator.prepare_next(execution)
+
+    assert second is not None
+    assert second.step_id == "tutoring"
+
+    engine.complete_current_step(
+        execution,
+        output={"lesson": "fractions"},
+    )
+
+    prepared = coordinator.prepare_next(execution)
+
+    assert prepared is None
+
+    # No prepared message has been published to EventBus.
+    assert bus.published == []

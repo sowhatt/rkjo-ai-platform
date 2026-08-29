@@ -42,7 +42,7 @@ class AsyncWorkflowDispatcher:
             "rkjo.workflow.dispatch"
         )
 
-    def dispatch(
+    def prepare(
         self,
         *,
         step: WorkflowStep,
@@ -52,9 +52,8 @@ class AsyncWorkflowDispatcher:
         correlation_id: str | None = None,
         reply_queue: str | None = None,
         target_agent_name: str | None = None,
-    ) -> AsyncDispatchResult:
-        """Queue one workflow step for asynchronous execution."""
-
+    ) -> tuple[str, AgentMessage]:
+        """Build one workflow step message without publishing it."""
         if not queue_name or not queue_name.strip():
             raise ValueError(
                 "queue_name must not be empty."
@@ -87,8 +86,32 @@ class AsyncWorkflowDispatcher:
             },
         )
 
-        self.event_bus.publish_agent_message(
+        return queue_name, message
+
+    def dispatch(
+        self,
+        *,
+        step: WorkflowStep,
+        context: WorkflowContext,
+        queue_name: str,
+        execution_id: str,
+        correlation_id: str | None = None,
+        reply_queue: str | None = None,
+        target_agent_name: str | None = None,
+    ) -> AsyncDispatchResult:
+        """Build and publish one workflow step message."""
+        prepared_queue, message = self.prepare(
+            step=step,
+            context=context,
             queue_name=queue_name,
+            execution_id=execution_id,
+            correlation_id=correlation_id,
+            reply_queue=reply_queue,
+            target_agent_name=target_agent_name,
+        )
+
+        self.event_bus.publish_agent_message(
+            queue_name=prepared_queue,
             message=message,
         )
 
@@ -103,7 +126,7 @@ class AsyncWorkflowDispatcher:
             execution_id=execution_id,
             step_id=step.step_id,
             agent_name=message.target,
-            queue_name=queue_name,
+            queue_name=prepared_queue,
             message_id=message.message_id,
             correlation_id=message.correlation_id,
         )
@@ -111,6 +134,6 @@ class AsyncWorkflowDispatcher:
         return AsyncDispatchResult(
             message_id=message.message_id,
             correlation_id=message.correlation_id,
-            queue_name=queue_name,
+            queue_name=prepared_queue,
             step_id=step.step_id,
         )
