@@ -9,10 +9,8 @@ from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
 from rkjo_kernel.messages.agent_message import AgentMessage
-from rkjo_kernel.registry.capability import AgentCapability
-from rkjo_kernel.registry.descriptor import (
-    AgentDescriptor,
-    AgentStatus,
+from rkjo_worker.agent_catalog import (
+    build_platform_worker_descriptor,
 )
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.runtime.agent_runtime import AgentRuntime
@@ -60,21 +58,6 @@ def build_runtime(
     default adapter.
     """
 
-    agent_name = get_env(
-        "RKJO_WORKER_AGENT_NAME",
-        "rkjo.platform.worker",
-    )
-
-    queue_name = get_env(
-        "RKJO_WORKER_QUEUE",
-        "rkjo.platform.worker",
-    )
-
-    capability_name = get_env(
-        "RKJO_WORKER_CAPABILITY",
-        "platform_task",
-    )
-
     bus = event_bus or RabbitMQEventBus()
 
     registry = AgentRegistry()
@@ -83,40 +66,15 @@ def build_runtime(
         registry=registry
     )
 
+    descriptor = build_platform_worker_descriptor()
+
     registry_service.register_agent(
-        AgentDescriptor(
-            name=agent_name,
-            display_name="RKJO Platform Worker",
-            description=(
-                "Generic distributed worker used to execute RKJO "
-                "platform missions."
-            ),
-            product="RKJO",
-            queue_name=queue_name,
-            status=AgentStatus.STOPPED,
-            capabilities=[
-                AgentCapability(
-                    name=capability_name,
-                    description=(
-                        "Execute a generic RKJO platform mission and "
-                        "return its processed payload."
-                    ),
-                    input_schema={"payload": "dict"},
-                    output_schema={
-                        "processed_by": "str",
-                        "message_id": "str",
-                        "payload": "dict",
-                    },
-                    tags=["rkjo", "worker", "runtime"],
-                    supports_local_model=True,
-                )
-            ],
-        )
+        descriptor
     )
 
     agent = PlatformWorkerAgent(
-        agent_name=agent_name,
-        queue_name=queue_name,
+        agent_name=descriptor.name,
+        queue_name=descriptor.queue_name,
         event_bus=bus,
     )
 
