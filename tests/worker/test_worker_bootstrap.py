@@ -104,3 +104,82 @@ def test_worker_registers_discoverable_capability(monkeypatch):
     assert result.agent.name == "rkjo.test.worker"
     assert result.agent.queue_name == "rkjo.test.worker.queue"
     assert result.capability.name == "document_analysis"
+
+
+def test_main_starts_health_server_and_closes_bus(monkeypatch):
+    from rkjo_kernel.runtime.status import RuntimeStatus
+    from rkjo_worker import main as worker_main
+
+    bus = Mock(spec=EventBus)
+
+    runtime = Mock()
+    runtime.status = RuntimeStatus.CREATED
+    runtime.last_error = None
+    runtime.event_bus = bus
+
+    def start_runtime():
+        runtime.status = RuntimeStatus.RUNNING
+
+    runtime.start.side_effect = start_runtime
+
+    health_server = Mock()
+
+    monkeypatch.setattr(
+        worker_main,
+        "build_runtime",
+        lambda: runtime,
+    )
+    monkeypatch.setattr(
+        worker_main,
+        "HealthHTTPServer",
+        lambda **kwargs: health_server,
+    )
+    monkeypatch.setattr(
+        worker_main.signal,
+        "signal",
+        Mock(),
+    )
+
+    worker_main.main()
+
+    health_server.start.assert_called_once_with()
+    runtime.start.assert_called_once_with()
+    health_server.stop.assert_called_once_with()
+    bus.close.assert_called_once_with()
+
+
+def test_main_handles_keyboard_interrupt(monkeypatch):
+    from rkjo_kernel.runtime.status import RuntimeStatus
+    from rkjo_worker import main as worker_main
+
+    bus = Mock(spec=EventBus)
+
+    runtime = Mock()
+    runtime.status = RuntimeStatus.RUNNING
+    runtime.last_error = None
+    runtime.event_bus = bus
+    runtime.start.side_effect = KeyboardInterrupt
+
+    health_server = Mock()
+
+    monkeypatch.setattr(
+        worker_main,
+        "build_runtime",
+        lambda: runtime,
+    )
+    monkeypatch.setattr(
+        worker_main,
+        "HealthHTTPServer",
+        lambda **kwargs: health_server,
+    )
+    monkeypatch.setattr(
+        worker_main.signal,
+        "signal",
+        Mock(),
+    )
+
+    worker_main.main()
+
+    health_server.start.assert_called_once_with()
+    health_server.stop.assert_called_once_with()
+    bus.close.assert_called_once_with()

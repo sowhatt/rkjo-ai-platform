@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import signal
 from typing import Any
 
 from rkjo_kernel.agents.base_agent import BaseAgent
@@ -12,6 +13,8 @@ from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_worker.agent_catalog import (
     build_platform_worker_descriptor,
 )
+from rkjo_worker.health_http import HealthHTTPServer
+from rkjo_worker.runtime_health import RuntimeHealthAdapter
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.runtime.agent_runtime import AgentRuntime
 from rkjo_kernel.services.registry_service import RegistryService
@@ -88,7 +91,45 @@ def build_runtime(
 def main() -> None:
     runtime = build_runtime()
 
-    runtime.start()
+    health = RuntimeHealthAdapter(
+        runtime=runtime,
+        service_name="platform-worker",
+    )
+
+    health_server = HealthHTTPServer(
+        health=health,
+        host=get_env(
+            "RKJO_WORKER_HEALTH_HOST",
+            "0.0.0.0",
+        ),
+        port=int(
+            get_env(
+                "RKJO_WORKER_HEALTH_PORT",
+                "8081",
+            )
+        ),
+    )
+
+    def _stop_handler(signum, frame) -> None:
+        raise KeyboardInterrupt
+
+    signal.signal(
+        signal.SIGTERM,
+        _stop_handler,
+    )
+    signal.signal(
+        signal.SIGINT,
+        _stop_handler,
+    )
+
+    try:
+        health_server.start()
+        runtime.start()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        health_server.stop()
+        runtime.event_bus.close()
 
 
 if __name__ == "__main__":
