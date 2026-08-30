@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import time
 from collections.abc import Callable
 
@@ -228,6 +229,21 @@ def main() -> None:
         retry_initial_seconds=retry_initial_seconds,
         retry_max_seconds=retry_max_seconds,
         retry_multiplier=retry_multiplier,
+    )
+
+    def _stop_handler(
+        signum,
+        frame,
+    ) -> None:
+        raise KeyboardInterrupt
+
+    signal.signal(
+        signal.SIGTERM,
+        _stop_handler,
+    )
+    signal.signal(
+        signal.SIGINT,
+        _stop_handler,
     )
 
     consumer.run()
