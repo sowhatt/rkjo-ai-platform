@@ -224,3 +224,189 @@ def test_consumer_rejects_invalid_retry_configuration(
             event_bus_factory=Mock(),
             **kwargs,
         )
+
+
+def test_result_consumer_marks_ready_before_consuming() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="workflow-result-consumer"
+    )
+
+    class Handler:
+        def handle(self, message):
+            return None
+
+    class EventBus:
+        def consume_agent_messages(
+            self,
+            *,
+            queue_name,
+            callback,
+        ):
+            snapshot = health.snapshot()
+
+            assert snapshot.live is True
+            assert snapshot.ready is True
+            assert snapshot.status == "ready"
+
+        def close(self):
+            return None
+
+    consumer = WorkflowResultConsumer(
+        event_bus_factory=EventBus,
+        handler_builder=lambda *, event_bus: (
+            "workflow-results",
+            Handler(),
+        ),
+        health=health,
+    )
+
+    consumer.run()
+
+    snapshot = health.snapshot()
+
+    assert snapshot.live is True
+    assert snapshot.ready is True
+
+
+def test_result_consumer_marks_not_ready_on_failure() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="workflow-result-consumer"
+    )
+
+    class Handler:
+        def handle(self, message):
+            return None
+
+    class EventBus:
+        def consume_agent_messages(
+            self,
+            *,
+            queue_name,
+            callback,
+        ):
+            raise RuntimeError(
+                "RabbitMQ unavailable"
+            )
+
+        def close(self):
+            return None
+
+    def stop_after_failure(_delay):
+        consumer.stop()
+
+    consumer = WorkflowResultConsumer(
+        event_bus_factory=EventBus,
+        handler_builder=lambda *, event_bus: (
+            "workflow-results",
+            Handler(),
+        ),
+        health=health,
+        sleep_fn=stop_after_failure,
+    )
+
+    consumer.run()
+
+    snapshot = health.snapshot()
+
+    assert snapshot.live is False
+    assert snapshot.ready is False
+    assert snapshot.status == "stopped"
+    assert snapshot.last_error == (
+        "RabbitMQ unavailable"
+    )
+
+
+def test_result_consumer_recovers_readiness_after_retry() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="workflow-result-consumer"
+    )
+
+    attempts = {"count": 0}
+
+    class Handler:
+        def handle(self, message):
+            return None
+
+    class EventBus:
+        def consume_agent_messages(
+            self,
+            *,
+            queue_name,
+            callback,
+        ):
+            attempts["count"] += 1
+
+            if attempts["count"] == 1:
+                raise RuntimeError(
+                    "temporary RabbitMQ failure"
+                )
+
+        def close(self):
+            return None
+
+    consumer = WorkflowResultConsumer(
+        event_bus_factory=EventBus,
+        handler_builder=lambda *, event_bus: (
+            "workflow-results",
+            Handler(),
+        ),
+        health=health,
+        sleep_fn=lambda _delay: None,
+    )
+
+    consumer.run()
+
+    snapshot = health.snapshot()
+
+    assert attempts["count"] == 2
+    assert snapshot.live is True
+    assert snapshot.ready is True
+    assert snapshot.status == "ready"
+    assert snapshot.last_error is None
+
+
+def test_result_consumer_marks_stopped_on_keyboard_interrupt() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="workflow-result-consumer"
+    )
+
+    class Handler:
+        def handle(self, message):
+            return None
+
+    class EventBus:
+        def consume_agent_messages(
+            self,
+            *,
+            queue_name,
+            callback,
+        ):
+            raise KeyboardInterrupt
+
+        def close(self):
+            return None
+
+    consumer = WorkflowResultConsumer(
+        event_bus_factory=EventBus,
+        handler_builder=lambda *, event_bus: (
+            "workflow-results",
+            Handler(),
+        ),
+        health=health,
+    )
+
+    consumer.run()
+
+    snapshot = health.snapshot()
+
+    assert snapshot.live is False
+    assert snapshot.ready is False
+    assert snapshot.status == "stopped"

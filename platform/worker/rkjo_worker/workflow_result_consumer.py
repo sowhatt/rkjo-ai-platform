@@ -10,6 +10,7 @@ from collections.abc import Callable
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
 from rkjo_kernel.logging.logger import get_logger
+from rkjo_worker.health import WorkerHealth
 from rkjo_kernel.registry.descriptor import AgentStatus
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.services.registry_service import RegistryService
@@ -110,6 +111,7 @@ class WorkflowResultConsumer:
         retry_max_seconds: float = 30.0,
         retry_multiplier: float = 2.0,
         sleep_fn=time.sleep,
+        health: WorkerHealth | None = None,
     ) -> None:
         if retry_initial_seconds <= 0:
             raise ValueError(
@@ -133,10 +135,14 @@ class WorkflowResultConsumer:
         self.retry_max_seconds = retry_max_seconds
         self.retry_multiplier = retry_multiplier
         self.sleep_fn = sleep_fn
+        self.health = health or WorkerHealth(
+            service_name="workflow-result-consumer"
+        )
         self._running = True
 
     def stop(self) -> None:
         self._running = False
+        self.health.mark_stopped()
 
     def run(self) -> None:
         retry_delay = self.retry_initial_seconds
@@ -156,6 +162,7 @@ class WorkflowResultConsumer:
                     result_queue,
                 )
 
+                self.health.mark_ready()
                 event_bus.consume_agent_messages(
                     queue_name=result_queue,
                     callback=handler.handle,
@@ -164,12 +171,15 @@ class WorkflowResultConsumer:
                 return
 
             except KeyboardInterrupt:
+                self.health.mark_stopped()
                 logger.info(
                     "Workflow result consumer interrupted."
                 )
                 return
 
             except Exception as exc:
+                self.health.mark_not_ready(exc)
+
                 if not self._running:
                     return
 
