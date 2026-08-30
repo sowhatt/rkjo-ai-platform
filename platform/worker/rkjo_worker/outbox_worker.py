@@ -9,6 +9,7 @@ from collections.abc import Callable
 
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
 from rkjo_kernel.logging.logger import get_logger
+from rkjo_worker.health import WorkerHealth
 from rkjo_kernel.workflow.outbox_publisher import OutboxPublisher
 from rkjo_kernel.workflow.postgres_unit_of_work import (
     PostgreSQLWorkflowUnitOfWork,
@@ -34,6 +35,7 @@ class OutboxWorker:
         publisher_factory: Callable[
             [], OutboxPublisher
         ] | None = None,
+        health: WorkerHealth | None = None,
     ) -> None:
         if poll_interval_seconds <= 0:
             raise ValueError(
@@ -69,10 +71,14 @@ class OutboxWorker:
         self.retry_multiplier = retry_multiplier
         self.sleep_fn = sleep_fn
         self.publisher_factory = publisher_factory
+        self.health = health or WorkerHealth(
+            service_name="outbox-worker"
+        )
         self._running = True
 
     def stop(self) -> None:
         self._running = False
+        self.health.mark_stopped()
 
     def run(self) -> None:
         retry_delay = self.retry_initial_seconds
@@ -83,6 +89,7 @@ class OutboxWorker:
                     limit=self.batch_size,
                 )
 
+                self.health.mark_ready()
                 retry_delay = self.retry_initial_seconds
 
                 if published == 0:
@@ -91,6 +98,8 @@ class OutboxWorker:
                     )
 
             except Exception as publish_exc:
+                self.health.mark_not_ready(publish_exc)
+
                 if not self._running:
                     break
 

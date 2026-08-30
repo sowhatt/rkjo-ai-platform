@@ -90,3 +90,19 @@ def test_snapshot_can_be_serialized() -> None:
         "status": "ready",
         "last_error": None,
     }
+
+
+def test_stopped_worker_cannot_become_ready_again() -> None:
+    health = WorkerHealth(
+        service_name="test-worker"
+    )
+
+    health.mark_ready()
+    health.mark_stopped()
+    health.mark_ready()
+
+    snapshot = health.snapshot()
+
+    assert snapshot.live is False
+    assert snapshot.ready is False
+    assert snapshot.status == "stopped"

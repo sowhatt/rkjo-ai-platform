@@ -427,3 +427,188 @@ def test_outbox_worker_validates_retry_configuration() -> None:
         raise AssertionError(
             "Expected ValueError."
         )
+
+
+def test_outbox_worker_marks_ready_after_successful_cycle() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="outbox-worker"
+    )
+
+    observations = []
+
+    class Publisher:
+        def publish_pending(
+            self,
+            *,
+            limit=100,
+        ):
+            return 0
+
+    worker = OutboxWorker(
+        publisher=Publisher(),
+        health=health,
+        sleep_fn=lambda _delay: (
+            observations.append(
+                health.snapshot()
+            ),
+            worker.stop(),
+        ),
+    )
+
+    worker.run()
+
+    assert len(observations) == 1
+
+    snapshot = observations[0]
+
+    assert snapshot.live is True
+    assert snapshot.ready is True
+    assert snapshot.status == "ready"
+    assert snapshot.last_error is None
+
+    stopped = health.snapshot()
+
+    assert stopped.live is False
+    assert stopped.ready is False
+    assert stopped.status == "stopped"
+
+
+def test_outbox_worker_marks_not_ready_on_failure() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="outbox-worker"
+    )
+
+    observations = []
+
+    class Publisher:
+        def publish_pending(
+            self,
+            *,
+            limit=100,
+        ):
+            raise RuntimeError(
+                "simulated outbox failure"
+            )
+
+    worker = OutboxWorker(
+        publisher=Publisher(),
+        health=health,
+        sleep_fn=lambda _delay: (
+            observations.append(
+                health.snapshot()
+            ),
+            worker.stop(),
+        ),
+    )
+
+    worker.run()
+
+    assert len(observations) == 1
+
+    snapshot = observations[0]
+
+    assert snapshot.live is True
+    assert snapshot.ready is False
+    assert snapshot.status == "not_ready"
+    assert snapshot.last_error == (
+        "simulated outbox failure"
+    )
+
+
+def test_outbox_worker_recovers_readiness_after_failure() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="outbox-worker"
+    )
+
+    observations = []
+
+    class Publisher:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def publish_pending(
+            self,
+            *,
+            limit=100,
+        ):
+            self.calls += 1
+
+            if self.calls == 1:
+                raise RuntimeError(
+                    "temporary outbox failure"
+                )
+
+            return 0
+
+    publisher = Publisher()
+
+    def sleep_and_observe(_delay):
+        observations.append(
+            health.snapshot()
+        )
+
+        if publisher.calls >= 2:
+            worker.stop()
+
+    worker = OutboxWorker(
+        publisher=publisher,
+        health=health,
+        sleep_fn=sleep_and_observe,
+    )
+
+    worker.run()
+
+    assert publisher.calls == 2
+    assert len(observations) == 2
+
+    failed = observations[0]
+
+    assert failed.live is True
+    assert failed.ready is False
+    assert failed.last_error == (
+        "temporary outbox failure"
+    )
+
+    recovered = observations[1]
+
+    assert recovered.live is True
+    assert recovered.ready is True
+    assert recovered.status == "ready"
+    assert recovered.last_error is None
+
+
+def test_outbox_worker_cannot_become_ready_after_stop() -> None:
+    from rkjo_worker.health import WorkerHealth
+
+    health = WorkerHealth(
+        service_name="outbox-worker"
+    )
+
+    class Publisher:
+        def publish_pending(
+            self,
+            *,
+            limit=100,
+        ):
+            worker.stop()
+            return 0
+
+    worker = OutboxWorker(
+        publisher=Publisher(),
+        health=health,
+        sleep_fn=lambda _delay: None,
+    )
+
+    worker.run()
+
+    snapshot = health.snapshot()
+
+    assert snapshot.live is False
+    assert snapshot.ready is False
+    assert snapshot.status == "stopped"

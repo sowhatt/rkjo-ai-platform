@@ -47,6 +47,9 @@ class WorkerHealth:
 
     def mark_ready(self) -> None:
         with self._lock:
+            if not self._live:
+                return
+
             self._ready = True
             self._last_error = None
 
