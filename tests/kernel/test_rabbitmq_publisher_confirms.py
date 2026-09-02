@@ -69,7 +69,7 @@ def test_agent_publish_is_mandatory_after_confirm_mode_enabled():
     assert call.kwargs["routing_key"] == "education.diagnostic"
     assert call.kwargs["mandatory"] is True
     assert call.kwargs["properties"].delivery_mode == (
-        pika.DeliveryMode.Persistent
+        pika.DeliveryMode.Persistent.value
     )
 
 
