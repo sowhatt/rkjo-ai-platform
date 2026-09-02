@@ -44,10 +44,18 @@ class RabbitMQEventBus(EventBus):
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
 
-        self.logger.info("Connected to RabbitMQ successfully.")
+        # Publisher confirms make a successful basic_publish synchronous with
+        # the broker acknowledgement. If RabbitMQ NACKs a publication, Pika
+        # raises and callers such as OutboxPublisher must not mark the message
+        # as published in PostgreSQL.
+        self.channel.confirm_delivery()
+
+        self.logger.info(
+            "Connected to RabbitMQ successfully with publisher confirms enabled."
+        )
 
     def publish(self, queue_name: str, message: str) -> None:
-        """Publish a persistent text message."""
+        """Publish a persistent text message with broker confirmation."""
         self.channel.queue_declare(
             queue=queue_name,
             durable=True,
@@ -61,6 +69,7 @@ class RabbitMQEventBus(EventBus):
                 delivery_mode=pika.DeliveryMode.Persistent,
                 content_type="text/plain",
             ),
+            mandatory=True,
         )
 
         self.logger.info(
@@ -125,7 +134,7 @@ class RabbitMQEventBus(EventBus):
         queue_name: str,
         message: AgentMessage,
     ) -> None:
-        """Publish a persistent structured AgentMessage."""
+        """Publish a persistent AgentMessage with broker confirmation."""
         self.channel.queue_declare(
             queue=queue_name,
             durable=True,
@@ -145,10 +154,11 @@ class RabbitMQEventBus(EventBus):
                 type=message.message_type,
                 priority=message.priority,
             ),
+            mandatory=True,
         )
 
         self.logger.info(
-            "AgentMessage '%s' published to queue '%s' "
+            "AgentMessage '%s' confirmed by RabbitMQ on queue '%s' "
             "with correlation_id '%s'.",
             message.message_id,
             queue_name,
@@ -230,10 +240,10 @@ class RabbitMQEventBus(EventBus):
     ) -> None:
         """Republish a failed delivery or move it to the DLQ.
 
-        The original delivery is acknowledged only after the replacement copy
-        has been accepted by ``basic_publish``. If republishing raises, the
-        original delivery remains unacknowledged and can be recovered by
-        RabbitMQ when the channel/connection is closed.
+        Publisher confirms are enabled on this channel, so the original
+        delivery is acknowledged only after RabbitMQ confirms the replacement
+        retry/DLQ publication. A broker NACK or unroutable publication raises
+        and leaves the original delivery unacknowledged for recovery.
         """
         attempt = self._delivery_attempt(properties)
 
@@ -275,6 +285,7 @@ class RabbitMQEventBus(EventBus):
                 original_queue=queue_name,
                 error=error,
             ),
+            mandatory=True,
         )
 
         channel.basic_ack(
