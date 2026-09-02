@@ -188,6 +188,8 @@ services:
       RKJO_WORKER_QUEUE: >-
         rkjo.platform.worker
 
+      RKJO_WORKER_HEALTH_PORT: "8081"
+
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -195,6 +197,19 @@ services:
         condition: service_healthy
       workflow-migrate:
         condition: service_completed_successfully
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:8081/live"
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
     restart: unless-stopped
 

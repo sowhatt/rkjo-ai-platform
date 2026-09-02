@@ -73,3 +73,50 @@ def test_attach_document_is_idempotent():
     assert updated.document_ids == [
         "demo-anatomie-coeur"
     ]
+
+
+def test_list_courses_is_tenant_safe():
+    repository = InMemoryCourseRepository()
+    service = CourseService(repository)
+
+    service.create(
+        Course(
+            course_id="course-a",
+            tenant_id="tenant-a",
+            title="Anatomie",
+            subject="Anatomie",
+            level="Médecine",
+        )
+    )
+
+    service.create(
+        Course(
+            course_id="course-b",
+            tenant_id="tenant-a",
+            title="Physiologie",
+            subject="Physiologie",
+            level="Médecine",
+        )
+    )
+
+    service.create(
+        Course(
+            course_id="course-c",
+            tenant_id="tenant-b",
+            title="SVT",
+            subject="SVT",
+            level="Terminale",
+        )
+    )
+
+    courses = service.list_courses(
+        tenant_id="tenant-a"
+    )
+
+    assert {
+        course.course_id
+        for course in courses
+    } == {
+        "course-a",
+        "course-b",
+    }
