@@ -75,12 +75,20 @@ class PostgreSQLTransactionalWorkflowRepository:
         self,
         execution_id: str,
     ) -> WorkflowExecution | None:
+        """Load and lock one workflow for transactional mutation.
+
+        The repository is transaction-bound and workflow result handling
+        performs a read-modify-write cycle. ``FOR UPDATE`` serializes
+        concurrent handlers targeting the same execution so only one of them
+        can advance the workflow state at a time.
+        """
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT payload
                 FROM workflow_executions
-                WHERE execution_id = %s;
+                WHERE execution_id = %s
+                FOR UPDATE;
                 """,
                 (execution_id,),
             )
