@@ -11,6 +11,9 @@ from rkjo_api.bearer_auth import (
 from rkjo_api.rag import (
     router as rag_router,
 )
+from rkjo_api.education import (
+    router as education_router,
+)
 
 from rkjo_api.security import (
     API_KEY_HEADER,
@@ -52,6 +55,9 @@ app = FastAPI(
 
 app.include_router(
     rag_router
+)
+app.include_router(
+    education_router
 )
 
 

@@ -29,6 +29,7 @@ PROTECTED_PATH_PREFIXES = (
     "/workflows",
     "/metrics",
     "/rag",
+    "/education",
 )
 
 
@@ -207,6 +208,22 @@ def required_role_for_request(
 
     if path.startswith(
         "/workflows"
+    ):
+        if normalized_method == "GET":
+            return ApiRole.VIEWER
+
+        if normalized_method in {
+            "POST",
+            "PUT",
+            "PATCH",
+        }:
+            return ApiRole.OPERATOR
+
+        if normalized_method == "DELETE":
+            return ApiRole.ADMIN
+
+    if path.startswith(
+        "/education"
     ):
         if normalized_method == "GET":
             return ApiRole.VIEWER
