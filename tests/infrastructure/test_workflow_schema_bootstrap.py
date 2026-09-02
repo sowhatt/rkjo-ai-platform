@@ -22,4 +22,12 @@ def test_workflow_bootstrap_module_is_packaged_in_platform_image():
     )
 
     assert "COPY platform ./platform" in dockerfile
-    assert "PYTHONPATH=/app/platform/kernel" in dockerfile
+
+    pythonpath_lines = [
+        line
+        for line in dockerfile.splitlines()
+        if line.startswith("ENV PYTHONPATH=")
+    ]
+
+    assert pythonpath_lines
+    assert "/app/platform/kernel" in pythonpath_lines[0]
