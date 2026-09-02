@@ -42,6 +42,7 @@ class FakeChannel:
         routing_key,
         body,
         properties,
+        mandatory=False,
     ):
         if self.publish_error is not None:
             raise self.publish_error
@@ -52,6 +53,7 @@ class FakeChannel:
                 "routing_key": routing_key,
                 "body": body,
                 "properties": properties,
+                "mandatory": mandatory,
             }
         )
 
@@ -168,6 +170,7 @@ def test_failed_agent_message_is_republished_with_incremented_attempt():
     assert published["routing_key"] == (
         "rkjo.workflow.results"
     )
+    assert published["mandatory"] is True
     assert published["body"] == (
         message.model_dump_json().encode("utf-8")
     )
@@ -212,6 +215,7 @@ def test_failed_agent_message_moves_to_dlq_after_max_attempts():
     assert published["routing_key"] == (
         "rkjo.workflow.results.dlq"
     )
+    assert published["mandatory"] is True
     assert (
         published["properties"].headers[
             "x-rkjo-delivery-attempt"
@@ -257,6 +261,7 @@ def test_invalid_json_is_dead_lettered_instead_of_looping_forever():
     assert channel.published[0]["routing_key"] == (
         "rkjo.workflow.results.dlq"
     )
+    assert channel.published[0]["mandatory"] is True
     assert channel.published[0]["body"] == invalid_body
     assert channel.acked == [10]
 
