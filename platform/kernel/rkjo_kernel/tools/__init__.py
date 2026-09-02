@@ -5,6 +5,7 @@ from rkjo_kernel.tools.invoker import (
     ToolExecutionResult,
     ToolInvoker,
 )
+from rkjo_kernel.tools.resolver import CapabilityToolResolver
 from rkjo_kernel.tools.registry import (
     RegisteredTool,
     ToolHandler,
@@ -12,6 +13,7 @@ from rkjo_kernel.tools.registry import (
 )
 
 __all__ = [
+    "CapabilityToolResolver",
     "RegisteredTool",
     "ToolBinding",
     "ToolDescriptor",
