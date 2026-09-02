@@ -8,32 +8,33 @@ from rkjo_kernel.logging.logger import get_logger
 from rkjo_kernel.messages.agent_message import AgentMessage
 
 
+_DELIVERY_ATTEMPT_HEADER = "x-rkjo-delivery-attempt"
+_ORIGINAL_QUEUE_HEADER = "x-rkjo-original-queue"
+_FAILURE_TYPE_HEADER = "x-rkjo-failure-type"
+_FAILURE_MESSAGE_HEADER = "x-rkjo-failure-message"
+
+
 class RabbitMQEventBus(EventBus):
-    """
-    Implémentation RabbitMQ du bus d'événements du RKJO AI Kernel.
+    """RabbitMQ implementation of the RKJO AI event bus."""
 
-    Pourquoi cette classe ?
+    def __init__(
+        self,
+        *,
+        max_delivery_attempts: int = 3,
+        dlq_suffix: str = ".dlq",
+    ) -> None:
+        if max_delivery_attempts <= 0:
+            raise ValueError(
+                "max_delivery_attempts must be greater than zero."
+            )
 
-    Les agents et l'orchestrateur ne doivent pas dépendre directement
-    des détails techniques de RabbitMQ.
+        if not dlq_suffix or not dlq_suffix.strip():
+            raise ValueError(
+                "dlq_suffix must not be empty."
+            )
 
-    Ils utilisent le contrat EventBus, tandis que cette classe prend en charge :
-    - la connexion au broker ;
-    - la création des files ;
-    - la publication ;
-    - la consommation ;
-    - les ACK et NACK ;
-    - la fermeture propre des connexions.
-    """
-
-    def __init__(self) -> None:
-        """
-        Ouvre une connexion avec RabbitMQ et crée un channel.
-
-        Le channel est le canal logique utilisé pour déclarer les files,
-        publier des messages et démarrer des consommateurs.
-        """
-
+        self.max_delivery_attempts = max_delivery_attempts
+        self.dlq_suffix = dlq_suffix.strip()
         self.logger = get_logger("rkjo.events.rabbitmq")
 
         self.logger.info("Connecting to RabbitMQ...")
@@ -43,16 +44,18 @@ class RabbitMQEventBus(EventBus):
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
 
-        self.logger.info("Connected to RabbitMQ successfully.")
+        # Publisher confirms make a successful basic_publish synchronous with
+        # the broker acknowledgement. If RabbitMQ NACKs a publication, Pika
+        # raises and callers such as OutboxPublisher must not mark the message
+        # as published in PostgreSQL.
+        self.channel.confirm_delivery()
+
+        self.logger.info(
+            "Connected to RabbitMQ successfully with publisher confirms enabled."
+        )
 
     def publish(self, queue_name: str, message: str) -> None:
-        """
-        Publie un message texte dans une file RabbitMQ.
-
-        Cette méthode est conservée pour les tests simples et pour assurer
-        une transition progressive vers les AgentMessage structurés.
-        """
-
+        """Publish a persistent text message with broker confirmation."""
         self.channel.queue_declare(
             queue=queue_name,
             durable=True,
@@ -66,6 +69,7 @@ class RabbitMQEventBus(EventBus):
                 delivery_mode=pika.DeliveryMode.Persistent,
                 content_type="text/plain",
             ),
+            mandatory=True,
         )
 
         self.logger.info(
@@ -78,13 +82,7 @@ class RabbitMQEventBus(EventBus):
         queue_name: str,
         callback: Callable[[str], None],
     ) -> None:
-        """
-        Consomme des messages texte depuis une file RabbitMQ.
-
-        Chaque message correctement traité reçoit un ACK.
-        En cas d'erreur, il est temporairement replacé dans la file.
-        """
-
+        """Consume legacy text messages."""
         self.channel.queue_declare(
             queue=queue_name,
             durable=True,
@@ -136,25 +134,7 @@ class RabbitMQEventBus(EventBus):
         queue_name: str,
         message: AgentMessage,
     ) -> None:
-        """
-        Publie un AgentMessage validé et structuré dans RabbitMQ.
-
-        Pourquoi ?
-
-        Un système multi-agents professionnel ne doit pas échanger uniquement
-        du texte libre. Chaque mission doit être traçable et contenir notamment :
-
-        - un message_id ;
-        - un correlation_id ;
-        - une source ;
-        - une cible ;
-        - un type de message ;
-        - une priorité ;
-        - un payload métier ;
-        - des métadonnées ;
-        - une date de création.
-        """
-
+        """Publish a persistent AgentMessage with broker confirmation."""
         self.channel.queue_declare(
             queue=queue_name,
             durable=True,
@@ -174,10 +154,11 @@ class RabbitMQEventBus(EventBus):
                 type=message.message_type,
                 priority=message.priority,
             ),
+            mandatory=True,
         )
 
         self.logger.info(
-            "AgentMessage '%s' published to queue '%s' "
+            "AgentMessage '%s' confirmed by RabbitMQ on queue '%s' "
             "with correlation_id '%s'.",
             message.message_id,
             queue_name,
@@ -189,16 +170,14 @@ class RabbitMQEventBus(EventBus):
         queue_name: str,
         callback: Callable[[AgentMessage], None],
     ) -> None:
-        """
-        Consomme des AgentMessage depuis RabbitMQ.
-
-        Le JSON reçu est validé par Pydantic avant d'être transmis à l'agent.
-        Un message invalide ou mal formé ne doit pas entrer directement
-        dans la logique métier.
-        """
-
+        """Consume AgentMessages with bounded retries and a durable DLQ."""
         self.channel.queue_declare(
             queue=queue_name,
+            durable=True,
+        )
+
+        self.channel.queue_declare(
+            queue=self._dlq_name(queue_name),
             durable=True,
         )
 
@@ -214,20 +193,25 @@ class RabbitMQEventBus(EventBus):
 
                 callback(message)
 
-                channel.basic_ack(
-                    delivery_tag=method.delivery_tag,
-                )
-
-            except Exception:
+            except Exception as exc:
                 self.logger.exception(
                     "Error while processing AgentMessage from queue '%s'.",
                     queue_name,
                 )
 
-                channel.basic_nack(
-                    delivery_tag=method.delivery_tag,
-                    requeue=True,
+                self._retry_or_dead_letter(
+                    channel=channel,
+                    method=method,
+                    properties=properties,
+                    body=body,
+                    queue_name=queue_name,
+                    error=exc,
                 )
+                return
+
+            channel.basic_ack(
+                delivery_tag=method.delivery_tag,
+            )
 
         self.channel.basic_qos(prefetch_count=1)
 
@@ -244,13 +228,134 @@ class RabbitMQEventBus(EventBus):
 
         self.channel.start_consuming()
 
+    def _retry_or_dead_letter(
+        self,
+        *,
+        channel,
+        method,
+        properties,
+        body: bytes,
+        queue_name: str,
+        error: Exception,
+    ) -> None:
+        """Republish a failed delivery or move it to the DLQ.
+
+        Publisher confirms are enabled on this channel, so the original
+        delivery is acknowledged only after RabbitMQ confirms the replacement
+        retry/DLQ publication. A broker NACK or unroutable publication raises
+        and leaves the original delivery unacknowledged for recovery.
+        """
+        attempt = self._delivery_attempt(properties)
+
+        if attempt < self.max_delivery_attempts:
+            next_attempt = attempt + 1
+            destination = queue_name
+
+            self.logger.warning(
+                "Retrying AgentMessage from queue '%s' "
+                "(attempt %d/%d).",
+                queue_name,
+                next_attempt,
+                self.max_delivery_attempts,
+            )
+        else:
+            next_attempt = attempt
+            destination = self._dlq_name(queue_name)
+
+            self.logger.error(
+                "AgentMessage from queue '%s' exhausted %d attempts; "
+                "routing to DLQ '%s'.",
+                queue_name,
+                attempt,
+                destination,
+            )
+
+        channel.queue_declare(
+            queue=destination,
+            durable=True,
+        )
+
+        channel.basic_publish(
+            exchange="",
+            routing_key=destination,
+            body=body,
+            properties=self._failure_properties(
+                properties=properties,
+                attempt=next_attempt,
+                original_queue=queue_name,
+                error=error,
+            ),
+            mandatory=True,
+        )
+
+        channel.basic_ack(
+            delivery_tag=method.delivery_tag,
+        )
+
+    @staticmethod
+    def _delivery_attempt(properties) -> int:
+        headers = getattr(properties, "headers", None) or {}
+        raw_attempt = headers.get(_DELIVERY_ATTEMPT_HEADER, 1)
+
+        try:
+            attempt = int(raw_attempt)
+        except (TypeError, ValueError):
+            return 1
+
+        return max(1, attempt)
+
+    @staticmethod
+    def _failure_properties(
+        *,
+        properties,
+        attempt: int,
+        original_queue: str,
+        error: Exception,
+    ) -> pika.BasicProperties:
+        headers = dict(
+            getattr(properties, "headers", None) or {}
+        )
+        headers[_DELIVERY_ATTEMPT_HEADER] = attempt
+        headers[_ORIGINAL_QUEUE_HEADER] = original_queue
+        headers[_FAILURE_TYPE_HEADER] = type(error).__name__
+        headers[_FAILURE_MESSAGE_HEADER] = str(error)[:512]
+
+        return pika.BasicProperties(
+            content_type=(
+                getattr(properties, "content_type", None)
+                or "application/json"
+            ),
+            content_encoding=getattr(
+                properties,
+                "content_encoding",
+                None,
+            ),
+            headers=headers,
+            delivery_mode=(
+                getattr(properties, "delivery_mode", None)
+                or pika.DeliveryMode.Persistent
+            ),
+            priority=getattr(properties, "priority", None),
+            correlation_id=getattr(
+                properties,
+                "correlation_id",
+                None,
+            ),
+            reply_to=getattr(properties, "reply_to", None),
+            expiration=getattr(properties, "expiration", None),
+            message_id=getattr(properties, "message_id", None),
+            timestamp=getattr(properties, "timestamp", None),
+            type=getattr(properties, "type", None),
+            user_id=getattr(properties, "user_id", None),
+            app_id=getattr(properties, "app_id", None),
+            cluster_id=getattr(properties, "cluster_id", None),
+        )
+
+    def _dlq_name(self, queue_name: str) -> str:
+        return f"{queue_name}{self.dlq_suffix}"
+
     def close(self) -> None:
-        """
-        Ferme proprement la connexion RabbitMQ.
-
-        Cette méthode sera appelée à l'arrêt du Kernel, d'un agent ou d'un test.
-        """
-
+        """Close the RabbitMQ connection cleanly."""
         if self.connection and self.connection.is_open:
             self.connection.close()
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rkjo_kernel.messages.agent_message import AgentMessage
+from rkjo_kernel.workflow.async_coordinator import AsyncWorkflowCoordinator
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.idempotency import ProcessedMessageStore
 
@@ -15,9 +16,11 @@ class WorkflowResultHandler:
         *,
         engine: WorkflowEngine,
         processed_messages: ProcessedMessageStore | None = None,
+        coordinator: AsyncWorkflowCoordinator | None = None,
     ) -> None:
         self.engine = engine
         self.processed_messages = processed_messages
+        self.coordinator = coordinator
 
     def handle(
         self,
@@ -62,6 +65,55 @@ class WorkflowResultHandler:
         )
 
         if execution.current_step_id != step_id:
+            matching_step = next(
+                (
+                    step
+                    for step in execution.definition.steps
+                    if step.step_id == step_id
+                ),
+                None,
+            )
+
+            already_applied = (
+                matching_step is not None
+                and getattr(
+                    matching_step.status,
+                    "value",
+                    matching_step.status,
+                )
+                == "completed"
+                and bool(message.payload.get("success"))
+                and matching_step.output
+                == message.payload.get("result")
+            )
+
+            if already_applied:
+                workflow_running = (
+                    getattr(
+                        execution.status,
+                        "value",
+                        execution.status,
+                    )
+                    == "running"
+                )
+
+                continuation_interrupted = (
+                    workflow_running
+                    and execution.current_step_id is None
+                    and self.coordinator is not None
+                    and self.engine.get_next_step(execution)
+                    is not None
+                )
+
+                if continuation_interrupted:
+                    self.coordinator.dispatch_next(
+                        execution,
+                        correlation_id=message.correlation_id,
+                    )
+
+                self._mark_processed(message.message_id)
+                return
+
             raise RuntimeError(
                 "Workflow result does not match the "
                 "currently running step."
@@ -79,11 +131,19 @@ class WorkflowResultHandler:
                 ),
             )
 
-            if self.engine.get_next_step(
+            next_step = self.engine.get_next_step(
                 execution
-            ) is None:
+            )
+
+            if next_step is None:
                 self.engine.complete(
                     execution
+                )
+
+            elif self.coordinator is not None:
+                self.coordinator.dispatch_next(
+                    execution,
+                    correlation_id=message.correlation_id,
                 )
 
             self._mark_processed(
@@ -108,7 +168,6 @@ class WorkflowResultHandler:
         self._mark_processed(
             message.message_id
         )
-
 
     def _mark_processed(
         self,

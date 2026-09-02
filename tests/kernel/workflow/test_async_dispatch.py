@@ -147,3 +147,38 @@ def test_dispatch_rejects_empty_queue():
             queue_name=" ",
             execution_id="execution-001",
         )
+
+
+def test_dispatch_can_target_resolved_agent() -> None:
+    bus = FakeEventBus()
+
+    dispatcher = AsyncWorkflowDispatcher(
+        event_bus=bus
+    )
+
+    step = WorkflowStep(
+        step_id="weather",
+        name="Weather",
+        capability_name="weather.analysis",
+    )
+
+    dispatcher.dispatch(
+        step=step,
+        context=WorkflowContext(),
+        queue_name="weather.high.queue",
+        execution_id="execution-001",
+        correlation_id="corr-001",
+        target_agent_name="weather.high",
+    )
+
+    assert len(bus.published) == 1
+
+    queue_name, message = bus.published[0]
+
+    assert queue_name == "weather.high.queue"
+    assert message.target == "weather.high"
+
+    assert (
+        message.metadata["capability_name"]
+        == "weather.analysis"
+    )

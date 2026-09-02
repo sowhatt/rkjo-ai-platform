@@ -124,3 +124,436 @@ def test_failure_result_fails_workflow():
     assert execution.error == (
         "weather provider unavailable"
     )
+
+
+def test_success_result_dispatches_next_step_with_coordinator():
+    from rkjo_kernel.events.event_bus import EventBus
+    from rkjo_kernel.registry.descriptor import (
+        AgentDescriptor,
+        AgentStatus,
+    )
+    from rkjo_kernel.registry.registry import AgentRegistry
+    from rkjo_kernel.services.registry_service import RegistryService
+    from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
+    from rkjo_kernel.workflow.async_coordinator import AsyncWorkflowCoordinator
+    from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
+
+    class FakeBus(EventBus):
+        def __init__(self):
+            self.published = []
+
+        def publish(self, queue_name, message):
+            pass
+
+        def consume(self, queue_name, callback):
+            pass
+
+        def publish_agent_message(self, queue_name, message):
+            self.published.append((queue_name, message))
+
+        def consume_agent_messages(self, queue_name, callback):
+            pass
+
+        def close(self):
+            pass
+
+    repository = InMemoryWorkflowRepository()
+    engine = WorkflowEngine(repository=repository)
+
+    definition = WorkflowDefinition(
+        workflow_id="education-result",
+        name="Education Result Workflow",
+        steps=[
+            WorkflowStep(
+                step_id="diagnostic",
+                name="Diagnostic",
+                agent_name="diagnostic.agent",
+                position=0,
+            ),
+            WorkflowStep(
+                step_id="tutoring",
+                name="Tutoring",
+                agent_name="tutor.agent",
+                position=1,
+            ),
+        ],
+    )
+
+    execution = engine.create_execution(
+        definition,
+        execution_id="education-result-001",
+    )
+
+    engine.start(execution)
+    engine.start_next_step(execution)
+
+    registry = AgentRegistry()
+    service = RegistryService(registry=registry)
+
+    service.register_agent(
+        AgentDescriptor(
+            name="tutor.agent",
+            display_name="Tutor Agent",
+            product="RKJO Education",
+            queue_name="education.tutor",
+            status=AgentStatus.AVAILABLE,
+        )
+    )
+
+    bus = FakeBus()
+
+    coordinator = AsyncWorkflowCoordinator(
+        engine=engine,
+        router=WorkflowAgentRouter(
+            registry_service=service
+        ),
+        dispatcher=AsyncWorkflowDispatcher(
+            event_bus=bus
+        ),
+        reply_queue="rkjo.workflow.results",
+    )
+
+    handler = WorkflowResultHandler(
+        engine=engine,
+        coordinator=coordinator,
+    )
+
+    message = AgentMessage(
+        source="diagnostic.agent",
+        target="rkjo.workflow",
+        message_type="workflow.step.result",
+        correlation_id="corr-education",
+        payload={
+            "success": True,
+            "result": {
+                "level": "beginner",
+            },
+        },
+        metadata={
+            "workflow_execution_id": (
+                "education-result-001"
+            ),
+            "workflow_step_id": "diagnostic",
+        },
+    )
+
+    handler.handle(message)
+
+    restored = repository.get(
+        "education-result-001"
+    )
+
+    assert restored is not None
+    assert restored.current_step_id == "tutoring"
+
+    assert restored.context.outputs[
+        "diagnostic"
+    ] == {
+        "level": "beginner",
+    }
+
+    assert len(bus.published) == 1
+
+    queue_name, dispatched = bus.published[0]
+
+    assert queue_name == "education.tutor"
+    assert dispatched.metadata[
+        "workflow_step_id"
+    ] == "tutoring"
+
+    assert dispatched.payload[
+        "outputs"
+    ] == {
+        "diagnostic": {
+            "level": "beginner",
+        }
+    }
+
+
+def _make_two_step_execution(
+    execution_id: str,
+):
+    repository = InMemoryWorkflowRepository()
+    engine = WorkflowEngine(repository=repository)
+
+    definition = WorkflowDefinition(
+        workflow_id=f"{execution_id}-workflow",
+        name="Idempotency Workflow",
+        steps=[
+            WorkflowStep(
+                step_id="step-1",
+                name="Step 1",
+                agent_name="agent.one",
+                position=0,
+            ),
+            WorkflowStep(
+                step_id="step-2",
+                name="Step 2",
+                agent_name="agent.two",
+                position=1,
+            ),
+        ],
+    )
+
+    execution = engine.create_execution(
+        definition,
+        execution_id=execution_id,
+    )
+    engine.start(execution)
+    engine.start_next_step(execution)
+
+    return engine, repository, execution
+
+
+def _result_message(
+    execution_id: str,
+    *,
+    message_id: str,
+    result: dict,
+) -> AgentMessage:
+    return AgentMessage(
+        message_id=message_id,
+        correlation_id="corr-idempotency",
+        source="agent.one",
+        target="rkjo.workflow",
+        message_type="workflow.step.result",
+        payload={
+            "success": True,
+            "result": result,
+        },
+        metadata={
+            "workflow_execution_id": execution_id,
+            "workflow_step_id": "step-1",
+        },
+    )
+
+
+def test_duplicate_step_result_is_ignored_when_already_processed():
+    from rkjo_kernel.workflow.idempotency import (
+        InMemoryProcessedMessageStore,
+    )
+
+    engine, repository, execution = (
+        _make_two_step_execution(
+            "duplicate-result-execution"
+        )
+    )
+
+    processed = InMemoryProcessedMessageStore()
+    handler = WorkflowResultHandler(
+        engine=engine,
+        processed_messages=processed,
+    )
+
+    message = _result_message(
+        execution.execution_id,
+        message_id="duplicate-result-001",
+        result={"value": "result-1"},
+    )
+
+    handler.handle(message)
+    handler.handle(message)
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.context.outputs["step-1"] == {
+        "value": "result-1"
+    }
+
+
+def test_redelivery_of_completed_step_result_is_idempotent():
+    engine, repository, execution = (
+        _make_two_step_execution(
+            "crash-window-execution"
+        )
+    )
+
+    result = {
+        "value": "step-1-result",
+    }
+
+    engine.complete_current_step(
+        execution,
+        output=result,
+    )
+    engine.start_next_step(execution)
+
+    handler = WorkflowResultHandler(
+        engine=engine,
+    )
+
+    message = _result_message(
+        execution.execution_id,
+        message_id="redelivery-result-001",
+        result=result,
+    )
+
+    handler.handle(message)
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.current_step_id == "step-2"
+    assert restored.context.outputs["step-1"] == result
+
+
+def test_stale_completed_step_with_conflicting_result_is_rejected():
+    import pytest
+
+    engine, repository, execution = (
+        _make_two_step_execution(
+            "conflicting-result-execution"
+        )
+    )
+
+    original = {
+        "value": "original-result",
+    }
+
+    engine.complete_current_step(
+        execution,
+        output=original,
+    )
+    engine.start_next_step(execution)
+
+    handler = WorkflowResultHandler(
+        engine=engine,
+    )
+
+    message = _result_message(
+        execution.execution_id,
+        message_id="conflicting-result-001",
+        result={
+            "value": "different-result",
+        },
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Workflow result does not match",
+    ):
+        handler.handle(message)
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.current_step_id == "step-2"
+    assert restored.context.outputs["step-1"] == original
+
+
+def test_redelivery_after_completion_before_dispatch_resumes_workflow():
+    from rkjo_kernel.events.event_bus import EventBus
+    from rkjo_kernel.registry.descriptor import (
+        AgentDescriptor,
+        AgentStatus,
+    )
+    from rkjo_kernel.registry.registry import AgentRegistry
+    from rkjo_kernel.services.registry_service import RegistryService
+    from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
+    from rkjo_kernel.workflow.async_coordinator import (
+        AsyncWorkflowCoordinator,
+    )
+    from rkjo_kernel.workflow.async_dispatch import (
+        AsyncWorkflowDispatcher,
+    )
+    from rkjo_kernel.workflow.idempotency import (
+        InMemoryProcessedMessageStore,
+    )
+
+    class FakeBus(EventBus):
+        def __init__(self):
+            self.published = []
+
+        def publish(self, queue_name, message):
+            pass
+
+        def consume(self, queue_name, callback):
+            pass
+
+        def publish_agent_message(self, queue_name, message):
+            self.published.append((queue_name, message))
+
+        def consume_agent_messages(self, queue_name, callback):
+            pass
+
+        def close(self):
+            pass
+
+    engine, repository, execution = (
+        _make_two_step_execution(
+            "completion-before-dispatch-execution"
+        )
+    )
+
+    result = {
+        "value": "step-1-result",
+    }
+
+    engine.complete_current_step(
+        execution,
+        output=result,
+    )
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.current_step_id is None
+
+    registry = AgentRegistry()
+    service = RegistryService(registry=registry)
+
+    service.register_agent(
+        AgentDescriptor(
+            name="agent.two",
+            display_name="Agent Two",
+            product="RKJO",
+            queue_name="agent.two.queue",
+            status=AgentStatus.AVAILABLE,
+        )
+    )
+
+    bus = FakeBus()
+
+    coordinator = AsyncWorkflowCoordinator(
+        engine=engine,
+        router=WorkflowAgentRouter(
+            registry_service=service
+        ),
+        dispatcher=AsyncWorkflowDispatcher(
+            event_bus=bus
+        ),
+        reply_queue="rkjo.workflow.results",
+    )
+
+    processed = InMemoryProcessedMessageStore()
+
+    handler = WorkflowResultHandler(
+        engine=engine,
+        processed_messages=processed,
+        coordinator=coordinator,
+    )
+
+    message = _result_message(
+        execution.execution_id,
+        message_id="resume-result-001",
+        result=result,
+    )
+
+    handler.handle(message)
+
+    restored = repository.get(
+        execution.execution_id
+    )
+
+    assert restored is not None
+    assert restored.current_step_id == "step-2"
+    assert len(bus.published) == 1

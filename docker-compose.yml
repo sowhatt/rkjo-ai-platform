@@ -46,6 +46,28 @@ services:
       retries: 12
       start_period: 5s
 
+  workflow-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rkjo_workflow_migrate
+    command:
+      [
+        "python",
+        "-m",
+        "rkjo_kernel.workflow.schema_bootstrap"
+      ]
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      DATABASE_URL: >-
+        postgresql://rkjo:rkjo_password@postgres:5432/rkjo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
@@ -119,6 +141,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      workflow-migrate:
+        condition: service_completed_successfully
 
     healthcheck:
       test:
@@ -169,6 +193,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      workflow-migrate:
+        condition: service_completed_successfully
 
     restart: unless-stopped
 
