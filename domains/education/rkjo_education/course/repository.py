@@ -55,3 +55,22 @@ class InMemoryCourseRepository:
                 course_id.strip(),
             )
         )
+
+
+    def list_for_tenant(
+        self,
+        tenant_id: str,
+    ) -> list[Course]:
+        normalized_tenant_id = (
+            tenant_id.strip()
+        )
+
+        return [
+            course
+            for (
+                stored_tenant_id,
+                _,
+            ), course in self._items.items()
+            if stored_tenant_id
+            == normalized_tenant_id
+        ]

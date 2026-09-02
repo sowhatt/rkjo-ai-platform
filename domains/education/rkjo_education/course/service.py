@@ -74,6 +74,24 @@ class CourseService:
 
         return course
 
+    def list_courses(
+        self,
+        *,
+        tenant_id: str,
+    ) -> list[Course]:
+        normalized_tenant_id = (
+            tenant_id.strip()
+        )
+
+        if not normalized_tenant_id:
+            raise ValueError(
+                "tenant_id must not be empty."
+            )
+
+        return self.repository.list_for_tenant(
+            normalized_tenant_id
+        )
+
     def attach_document(
         self,
         *,

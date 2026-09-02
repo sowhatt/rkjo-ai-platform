@@ -450,3 +450,33 @@ def get_rag_answering_service() -> RAGAnsweringService:
             ),
         ),
     )
+
+
+def get_education_course_service():
+    from rkjo_education.course.postgres_repository import (
+        PostgresCourseRepository,
+    )
+    from rkjo_education.course.service import (
+        CourseService,
+    )
+
+    return CourseService(
+        PostgresCourseRepository(
+            get_database_url()
+        )
+    )
+
+
+def get_education_curriculum_service():
+    from rkjo_education.curriculum.postgres_repository import (
+        PostgresCurriculumRepository,
+    )
+    from rkjo_education.curriculum.service import (
+        CurriculumService,
+    )
+
+    return CurriculumService(
+        PostgresCurriculumRepository(
+            get_database_url()
+        )
+    )

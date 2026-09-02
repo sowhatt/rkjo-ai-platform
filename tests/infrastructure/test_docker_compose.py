@@ -41,3 +41,14 @@ def test_no_localhost_database_inside_compose():
         "@localhost:5432"
         not in content
     )
+
+
+def test_worker_has_liveness_healthcheck():
+    content = Path(
+        "docker-compose.yml"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert "RKJO_WORKER_HEALTH_PORT" in content
+    assert "http://localhost:8081/live" in content
