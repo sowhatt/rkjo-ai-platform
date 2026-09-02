@@ -29,10 +29,41 @@ def configured_api_keys(
         "rkjo-admin-key",
     )
 
+    # RAG API tests are tenant-scoped. Keep all role-specific
+    # credentials bound to the same deterministic tenant unless
+    # an individual test overrides the environment explicitly.
+    monkeypatch.setenv(
+        "RKJO_API_TENANT_ID",
+        "tenant-a",
+    )
+
+    monkeypatch.setenv(
+        "RKJO_VIEWER_TENANT_ID",
+        "tenant-a",
+    )
+
+    monkeypatch.setenv(
+        "RKJO_OPERATOR_TENANT_ID",
+        "tenant-a",
+    )
+
+    monkeypatch.setenv(
+        "RKJO_ADMIN_TENANT_ID",
+        "tenant-a",
+    )
 
     monkeypatch.setenv(
         "RKJO_JWT_SECRET",
         "rkjo-test-jwt-secret-with-sufficient-length-123456",
+    )
+
+    # Some invalid-payload tests intentionally exercise FastAPI
+    # validation without overriding the production RAG dependency.
+    # A deterministic dummy key prevents dependency construction from
+    # failing before request validation can return the expected 422.
+    monkeypatch.setenv(
+        "OPENAI_API_KEY",
+        "rkjo-test-openai-key",
     )
 
 
