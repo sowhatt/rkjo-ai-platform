@@ -384,17 +384,23 @@ class PostgreSQLWorkflowUnitOfWork:
         exc_value,
         traceback,
     ) -> None:
+        """Rollback any unfinished work and release transaction resources.
+
+        Commits remain explicit through ``commit()``. Rolling back on context
+        exit is therefore a safety net: it discards uncommitted changes and
+        also closes any transaction implicitly opened after an earlier commit.
+        """
         if self._connection is None:
             return
 
         try:
-            if exc_type is not None:
-                self._connection.rollback()
-            else:
-                self._connection.rollback()
+            self._connection.rollback()
         finally:
             self._connection.close()
             self._connection = None
+            self.workflows = None
+            self.inbox = None
+            self.outbox = None
 
     def commit(self) -> None:
         if self._connection is None:
