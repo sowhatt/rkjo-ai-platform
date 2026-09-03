@@ -29,6 +29,7 @@ PROTECTED_PATH_PREFIXES = (
     "/workflows",
     "/metrics",
     "/rag",
+    "/education",
 )
 
 
@@ -122,9 +123,6 @@ def resolve_api_role(
     if provided_api_key is None:
         return None
 
-    # Backward compatibility:
-    # RKJO_API_KEY always maps to ADMIN,
-    # even when RKJO_ADMIN_API_KEY also exists.
     if (
         legacy_api_key is not None
         and secrets.compare_digest(
@@ -134,7 +132,6 @@ def resolve_api_role(
     ):
         return ApiRole.ADMIN
 
-    # Check role-specific credentials.
     for role, configured_key in (
         configured.items()
     ):
@@ -169,25 +166,36 @@ def required_role_for_request(
 
     normalized_method = method.upper()
 
-    # Operational metrics are readable
-    # by the lowest authenticated role.
     if path == "/metrics":
         return ApiRole.VIEWER
 
-    # Semantic retrieval is read-only even though
-    # HTTP POST is used to carry the search payload.
     if (
         path == "/rag/search"
         and normalized_method == "POST"
     ):
         return ApiRole.VIEWER
 
-    # Grounded RAG answering is also read-only.
     if (
         path == "/rag/answer"
         and normalized_method == "POST"
     ):
         return ApiRole.VIEWER
+
+    if path.startswith(
+        "/education"
+    ):
+        if normalized_method == "GET":
+            return ApiRole.VIEWER
+
+        if normalized_method in {
+            "POST",
+            "PUT",
+            "PATCH",
+        }:
+            return ApiRole.OPERATOR
+
+        if normalized_method == "DELETE":
+            return ApiRole.ADMIN
 
     if path.startswith(
         "/rag"
@@ -221,8 +229,6 @@ def required_role_for_request(
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
 
-    # Protected resources default to
-    # the safest privilege.
     return ApiRole.ADMIN
 
 
@@ -237,7 +243,6 @@ def role_allows(
         ROLE_PRIORITY[actual_role]
         >= ROLE_PRIORITY[required_role]
     )
-
 
 
 def resolve_api_tenant(
