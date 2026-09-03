@@ -1,9 +1,9 @@
 from uuid import uuid4
 
-from domains.education.rkjo_education.learner.repository import InMemoryLearnerRepository
-from domains.education.rkjo_education.learner.service import LearnerService
-from domains.education.rkjo_education.learning.repository import InMemoryLearningRepository
-from domains.education.rkjo_education.learning.service import LearningService
+from rkjo_education.learner.repository import InMemoryLearnerRepository
+from rkjo_education.learner.service import LearnerService
+from rkjo_education.learning.repository import InMemoryLearningRepository
+from rkjo_education.learning.service import LearningService
 
 
 def test_learner_curriculum_course_progress_journey() -> None:
