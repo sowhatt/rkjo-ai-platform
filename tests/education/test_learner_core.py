@@ -2,10 +2,10 @@ from uuid import uuid4
 
 import pytest
 
-from domains.education.rkjo_education.learner.repository import InMemoryLearnerRepository
-from domains.education.rkjo_education.learner.service import LearnerNotFoundError, LearnerService
-from domains.education.rkjo_education.learning.repository import InMemoryLearningRepository
-from domains.education.rkjo_education.learning.service import (
+from rkjo_education.learner.repository import InMemoryLearnerRepository
+from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
+from rkjo_education.learning.repository import InMemoryLearningRepository
+from rkjo_education.learning.service import (
     DuplicateEnrollmentError,
     LearningService,
 )
