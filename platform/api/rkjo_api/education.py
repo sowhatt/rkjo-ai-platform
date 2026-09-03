@@ -5,10 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from domains.education.rkjo_education.learner.repository import InMemoryLearnerRepository
-from domains.education.rkjo_education.learner.service import LearnerNotFoundError, LearnerService
-from domains.education.rkjo_education.learning.repository import InMemoryLearningRepository
-from domains.education.rkjo_education.learning.service import DuplicateEnrollmentError, LearningService
+from rkjo_education.learner.repository import InMemoryLearnerRepository
+from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
+from rkjo_education.learning.repository import InMemoryLearningRepository
+from rkjo_education.learning.service import DuplicateEnrollmentError, LearningService
 
 
 router = APIRouter(prefix="/education", tags=["education"])
