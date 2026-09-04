@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from rkjo_kernel.tools.context import ToolExecutionContext
+
 
 @dataclass(frozen=True)
 class MCPRemoteTool:
@@ -38,6 +40,7 @@ class MCPClient(ABC):
         *,
         tool_name: str,
         arguments: dict[str, Any],
+        context: ToolExecutionContext | None = None,
     ) -> Any:
         """Execute one remote MCP tool."""
         raise NotImplementedError
