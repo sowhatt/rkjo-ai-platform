@@ -11,7 +11,7 @@ from rkjo_kernel.tools.registry import ToolRegistry
 
 class FakeMCPClient(MCPClient):
     def __init__(self) -> None:
-        self.calls: list[tuple[str, dict]] = []
+        self.calls: list[tuple[str, dict, str | None]] = []
 
     def list_tools(self) -> list[MCPRemoteTool]:
         return [
@@ -27,8 +27,20 @@ class FakeMCPClient(MCPClient):
             )
         ]
 
-    def call_tool(self, *, tool_name: str, arguments: dict):
-        self.calls.append((tool_name, arguments))
+    def call_tool(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict,
+        context: ToolExecutionContext | None = None,
+    ):
+        self.calls.append(
+            (
+                tool_name,
+                arguments,
+                context.tenant_id if context else None,
+            )
+        )
         return {"items": [arguments["query"]]}
 
 
@@ -44,13 +56,9 @@ def test_adapter_registers_remote_tool_as_rkjo_tool():
     registrations = adapter.register_remote_tools()
 
     assert registrations[0].remote_name == "search_courses"
-    assert registrations[0].rkjo_name == (
-        "mcp.education.search_courses"
-    )
+    assert registrations[0].rkjo_name == "mcp.education.search_courses"
 
-    descriptor = registry.find_by_name(
-        "mcp.education.search_courses"
-    )
+    descriptor = registry.find_by_name("mcp.education.search_courses")
 
     assert descriptor is not None
     assert descriptor.metadata["transport"] == "mcp"
@@ -88,7 +96,11 @@ def test_registered_mcp_tool_executes_through_authorized_invoker():
 
     assert result.success is True
     assert client.calls == [
-        ("search_courses", {"query": "biotechnology"})
+        (
+            "search_courses",
+            {"query": "biotechnology"},
+            "tenant.demo",
+        )
     ]
     assert result.output == {
         "server": "education",
