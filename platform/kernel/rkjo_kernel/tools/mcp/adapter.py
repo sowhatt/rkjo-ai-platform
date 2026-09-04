@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 from rkjo_kernel.tools.context import ToolExecutionContext
 from rkjo_kernel.tools.descriptor import ToolDescriptor
+from rkjo_kernel.tools.mcp.audit import (
+    MCPAuditSink,
+    MCPExecutionAuditRecord,
+    NullMCPAuditSink,
+)
 from rkjo_kernel.tools.mcp.client import MCPClient, MCPRemoteTool
 from rkjo_kernel.tools.registry import ToolRegistry
 
@@ -31,6 +37,7 @@ class MCPToolAdapter:
         client: MCPClient,
         registry: ToolRegistry,
         server_name: str,
+        audit_sink: MCPAuditSink | None = None,
     ) -> None:
         normalized_server_name = server_name.strip().lower()
 
@@ -43,6 +50,7 @@ class MCPToolAdapter:
         self.client = client
         self.registry = registry
         self.server_name = normalized_server_name
+        self.audit_sink = audit_sink or NullMCPAuditSink()
 
     def register_remote_tools(self) -> list[MCPToolRegistration]:
         registrations: list[MCPToolRegistration] = []
@@ -91,10 +99,29 @@ class MCPToolAdapter:
             payload: dict,
             context: ToolExecutionContext,
         ):
-            result = self.client.call_tool(
-                tool_name=remote_tool_name,
-                arguments=payload,
+            started_at = perf_counter()
+
+            try:
+                result = self.client.call_tool(
+                    tool_name=remote_tool_name,
+                    arguments=payload,
+                    context=context,
+                )
+            except Exception as exc:
+                self._record_audit(
+                    remote_tool_name=remote_tool_name,
+                    context=context,
+                    started_at=started_at,
+                    success=False,
+                    error_type=type(exc).__name__,
+                )
+                raise
+
+            self._record_audit(
+                remote_tool_name=remote_tool_name,
                 context=context,
+                started_at=started_at,
+                success=True,
             )
 
             return {
@@ -105,6 +132,35 @@ class MCPToolAdapter:
             }
 
         return handler
+
+    def _record_audit(
+        self,
+        *,
+        remote_tool_name: str,
+        context: ToolExecutionContext,
+        started_at: float,
+        success: bool,
+        error_type: str | None = None,
+    ) -> None:
+        duration_ms = max(0, int((perf_counter() - started_at) * 1000))
+        self.audit_sink.record(
+            MCPExecutionAuditRecord(
+                server_name=self.server_name,
+                remote_tool_name=remote_tool_name,
+                tenant_id=context.tenant_id,
+                agent_name=context.agent_name,
+                capability_name=context.capability_name,
+                workflow_execution_id=context.workflow_execution_id,
+                workflow_step_id=context.workflow_step_id,
+                correlation_id=context.correlation_id,
+                duration_ms=duration_ms,
+                success=success,
+                error_type=error_type,
+                metadata={
+                    "transport": "mcp",
+                },
+            )
+        )
 
     def _rkjo_tool_name(self, remote_tool: MCPRemoteTool) -> str:
         normalized_remote_name = (
