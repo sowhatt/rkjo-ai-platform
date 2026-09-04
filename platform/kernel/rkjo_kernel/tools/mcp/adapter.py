@@ -94,6 +94,7 @@ class MCPToolAdapter:
             result = self.client.call_tool(
                 tool_name=remote_tool_name,
                 arguments=payload,
+                context=context,
             )
 
             return {
