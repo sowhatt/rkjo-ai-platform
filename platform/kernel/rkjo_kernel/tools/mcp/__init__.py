@@ -2,6 +2,12 @@ from rkjo_kernel.tools.mcp.adapter import (
     MCPToolAdapter,
     MCPToolRegistration,
 )
+from rkjo_kernel.tools.mcp.audit import (
+    InMemoryMCPAuditSink,
+    MCPAuditSink,
+    MCPExecutionAuditRecord,
+    NullMCPAuditSink,
+)
 from rkjo_kernel.tools.mcp.client import MCPClient, MCPRemoteTool
 from rkjo_kernel.tools.mcp.credentials import (
     EmptyMCPCredentialProvider,
@@ -10,6 +16,7 @@ from rkjo_kernel.tools.mcp.credentials import (
 )
 from rkjo_kernel.tools.mcp.http_transport import HTTPMCPTransport
 from rkjo_kernel.tools.mcp.runtime_client import TransportMCPClient
+from rkjo_kernel.tools.mcp.stdio_transport import StdioMCPTransport
 from rkjo_kernel.tools.mcp.transport import (
     MCPTransport,
     MCPTransportError,
@@ -19,14 +26,19 @@ from rkjo_kernel.tools.mcp.transport import (
 __all__ = [
     "EmptyMCPCredentialProvider",
     "HTTPMCPTransport",
+    "InMemoryMCPAuditSink",
     "MappingMCPCredentialProvider",
+    "MCPAuditSink",
     "MCPClient",
     "MCPCredentialProvider",
+    "MCPExecutionAuditRecord",
     "MCPRemoteTool",
     "MCPToolAdapter",
     "MCPToolRegistration",
     "MCPTransport",
     "MCPTransportError",
     "MCPTransportTimeoutError",
+    "NullMCPAuditSink",
+    "StdioMCPTransport",
     "TransportMCPClient",
 ]
