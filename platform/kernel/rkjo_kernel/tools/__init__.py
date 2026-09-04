@@ -7,8 +7,11 @@ from rkjo_kernel.tools.invoker import (
 )
 from rkjo_kernel.tools.mcp import (
     HTTPMCPTransport,
+    InMemoryMCPAuditSink,
+    MCPAuditSink,
     MCPClient,
     MCPCredentialProvider,
+    MCPExecutionAuditRecord,
     MCPRemoteTool,
     MCPToolAdapter,
     MCPToolRegistration,
@@ -16,6 +19,8 @@ from rkjo_kernel.tools.mcp import (
     MCPTransportError,
     MCPTransportTimeoutError,
     MappingMCPCredentialProvider,
+    NullMCPAuditSink,
+    StdioMCPTransport,
     TransportMCPClient,
 )
 from rkjo_kernel.tools.policy import (
@@ -32,8 +37,11 @@ from rkjo_kernel.tools.registry import (
 __all__ = [
     "CapabilityToolResolver",
     "HTTPMCPTransport",
+    "InMemoryMCPAuditSink",
+    "MCPAuditSink",
     "MCPClient",
     "MCPCredentialProvider",
+    "MCPExecutionAuditRecord",
     "MCPRemoteTool",
     "MCPToolAdapter",
     "MCPToolRegistration",
@@ -41,7 +49,9 @@ __all__ = [
     "MCPTransportError",
     "MCPTransportTimeoutError",
     "MappingMCPCredentialProvider",
+    "NullMCPAuditSink",
     "RegisteredTool",
+    "StdioMCPTransport",
     "ToolBinding",
     "ToolDescriptor",
     "ToolExecutionContext",
