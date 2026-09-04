@@ -5,6 +5,12 @@ from rkjo_kernel.tools.invoker import (
     ToolExecutionResult,
     ToolInvoker,
 )
+from rkjo_kernel.tools.mcp import (
+    MCPClient,
+    MCPRemoteTool,
+    MCPToolAdapter,
+    MCPToolRegistration,
+)
 from rkjo_kernel.tools.policy import (
     ToolExecutionDecision,
     ToolExecutionPolicy,
@@ -18,6 +24,10 @@ from rkjo_kernel.tools.registry import (
 
 __all__ = [
     "CapabilityToolResolver",
+    "MCPClient",
+    "MCPRemoteTool",
+    "MCPToolAdapter",
+    "MCPToolRegistration",
     "RegisteredTool",
     "ToolBinding",
     "ToolDescriptor",
