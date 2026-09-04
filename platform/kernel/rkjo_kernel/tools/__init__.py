@@ -6,10 +6,17 @@ from rkjo_kernel.tools.invoker import (
     ToolInvoker,
 )
 from rkjo_kernel.tools.mcp import (
+    HTTPMCPTransport,
     MCPClient,
+    MCPCredentialProvider,
     MCPRemoteTool,
     MCPToolAdapter,
     MCPToolRegistration,
+    MCPTransport,
+    MCPTransportError,
+    MCPTransportTimeoutError,
+    MappingMCPCredentialProvider,
+    TransportMCPClient,
 )
 from rkjo_kernel.tools.policy import (
     ToolExecutionDecision,
@@ -24,10 +31,16 @@ from rkjo_kernel.tools.registry import (
 
 __all__ = [
     "CapabilityToolResolver",
+    "HTTPMCPTransport",
     "MCPClient",
+    "MCPCredentialProvider",
     "MCPRemoteTool",
     "MCPToolAdapter",
     "MCPToolRegistration",
+    "MCPTransport",
+    "MCPTransportError",
+    "MCPTransportTimeoutError",
+    "MappingMCPCredentialProvider",
     "RegisteredTool",
     "ToolBinding",
     "ToolDescriptor",
@@ -38,4 +51,5 @@ __all__ = [
     "ToolHandler",
     "ToolInvoker",
     "ToolRegistry",
+    "TransportMCPClient",
 ]
