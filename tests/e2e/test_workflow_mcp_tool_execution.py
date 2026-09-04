@@ -3,6 +3,7 @@ from rkjo_kernel.registry.descriptor import AgentDescriptor, AgentStatus
 from rkjo_kernel.registry.discovery import AgentDiscovery
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.services.registry_service import RegistryService
+from rkjo_kernel.tools.context import ToolExecutionContext
 from rkjo_kernel.tools.invoker import ToolInvoker
 from rkjo_kernel.tools.mcp import MCPClient, MCPRemoteTool, MCPToolAdapter
 from rkjo_kernel.tools.registry import ToolRegistry
@@ -27,7 +28,13 @@ class FakeEducationMCPClient(MCPClient):
             )
         ]
 
-    def call_tool(self, *, tool_name: str, arguments: dict):
+    def call_tool(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict,
+        context: ToolExecutionContext | None = None,
+    ):
         return {
             "tool": tool_name,
             "matches": [arguments["query"]],
