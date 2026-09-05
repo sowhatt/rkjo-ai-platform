@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app/domains/education:/app/platform/kernel:/app/platform/api:/app/platform/worker
+ENV PYTHONPATH=/app/domains/education:/app/domains/family:/app/platform/kernel:/app/platform/api:/app/platform/worker
 
 WORKDIR /app
 
@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir \
 
 COPY platform ./platform
 COPY domains/education ./domains/education
+COPY domains/family ./domains/family
 
 RUN useradd --create-home --uid 10001 rkjo \
     && chown -R rkjo:rkjo /app
