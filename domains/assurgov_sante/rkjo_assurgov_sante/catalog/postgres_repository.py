@@ -378,3 +378,423 @@ class PostgresDataSourceRepository:
             )
             for row in rows
         ]
+
+
+from rkjo_assurgov_sante.catalog.models import (
+    DataAsset,
+    DataField,
+    DataSourceScan,
+)
+
+
+class PostgresDataAssetRepository:
+    def __init__(self, database_url: str) -> None:
+        if not database_url.strip():
+            raise ValueError("database_url must not be empty.")
+
+        self.database_url = database_url
+
+        # Reuse catalog schema bootstrap.
+        PostgresDataSourceRepository(database_url)
+
+    def _connect(self):
+        return psycopg.connect(self.database_url)
+
+    def save(self, asset: DataAsset) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO assurgov_data_assets (
+                    tenant_id,
+                    asset_id,
+                    data_source_id,
+                    schema_name,
+                    asset_name,
+                    asset_type,
+                    domain,
+                    owner,
+                    criticality,
+                    description
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s
+                )
+                ON CONFLICT (
+                    tenant_id,
+                    asset_id
+                )
+                DO UPDATE SET
+                    data_source_id = EXCLUDED.data_source_id,
+                    schema_name = EXCLUDED.schema_name,
+                    asset_name = EXCLUDED.asset_name,
+                    asset_type = EXCLUDED.asset_type,
+                    domain = EXCLUDED.domain,
+                    owner = EXCLUDED.owner,
+                    criticality = EXCLUDED.criticality,
+                    description = EXCLUDED.description,
+                    updated_at = NOW()
+                """,
+                (
+                    asset.tenant_id,
+                    asset.asset_id,
+                    asset.data_source_id,
+                    asset.schema_name,
+                    asset.asset_name,
+                    asset.asset_type,
+                    asset.domain,
+                    asset.owner,
+                    asset.criticality,
+                    asset.description,
+                ),
+            )
+
+    def get(
+        self,
+        *,
+        tenant_id: str,
+        asset_id: str,
+    ) -> DataAsset | None:
+        tenant_id = tenant_id.strip()
+        asset_id = asset_id.strip()
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    data_source_id,
+                    schema_name,
+                    asset_name,
+                    asset_type,
+                    domain,
+                    owner,
+                    criticality,
+                    description
+                FROM assurgov_data_assets
+                WHERE tenant_id = %s
+                  AND asset_id = %s
+                """,
+                (tenant_id, asset_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return DataAsset(
+            asset_id=asset_id,
+            tenant_id=tenant_id,
+            data_source_id=row[0],
+            schema_name=row[1],
+            asset_name=row[2],
+            asset_type=row[3],
+            domain=row[4],
+            owner=row[5],
+            criticality=row[6],
+            description=row[7],
+        )
+
+    def list_for_source(
+        self,
+        *,
+        tenant_id: str,
+        data_source_id: str,
+    ) -> list[DataAsset]:
+        tenant_id = tenant_id.strip()
+        data_source_id = data_source_id.strip()
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT asset_id
+                FROM assurgov_data_assets
+                WHERE tenant_id = %s
+                  AND data_source_id = %s
+                ORDER BY schema_name, asset_name
+                """,
+                (tenant_id, data_source_id),
+            ).fetchall()
+
+        return [
+            self.get(
+                tenant_id=tenant_id,
+                asset_id=row[0],
+            )
+            for row in rows
+        ]
+
+
+class PostgresDataFieldRepository:
+    def __init__(self, database_url: str) -> None:
+        if not database_url.strip():
+            raise ValueError("database_url must not be empty.")
+
+        self.database_url = database_url
+        PostgresDataSourceRepository(database_url)
+
+    def _connect(self):
+        return psycopg.connect(self.database_url)
+
+    def save(self, field: DataField) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO assurgov_data_fields (
+                    tenant_id,
+                    field_id,
+                    asset_id,
+                    field_name,
+                    data_type,
+                    ordinal_position,
+                    is_nullable,
+                    is_sensitive,
+                    business_term,
+                    description
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s
+                )
+                ON CONFLICT (
+                    tenant_id,
+                    field_id
+                )
+                DO UPDATE SET
+                    asset_id = EXCLUDED.asset_id,
+                    field_name = EXCLUDED.field_name,
+                    data_type = EXCLUDED.data_type,
+                    ordinal_position = EXCLUDED.ordinal_position,
+                    is_nullable = EXCLUDED.is_nullable,
+                    is_sensitive = EXCLUDED.is_sensitive,
+                    business_term = EXCLUDED.business_term,
+                    description = EXCLUDED.description,
+                    updated_at = NOW()
+                """,
+                (
+                    field.tenant_id,
+                    field.field_id,
+                    field.asset_id,
+                    field.field_name,
+                    field.data_type,
+                    field.ordinal_position,
+                    field.is_nullable,
+                    field.is_sensitive,
+                    field.business_term,
+                    field.description,
+                ),
+            )
+
+    def get(
+        self,
+        *,
+        tenant_id: str,
+        field_id: str,
+    ) -> DataField | None:
+        tenant_id = tenant_id.strip()
+        field_id = field_id.strip()
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    asset_id,
+                    field_name,
+                    data_type,
+                    ordinal_position,
+                    is_nullable,
+                    is_sensitive,
+                    business_term,
+                    description
+                FROM assurgov_data_fields
+                WHERE tenant_id = %s
+                  AND field_id = %s
+                """,
+                (tenant_id, field_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return DataField(
+            field_id=field_id,
+            tenant_id=tenant_id,
+            asset_id=row[0],
+            field_name=row[1],
+            data_type=row[2],
+            ordinal_position=row[3],
+            is_nullable=row[4],
+            is_sensitive=row[5],
+            business_term=row[6],
+            description=row[7],
+        )
+
+    def list_for_asset(
+        self,
+        *,
+        tenant_id: str,
+        asset_id: str,
+    ) -> list[DataField]:
+        tenant_id = tenant_id.strip()
+        asset_id = asset_id.strip()
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT field_id
+                FROM assurgov_data_fields
+                WHERE tenant_id = %s
+                  AND asset_id = %s
+                ORDER BY ordinal_position, field_name
+                """,
+                (tenant_id, asset_id),
+            ).fetchall()
+
+        return [
+            self.get(
+                tenant_id=tenant_id,
+                field_id=row[0],
+            )
+            for row in rows
+        ]
+
+
+class PostgresDataSourceScanRepository:
+    def __init__(self, database_url: str) -> None:
+        if not database_url.strip():
+            raise ValueError("database_url must not be empty.")
+
+        self.database_url = database_url
+        PostgresDataSourceRepository(database_url)
+
+    def _connect(self):
+        return psycopg.connect(self.database_url)
+
+    def save(self, scan: DataSourceScan) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO assurgov_data_source_scans (
+                    tenant_id,
+                    scan_id,
+                    data_source_id,
+                    scan_type,
+                    status,
+                    assets_found,
+                    fields_found,
+                    message,
+                    source_snapshot,
+                    started_at,
+                    finished_at
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s
+                )
+                ON CONFLICT (
+                    tenant_id,
+                    scan_id
+                )
+                DO UPDATE SET
+                    data_source_id = EXCLUDED.data_source_id,
+                    scan_type = EXCLUDED.scan_type,
+                    status = EXCLUDED.status,
+                    assets_found = EXCLUDED.assets_found,
+                    fields_found = EXCLUDED.fields_found,
+                    message = EXCLUDED.message,
+                    source_snapshot = EXCLUDED.source_snapshot,
+                    started_at = EXCLUDED.started_at,
+                    finished_at = EXCLUDED.finished_at
+                """,
+                (
+                    scan.tenant_id,
+                    scan.scan_id,
+                    scan.data_source_id,
+                    scan.scan_type,
+                    scan.status,
+                    scan.assets_found,
+                    scan.fields_found,
+                    scan.message,
+                    Jsonb(scan.source_snapshot),
+                    scan.started_at,
+                    scan.finished_at,
+                ),
+            )
+
+    def get(
+        self,
+        *,
+        tenant_id: str,
+        scan_id: str,
+    ) -> DataSourceScan | None:
+        tenant_id = tenant_id.strip()
+        scan_id = scan_id.strip()
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    data_source_id,
+                    scan_type,
+                    status,
+                    assets_found,
+                    fields_found,
+                    message,
+                    source_snapshot,
+                    started_at,
+                    finished_at
+                FROM assurgov_data_source_scans
+                WHERE tenant_id = %s
+                  AND scan_id = %s
+                """,
+                (tenant_id, scan_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        snapshot = row[6]
+
+        if isinstance(snapshot, str):
+            snapshot = json.loads(snapshot)
+
+        return DataSourceScan(
+            scan_id=scan_id,
+            tenant_id=tenant_id,
+            data_source_id=row[0],
+            scan_type=row[1],
+            status=row[2],
+            assets_found=row[3],
+            fields_found=row[4],
+            message=row[5],
+            source_snapshot=dict(snapshot),
+            started_at=row[7],
+            finished_at=row[8],
+        )
+
+    def list_for_source(
+        self,
+        *,
+        tenant_id: str,
+        data_source_id: str,
+    ) -> list[DataSourceScan]:
+        tenant_id = tenant_id.strip()
+        data_source_id = data_source_id.strip()
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT scan_id
+                FROM assurgov_data_source_scans
+                WHERE tenant_id = %s
+                  AND data_source_id = %s
+                ORDER BY created_at, scan_id
+                """,
+                (tenant_id, data_source_id),
+            ).fetchall()
+
+        return [
+            self.get(
+                tenant_id=tenant_id,
+                scan_id=row[0],
+            )
+            for row in rows
+        ]
