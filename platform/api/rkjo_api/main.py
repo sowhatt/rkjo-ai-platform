@@ -14,6 +14,9 @@ from rkjo_api.rag import (
 from rkjo_api.education import (
     router as education_router,
 )
+from rkjo_api.education_tutor import (
+    router as education_tutor_router,
+)
 
 from rkjo_api.security import (
     API_KEY_HEADER,
@@ -58,6 +61,9 @@ app.include_router(
 )
 app.include_router(
     education_router
+)
+app.include_router(
+    education_tutor_router
 )
 
 
