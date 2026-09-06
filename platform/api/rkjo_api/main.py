@@ -14,6 +14,9 @@ from rkjo_api.rag import (
 from rkjo_api.education import (
     router as education_router,
 )
+from rkjo_api.family import (
+    router as family_router,
+)
 
 from rkjo_api.security import (
     API_KEY_HEADER,
@@ -59,8 +62,9 @@ app.include_router(
 app.include_router(
     education_router
 )
-
-
+app.include_router(
+    family_router
+)
 
 
 @app.middleware("http")
@@ -206,8 +210,6 @@ class MetricsResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-
-
 
 
 class WorkflowStepRequest(BaseModel):
