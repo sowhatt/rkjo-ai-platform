@@ -35,7 +35,8 @@ def test_postgres_learning_roundtrip():
     learner_id = uuid4()
     curriculum_id = uuid4()
     course_id = uuid4()
-    service = LearningService(PostgresLearningRepository(database_url()))
+    repository = PostgresLearningRepository(database_url())
+    service = LearningService(repository)
 
     enrollment = service.enroll(
         tenant_id=tenant_id,
@@ -55,17 +56,19 @@ def test_postgres_learning_roundtrip():
         competency_scores={competency.code: 88},
     )
 
-    restored_enrollment = service.repository.find_enrollment(
+    restored_enrollment = repository.find_enrollment(
         tenant_id=tenant_id,
         learner_id=learner_id,
         curriculum_id=curriculum_id,
     )
-    restored_progress = service.repository.find_progress(
+    restored_progress = repository.find_progress(
         tenant_id=tenant_id,
         learner_id=learner_id,
         course_id=course_id,
     )
 
+    assert restored_enrollment is not None
+    assert restored_progress is not None
     assert restored_enrollment.id == enrollment.id
     assert restored_progress.id == progress.id
     assert restored_progress.completion_percent == 75
