@@ -9,10 +9,16 @@ from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import get_education_course_service
 from rkjo_api.education_dependencies import (
+    get_education_assessment_service,
     get_education_learner_service,
     get_education_learning_service,
 )
 from rkjo_api.identity import get_authenticated_identity
+from rkjo_education.assessment.service import (
+    AssessmentNotFoundError,
+    AssessmentService,
+    AttemptNotFoundError,
+)
 from rkjo_education.course.models import Course
 from rkjo_education.course.service import CourseService
 from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
@@ -93,6 +99,46 @@ class ProgressResponse(BaseModel):
     course_id: UUID
     completion_percent: int
     competency_scores: dict[str, int]
+
+
+class QuestionRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=1000)
+    correct_answer: str = Field(min_length=1, max_length=500)
+    points: int = Field(default=1, ge=1, le=100)
+    competency_code: str | None = Field(default=None, max_length=120)
+
+
+class AssessmentCreateRequest(BaseModel):
+    course_id: UUID
+    title: str = Field(min_length=1, max_length=300)
+    questions: list[QuestionRequest] = Field(min_length=1)
+
+
+class AssessmentResponse(BaseModel):
+    id: UUID
+    course_id: UUID
+    title: str
+    question_ids: list[UUID]
+    max_score: int
+
+
+class AttemptStartRequest(BaseModel):
+    assessment_id: UUID
+    learner_id: UUID
+
+
+class AttemptSubmitRequest(BaseModel):
+    answers: dict[UUID, str]
+
+
+class AttemptResponse(BaseModel):
+    id: UUID
+    assessment_id: UUID
+    learner_id: UUID
+    status: str
+    score: int
+    max_score: int
+    percentage: int
 
 
 def require_tenant(request: Request) -> str:
@@ -299,4 +345,103 @@ def record_progress(
         course_id=progress.course_id,
         completion_percent=progress.completion_percent,
         competency_scores=progress.competency_scores,
+    )
+
+
+@router.post("/assessments", response_model=AssessmentResponse, status_code=201)
+def create_assessment(
+    payload: AssessmentCreateRequest,
+    request: Request,
+    service: AssessmentService = Depends(get_education_assessment_service),
+) -> AssessmentResponse:
+    try:
+        assessment = service.create_assessment(
+            tenant_id=require_uuid_tenant(request),
+            course_id=payload.course_id,
+            title=payload.title,
+            questions=[question.model_dump() for question in payload.questions],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return AssessmentResponse(
+        id=assessment.id,
+        course_id=assessment.course_id,
+        title=assessment.title,
+        question_ids=[question.id for question in assessment.questions],
+        max_score=sum(question.points for question in assessment.questions),
+    )
+
+
+@router.get("/assessments/{assessment_id}", response_model=AssessmentResponse)
+def get_assessment(
+    assessment_id: UUID,
+    request: Request,
+    service: AssessmentService = Depends(get_education_assessment_service),
+) -> AssessmentResponse:
+    try:
+        assessment = service.get_assessment(
+            tenant_id=require_uuid_tenant(request),
+            assessment_id=assessment_id,
+        )
+    except AssessmentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Assessment not found.") from exc
+    return AssessmentResponse(
+        id=assessment.id,
+        course_id=assessment.course_id,
+        title=assessment.title,
+        question_ids=[question.id for question in assessment.questions],
+        max_score=sum(question.points for question in assessment.questions),
+    )
+
+
+@router.post("/attempts", response_model=AttemptResponse, status_code=201)
+def start_attempt(
+    payload: AttemptStartRequest,
+    request: Request,
+    service: AssessmentService = Depends(get_education_assessment_service),
+) -> AttemptResponse:
+    try:
+        attempt = service.start_attempt(
+            tenant_id=require_uuid_tenant(request),
+            assessment_id=payload.assessment_id,
+            learner_id=payload.learner_id,
+        )
+    except AssessmentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Assessment not found.") from exc
+    return AttemptResponse(
+        id=attempt.id,
+        assessment_id=attempt.assessment_id,
+        learner_id=attempt.learner_id,
+        status=attempt.status.value,
+        score=attempt.score,
+        max_score=attempt.max_score,
+        percentage=attempt.percentage,
+    )
+
+
+@router.post("/attempts/{attempt_id}/submit", response_model=AttemptResponse)
+def submit_attempt(
+    attempt_id: UUID,
+    payload: AttemptSubmitRequest,
+    request: Request,
+    service: AssessmentService = Depends(get_education_assessment_service),
+) -> AttemptResponse:
+    try:
+        attempt = service.submit_attempt(
+            tenant_id=require_uuid_tenant(request),
+            attempt_id=attempt_id,
+            answers=payload.answers,
+        )
+    except (AssessmentNotFoundError, AttemptNotFoundError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return AttemptResponse(
+        id=attempt.id,
+        assessment_id=attempt.assessment_id,
+        learner_id=attempt.learner_id,
+        status=attempt.status.value,
+        score=attempt.score,
+        max_score=attempt.max_score,
+        percentage=attempt.percentage,
     )
