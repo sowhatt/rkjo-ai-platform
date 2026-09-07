@@ -480,3 +480,31 @@ def get_education_curriculum_service():
             get_database_url()
         )
     )
+
+
+_meeting_repository = None
+
+
+def get_meeting_repository():
+    global _meeting_repository
+
+    if _meeting_repository is None:
+        from rkjo_meeting_intelligence.infrastructure.memory_repository import (
+            InMemoryMeetingRepository,
+        )
+
+        _meeting_repository = (
+            InMemoryMeetingRepository()
+        )
+
+    return _meeting_repository
+
+
+def get_meeting_create_service():
+    from rkjo_meeting_intelligence.application.create_meeting import (
+        CreateMeetingService,
+    )
+
+    return CreateMeetingService(
+        repository=get_meeting_repository()
+    )
