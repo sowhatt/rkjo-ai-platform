@@ -7,7 +7,10 @@ from rkjo_kernel.logging.logger import get_logger
 from rkjo_kernel.logging.structured import structured_log
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
-from rkjo_kernel.registry.descriptor import AgentStatus
+from rkjo_kernel.registry.descriptor import (
+    AgentDescriptor,
+    AgentStatus,
+)
 from rkjo_kernel.runtime.dead_letter_publisher import DeadLetterPublisher
 from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
 from rkjo_kernel.runtime.retry_message import build_retry_message
@@ -48,6 +51,7 @@ class AgentRuntime:
         dead_letter_publisher: DeadLetterPublisher | None = None,
         metrics: MetricsRegistry | None = None,
         instance_id: str | None = None,
+        descriptor: AgentDescriptor | None = None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -67,6 +71,7 @@ class AgentRuntime:
         self.dead_letter_publisher = dead_letter_publisher
         self.metrics = metrics
         self.instance_id = instance_id
+        self.descriptor = descriptor
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -109,6 +114,13 @@ class AgentRuntime:
         self.last_error = None
 
         try:
+            # Registration belongs to the runtime lifecycle.
+            # Constructing AgentRuntime must remain side-effect free.
+            if self.descriptor is not None:
+                self.registry_service.register_agent(
+                    self.descriptor
+                )
+
             self.registry_service.update_agent_status(
                 agent_name=self.agent.agent_name,
                 status=AgentStatus.AVAILABLE,

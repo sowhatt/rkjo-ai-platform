@@ -77,33 +77,61 @@ def test_worker_registers_discoverable_capability(monkeypatch):
     bus = Mock(spec=EventBus)
     runtime = build_runtime(event_bus=bus)
 
+    # Construction must be side-effect free: merely creating a runtime
+    # must not claim or mutate the shared agent registry.
+    assert runtime.registry_service.get_agent(
+        "rkjo.test.worker"
+    ) is None
+
+    observed = {}
+
+    def consume_agent_messages(
+        *,
+        queue_name,
+        callback,
+    ):
+        descriptor = runtime.registry_service.get_agent(
+            "rkjo.test.worker"
+        )
+
+        assert descriptor is not None
+        assert descriptor.status == AgentStatus.AVAILABLE
+        assert descriptor.queue_name == "rkjo.test.worker.queue"
+        assert descriptor.has_capability("document_analysis")
+
+        discovery = AgentDiscovery(
+            registry_service=runtime.registry_service
+        )
+
+        result = discovery.discover(
+            DiscoveryCriteria(
+                capability_name="document_analysis"
+            )
+        )
+
+        assert result is not None
+        assert result.agent.name == "rkjo.test.worker"
+        assert result.agent.queue_name == "rkjo.test.worker.queue"
+        assert result.capability.name == "document_analysis"
+
+        observed["available"] = True
+
+    bus.consume_agent_messages.side_effect = (
+        consume_agent_messages
+    )
+
+    runtime.start()
+
+    assert observed == {
+        "available": True
+    }
+
     descriptor = runtime.registry_service.get_agent(
         "rkjo.test.worker"
     )
 
     assert descriptor is not None
-    assert descriptor.queue_name == "rkjo.test.worker.queue"
-    assert descriptor.has_capability("document_analysis")
-
-    runtime.registry_service.update_agent_status(
-        agent_name=descriptor.name,
-        status=AgentStatus.AVAILABLE,
-    )
-
-    discovery = AgentDiscovery(
-        registry_service=runtime.registry_service
-    )
-
-    result = discovery.discover(
-        DiscoveryCriteria(
-            capability_name="document_analysis"
-        )
-    )
-
-    assert result is not None
-    assert result.agent.name == "rkjo.test.worker"
-    assert result.agent.queue_name == "rkjo.test.worker.queue"
-    assert result.capability.name == "document_analysis"
+    assert descriptor.status == AgentStatus.STOPPED
 
 
 def test_main_starts_health_server_and_closes_bus(monkeypatch):

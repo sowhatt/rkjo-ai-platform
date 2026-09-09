@@ -114,10 +114,6 @@ def build_runtime(
         }
     )
 
-    registry_service.register_agent(
-        descriptor
-    )
-
     agent = PlatformWorkerAgent(
         agent_name=descriptor.name,
         queue_name=descriptor.queue_name,
@@ -135,6 +131,7 @@ def build_runtime(
         registry_service=registry_service,
         result_publisher=result_publisher,
         instance_id=instance_id,
+        descriptor=descriptor,
     )
 
 
