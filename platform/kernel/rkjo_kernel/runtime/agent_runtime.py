@@ -47,6 +47,7 @@ class AgentRuntime:
         retry_policy: RetryPolicy | None = None,
         dead_letter_publisher: DeadLetterPublisher | None = None,
         metrics: MetricsRegistry | None = None,
+        instance_id: str | None = None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -65,6 +66,7 @@ class AgentRuntime:
         self.retry_policy = retry_policy
         self.dead_letter_publisher = dead_letter_publisher
         self.metrics = metrics
+        self.instance_id = instance_id
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -110,6 +112,7 @@ class AgentRuntime:
             self.registry_service.update_agent_status(
                 agent_name=self.agent.agent_name,
                 status=AgentStatus.AVAILABLE,
+                instance_id=self.instance_id,
             )
 
             self.status = RuntimeStatus.RUNNING
@@ -318,6 +321,7 @@ class AgentRuntime:
         self.registry_service.update_agent_status(
             agent_name=self.agent.agent_name,
             status=AgentStatus.BUSY,
+            instance_id=self.instance_id,
         )
 
         try:
@@ -460,6 +464,7 @@ class AgentRuntime:
                 self.registry_service.update_agent_status(
                     agent_name=self.agent.agent_name,
                     status=AgentStatus.AVAILABLE,
+                    instance_id=self.instance_id,
                 )
 
     def _increment_metric(
@@ -479,6 +484,7 @@ class AgentRuntime:
             self.registry_service.update_agent_status(
                 agent_name=self.agent.agent_name,
                 status=AgentStatus.ERROR,
+                instance_id=self.instance_id,
             )
         except KeyError:
             self.logger.warning(
@@ -495,6 +501,7 @@ class AgentRuntime:
             self.registry_service.update_agent_status(
                 agent_name=self.agent.agent_name,
                 status=AgentStatus.STOPPED,
+                instance_id=self.instance_id,
             )
         except KeyError:
             self.logger.warning(

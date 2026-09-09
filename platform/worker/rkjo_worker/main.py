@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import signal
 from typing import Any
+from uuid import uuid4
 
 from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.event_bus import EventBus
@@ -100,7 +101,18 @@ def build_runtime(
         registry=registry_backend
     )
 
+    instance_id = uuid4().hex
+
     descriptor = build_platform_worker_descriptor()
+
+    descriptor = descriptor.model_copy(
+        update={
+            "metadata": {
+                **descriptor.metadata,
+                "instance_id": instance_id,
+            }
+        }
+    )
 
     registry_service.register_agent(
         descriptor
@@ -122,6 +134,7 @@ def build_runtime(
         event_bus=bus,
         registry_service=registry_service,
         result_publisher=result_publisher,
+        instance_id=instance_id,
     )
 
 

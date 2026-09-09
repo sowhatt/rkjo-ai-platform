@@ -225,30 +225,83 @@ class PostgresAgentRegistry(AgentRegistry):
         self,
         agent_name: str,
         status: AgentStatus,
+        *,
+        instance_id: str | None = None,
     ) -> AgentDescriptor:
+        normalized_name = agent_name.strip().lower()
+
         descriptor = self.find_by_name(
-            agent_name
+            normalized_name
         )
 
         if descriptor is None:
             raise KeyError(
-                f"Agent '{agent_name}' "
+                f"Agent '{normalized_name}' "
                 "is not registered."
             )
 
-        updated_descriptor = (
-            descriptor.model_copy(
-                update={
-                    "status": status,
-                }
+        if instance_id is None:
+            updated_descriptor = (
+                descriptor.model_copy(
+                    update={
+                        "status": status,
+                    }
+                )
             )
-        )
 
-        self.register(
-            updated_descriptor
-        )
+            self.register(
+                updated_descriptor
+            )
 
-        return updated_descriptor
+            return updated_descriptor
+
+        query = """
+        UPDATE agent_registry
+        SET
+            status = %s,
+            payload = jsonb_set(
+                payload,
+                '{status}',
+                to_jsonb(%s::text),
+                true
+            ),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE name = %s
+          AND payload->'metadata'->>'instance_id' = %s
+        RETURNING payload;
+        """
+
+        with psycopg.connect(
+            self.database_url
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    query,
+                    (
+                        status.value,
+                        status.value,
+                        normalized_name,
+                        instance_id,
+                    ),
+                )
+                row = cursor.fetchone()
+
+        if row is None:
+            current = self.find_by_name(
+                normalized_name
+            )
+
+            if current is None:
+                raise KeyError(
+                    f"Agent '{normalized_name}' "
+                    "is not registered."
+                )
+
+            return current
+
+        return AgentDescriptor.model_validate(
+            row[0]
+        )
 
     def count(self) -> int:
         query = """
