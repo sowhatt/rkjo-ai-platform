@@ -20,6 +20,7 @@ from rkjo_kernel.registry.postgres_registry import (
     PostgresAgentRegistry,
 )
 from rkjo_kernel.runtime.agent_runtime import AgentRuntime
+from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
 from rkjo_kernel.services.registry_service import RegistryService
 
 
@@ -111,10 +112,16 @@ def build_runtime(
         event_bus=bus,
     )
 
+    result_publisher = AgentResultPublisher(
+        event_bus=bus,
+        source=descriptor.name,
+    )
+
     return AgentRuntime(
         agent=agent,
         event_bus=bus,
         registry_service=registry_service,
+        result_publisher=result_publisher,
     )
 
 
