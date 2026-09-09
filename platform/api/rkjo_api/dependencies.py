@@ -64,7 +64,9 @@ from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
 )
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
-from rkjo_kernel.registry.registry import AgentRegistry
+from rkjo_kernel.registry.postgres_registry import (
+    PostgresAgentRegistry,
+)
 from rkjo_kernel.services.registry_service import RegistryService
 from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
@@ -109,8 +111,12 @@ def get_async_dispatcher() -> AsyncWorkflowDispatcher:
 
 
 
-def get_agent_registry() -> AgentRegistry:
-    return AgentRegistry()
+def get_agent_registry() -> PostgresAgentRegistry:
+    registry = PostgresAgentRegistry(
+        get_database_url()
+    )
+    registry.initialize_schema()
+    return registry
 
 
 def get_registry_service() -> RegistryService:

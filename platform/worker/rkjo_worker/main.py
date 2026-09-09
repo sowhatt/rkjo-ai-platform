@@ -16,6 +16,9 @@ from rkjo_worker.agent_catalog import (
 from rkjo_worker.health_http import HealthHTTPServer
 from rkjo_worker.runtime_health import RuntimeHealthAdapter
 from rkjo_kernel.registry.registry import AgentRegistry
+from rkjo_kernel.registry.postgres_registry import (
+    PostgresAgentRegistry,
+)
 from rkjo_kernel.runtime.agent_runtime import AgentRuntime
 from rkjo_kernel.services.registry_service import RegistryService
 
@@ -53,6 +56,7 @@ def get_env(
 
 def build_runtime(
     event_bus: EventBus | None = None,
+    registry: AgentRegistry | None = None,
 ) -> AgentRuntime:
     """Build the production runtime and register its discoverable capability.
 
@@ -63,10 +67,36 @@ def build_runtime(
 
     bus = event_bus or RabbitMQEventBus()
 
-    registry = AgentRegistry()
+    registry_backend = registry
+
+    # Keep injected/test runtimes isolated in memory.
+    # Production runtimes share discovery through PostgreSQL.
+    if registry_backend is None:
+        if event_bus is not None:
+            registry_backend = AgentRegistry()
+        else:
+            database_url = (
+                os.getenv("RKJO_DATABASE_URL")
+                or os.getenv("DATABASE_URL")
+                or ""
+            ).strip()
+
+            if not database_url:
+                raise RuntimeError(
+                    "DATABASE_URL or RKJO_DATABASE_URL "
+                    "is required."
+                )
+
+            postgres_registry = (
+                PostgresAgentRegistry(
+                    database_url
+                )
+            )
+            postgres_registry.initialize_schema()
+            registry_backend = postgres_registry
 
     registry_service = RegistryService(
-        registry=registry
+        registry=registry_backend
     )
 
     descriptor = build_platform_worker_descriptor()
