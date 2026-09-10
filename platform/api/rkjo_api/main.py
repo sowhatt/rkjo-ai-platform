@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import Any
@@ -33,6 +34,7 @@ from rkjo_api.dependencies import (
     get_workflow_agent_router,
     get_workflow_engine,
     get_workflow_repository,
+    get_workflow_uow_factory,
 )
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
@@ -45,6 +47,7 @@ from rkjo_kernel.workflow.models.workflow_definition import (
 from rkjo_kernel.workflow.models.workflow_step import (
     WorkflowStep,
 )
+from rkjo_kernel.workflow.outbox import OutboxMessage
 from rkjo_kernel.workflow.repository.postgres import (
     PostgreSQLWorkflowRepository,
 )
@@ -389,50 +392,72 @@ def create_execution(
 )
 def start_execution(
     execution_id: str,
-    engine: WorkflowEngine = Depends(
-        get_workflow_engine
-    ),
     dispatcher: AsyncWorkflowDispatcher = Depends(
         get_async_dispatcher
     ),
     router: WorkflowAgentRouter = Depends(
         get_workflow_agent_router
     ),
+    uow_factory=Depends(
+        get_workflow_uow_factory
+    ),
 ) -> WorkflowDispatchResponse:
+    """Atomically start a workflow and enqueue its first dispatch intent."""
     try:
-        execution = engine.load_execution(
-            execution_id
-        )
-    except KeyError as exc:
-        raise HTTPException(
-            status_code=404,
-            detail="Workflow execution not found.",
-        ) from exc
-
-    try:
-        engine.start(execution)
-
-        step = engine.start_next_step(
-            execution
-        )
-
-        if step is None:
-            raise ValueError(
-                "Workflow has no executable step."
+        with uow_factory() as uow:
+            engine = WorkflowEngine(
+                repository=uow.workflows,
+                metrics=get_metrics_registry(),
             )
 
-        route = router.resolve(
-            step
-        )
+            try:
+                execution = engine.load_execution(
+                    execution_id
+                )
+            except KeyError as exc:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Workflow execution not found.",
+                ) from exc
 
-        result = dispatcher.dispatch(
-            step=step,
-            context=execution.context,
-            queue_name=route.queue_name,
-            execution_id=execution.execution_id,
-            reply_queue="rkjo.workflow.results",
-        )
+            engine.start(execution)
 
+            step = engine.start_next_step(
+                execution
+            )
+
+            if step is None:
+                raise ValueError(
+                    "Workflow has no executable step."
+                )
+
+            route = router.resolve(
+                step
+            )
+
+            queue_name, message = dispatcher.prepare(
+                step=step,
+                context=execution.context,
+                queue_name=route.queue_name,
+                execution_id=execution.execution_id,
+                reply_queue="rkjo.workflow.results",
+            )
+
+            uow.outbox.add(
+                OutboxMessage(
+                    outbox_id=message.message_id,
+                    queue_name=queue_name,
+                    message=message,
+                    created_at=datetime.now(
+                        timezone.utc
+                    ),
+                )
+            )
+
+            uow.commit()
+
+    except HTTPException:
+        raise
     except (
         ValueError,
         InvalidWorkflowTransitionError,
@@ -446,10 +471,10 @@ def start_execution(
         execution_id=execution.execution_id,
         workflow_id=execution.definition.workflow_id,
         status=execution.status.value,
-        step_id=result.step_id,
-        queue_name=result.queue_name,
-        message_id=result.message_id,
-        correlation_id=result.correlation_id,
+        step_id=step.step_id,
+        queue_name=queue_name,
+        message_id=message.message_id,
+        correlation_id=message.correlation_id,
     )
 
 
