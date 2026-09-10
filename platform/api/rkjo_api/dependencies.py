@@ -71,6 +71,9 @@ from rkjo_kernel.services.registry_service import RegistryService
 from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
 from rkjo_kernel.workflow.engine import WorkflowEngine
+from rkjo_kernel.workflow.postgres_unit_of_work import (
+    PostgreSQLWorkflowUnitOfWork,
+)
 from rkjo_kernel.workflow.repository.postgres import (
     PostgreSQLWorkflowRepository,
 )
@@ -96,6 +99,18 @@ def get_workflow_engine() -> WorkflowEngine:
         repository=get_workflow_repository(),
         metrics=get_metrics_registry(),
     )
+
+
+def get_workflow_uow_factory():
+    """Build transactions that atomically persist workflow state and outbox."""
+    database_url = get_database_url()
+
+    def factory() -> PostgreSQLWorkflowUnitOfWork:
+        return PostgreSQLWorkflowUnitOfWork(
+            database_url
+        )
+
+    return factory
 
 
 
