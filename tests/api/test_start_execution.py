@@ -6,6 +6,7 @@ from rkjo_api.dependencies import (
     get_async_dispatcher,
     get_workflow_agent_router,
     get_workflow_engine,
+    get_workflow_uow_factory,
 )
 from rkjo_api.main import app
 from rkjo_kernel.events.event_bus import EventBus
@@ -20,14 +21,14 @@ from rkjo_kernel.workflow.async_dispatch import (
     AsyncWorkflowDispatcher,
 )
 from rkjo_kernel.workflow.engine import WorkflowEngine
+from rkjo_kernel.workflow.in_memory_unit_of_work import (
+    InMemoryWorkflowUnitOfWork,
+)
 from rkjo_kernel.workflow.models.workflow_definition import (
     WorkflowDefinition,
 )
 from rkjo_kernel.workflow.models.workflow_step import (
     WorkflowStep,
-)
-from rkjo_kernel.workflow.repository.memory import (
-    InMemoryWorkflowRepository,
 )
 
 
@@ -70,8 +71,13 @@ class FakeEventBus(EventBus):
 
 
 @pytest.fixture
-def repository():
-    return InMemoryWorkflowRepository()
+def uow():
+    return InMemoryWorkflowUnitOfWork()
+
+
+@pytest.fixture
+def repository(uow):
+    return uow.workflows
 
 
 @pytest.fixture
@@ -114,6 +120,7 @@ def client(
     engine,
     event_bus,
     router,
+    uow,
 ):
     def override_engine():
         return engine
@@ -126,6 +133,9 @@ def client(
     def override_router():
         return router
 
+    def override_uow_factory():
+        return lambda: uow
+
     app.dependency_overrides[
         get_workflow_engine
     ] = override_engine
@@ -137,6 +147,10 @@ def client(
     app.dependency_overrides[
         get_workflow_agent_router
     ] = override_router
+
+    app.dependency_overrides[
+        get_workflow_uow_factory
+    ] = override_uow_factory
 
     with TestClient(
         app,
@@ -156,9 +170,13 @@ def client(
         None,
     )
 
-
     app.dependency_overrides.pop(
         get_workflow_agent_router,
+        None,
+    )
+
+    app.dependency_overrides.pop(
+        get_workflow_uow_factory,
         None,
     )
 
@@ -184,10 +202,11 @@ def create_execution(
     )
 
 
-def test_start_execution_dispatches_first_step(
+def test_start_execution_enqueues_first_step_without_direct_publish(
     client,
     engine,
     event_bus,
+    uow,
 ):
     create_execution(
         engine
@@ -221,31 +240,25 @@ def test_start_execution_dispatches_first_step(
 
     assert payload["correlation_id"]
 
-    assert len(event_bus.messages) == 1
+    # The API must never publish directly to RabbitMQ. The durable outbox
+    # publisher owns external delivery after the database transaction commits.
+    assert event_bus.messages == []
 
-    queue_name, message = (
-        event_bus.messages[0]
-    )
+    pending = uow.outbox.pending()
+    assert len(pending) == 1
 
-    assert queue_name == "weather.queue"
-
-    assert message.target == (
-        "weather.agent"
-    )
-
-    assert message.message_type == (
-        "workflow.step.execute"
-    )
-
-    assert message.metadata[
+    outbox_message = pending[0]
+    assert outbox_message.outbox_id == payload["message_id"]
+    assert outbox_message.queue_name == "weather.queue"
+    assert outbox_message.message.target == "weather.agent"
+    assert outbox_message.message.message_type == "workflow.step.execute"
+    assert outbox_message.message.metadata[
         "workflow_execution_id"
     ] == "start-api-001"
-
-    assert message.metadata[
+    assert outbox_message.message.metadata[
         "workflow_step_id"
     ] == "weather"
-
-    assert message.metadata[
+    assert outbox_message.message.metadata[
         "reply_queue"
     ] == "rkjo.workflow.results"
 
@@ -264,10 +277,11 @@ def test_start_unknown_execution_returns_404(
     }
 
 
-def test_execution_is_persisted_as_running(
+def test_execution_and_outbox_are_committed_together(
     client,
     engine,
     repository,
+    uow,
 ):
     create_execution(
         engine
@@ -284,12 +298,14 @@ def test_execution_is_persisted_as_running(
     )
 
     assert stored is not None
-
     assert stored.status.value == "running"
+    assert stored.current_step_id == "weather"
 
-    assert stored.current_step_id == (
-        "weather"
-    )
+    pending = uow.outbox.pending()
+    assert len(pending) == 1
+    assert pending[0].message.metadata[
+        "workflow_execution_id"
+    ] == stored.execution_id
 
 
 def test_start_execution_twice_returns_conflict(
