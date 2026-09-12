@@ -20,6 +20,9 @@ from rkjo_api.meeting import (
 from rkjo_api.meeting_audio import (
     router as meeting_audio_router,
 )
+from rkjo_api.meeting_transcription import (
+    router as meeting_transcription_router,
+)
 
 from rkjo_api.security import (
     API_KEY_HEADER,
@@ -70,6 +73,9 @@ app.include_router(
 )
 app.include_router(
     meeting_audio_router
+)
+app.include_router(
+    meeting_transcription_router
 )
 
 
