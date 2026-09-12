@@ -17,6 +17,9 @@ from rkjo_api.education import (
 from rkjo_api.meeting import (
     router as meeting_router,
 )
+from rkjo_api.meeting_audio import (
+    router as meeting_audio_router,
+)
 
 from rkjo_api.security import (
     API_KEY_HEADER,
@@ -65,8 +68,9 @@ app.include_router(
 app.include_router(
     meeting_router
 )
-
-
+app.include_router(
+    meeting_audio_router
+)
 
 
 @app.middleware("http")
@@ -212,8 +216,6 @@ class MetricsResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-
-
 
 
 class WorkflowStepRequest(BaseModel):
