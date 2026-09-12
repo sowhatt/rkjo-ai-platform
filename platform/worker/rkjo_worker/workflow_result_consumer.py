@@ -11,9 +11,8 @@ from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
 from rkjo_kernel.logging.logger import get_logger
 from rkjo_worker.health import WorkerHealth
-from rkjo_kernel.registry.postgres_registry import (
-    PostgresAgentRegistry,
-)
+from rkjo_kernel.registry.descriptor import AgentStatus
+from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.services.registry_service import RegistryService
 from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
@@ -22,6 +21,9 @@ from rkjo_kernel.workflow.postgres_unit_of_work import (
 )
 from rkjo_kernel.workflow.transactional_result_handler import (
     TransactionalWorkflowResultHandler,
+)
+from rkjo_worker.agent_catalog import (
+    register_platform_worker,
 )
 
 
@@ -52,13 +54,7 @@ def build_result_handler(
     str,
     TransactionalWorkflowResultHandler,
 ]:
-    """Build the production workflow result handler.
-
-    Routing is backed by the same PostgreSQL agent registry used by the API
-    and workers. The result consumer must never create a private in-memory
-    view of agent availability because workflow continuation can target agents
-    registered by another process or instance.
-    """
+    """Build the production workflow result handler."""
 
     database_url = get_env(
         "RKJO_DATABASE_URL",
@@ -70,13 +66,15 @@ def build_result_handler(
         "rkjo.workflow.results",
     )
 
-    registry = PostgresAgentRegistry(
-        database_url
-    )
-    registry.initialize_schema()
+    registry = AgentRegistry()
 
     registry_service = RegistryService(
         registry=registry,
+    )
+
+    register_platform_worker(
+        registry_service,
+        status=AgentStatus.AVAILABLE,
     )
 
     router = WorkflowAgentRouter(
