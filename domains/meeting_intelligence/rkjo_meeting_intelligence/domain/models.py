@@ -42,6 +42,49 @@ class ActionStatus(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class AudioAsset:
+    asset_id: str
+    meeting_id: str
+    tenant_id: str
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    sha256: str
+    storage_key: str
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "asset_id",
+            "meeting_id",
+            "tenant_id",
+            "original_filename",
+            "content_type",
+            "sha256",
+            "storage_key",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _required(
+                    getattr(self, field_name),
+                    field_name=field_name,
+                ),
+            )
+
+        if self.size_bytes <= 0:
+            raise ValueError("size_bytes must be greater than 0.")
+
+        if len(self.sha256) != 64:
+            raise ValueError("sha256 must contain 64 hexadecimal characters.")
+
+        try:
+            int(self.sha256, 16)
+        except ValueError as exc:
+            raise ValueError("sha256 must be hexadecimal.") from exc
+
+
+@dataclass(frozen=True, slots=True)
 class Participant:
     participant_id: str
     meeting_id: str
