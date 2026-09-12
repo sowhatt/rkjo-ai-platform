@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from rkjo_meeting_intelligence.domain.models import (
     ActionItem,
+    AudioAsset,
     Decision,
     Meeting,
     Participant,
@@ -18,6 +19,7 @@ class InMemoryMeetingRepository:
         self._segments: dict[tuple[str, str, str], TranscriptSegment] = {}
         self._decisions: dict[tuple[str, str, str], Decision] = {}
         self._actions: dict[tuple[str, str, str], ActionItem] = {}
+        self._audio_assets: dict[tuple[str, str, str], AudioAsset] = {}
 
     def save(self, meeting: Meeting) -> Meeting:
         self._meetings[(meeting.tenant_id, meeting.meeting_id)] = meeting
@@ -31,6 +33,17 @@ class InMemoryMeetingRepository:
         return sorted(
             [meeting for (stored_tenant_id, _), meeting in self._meetings.items() if stored_tenant_id == tenant_id],
             key=lambda meeting: meeting.meeting_id,
+        )
+
+    def save_audio_asset(self, asset: AudioAsset) -> AudioAsset:
+        self._audio_assets[(asset.tenant_id, asset.meeting_id, asset.asset_id)] = asset
+        return asset
+
+    def list_audio_assets(self, *, tenant_id: str, meeting_id: str) -> list[AudioAsset]:
+        tenant_id = tenant_id.strip(); meeting_id = meeting_id.strip()
+        return sorted(
+            [item for (t, m, _), item in self._audio_assets.items() if t == tenant_id and m == meeting_id],
+            key=lambda item: (item.created_at, item.asset_id),
         )
 
     def save_participant(self, participant: Participant) -> Participant:
