@@ -7,6 +7,7 @@ import pytest
 
 from rkjo_meeting_intelligence.domain.models import (
     ActionItem,
+    AudioAsset,
     Decision,
     Meeting,
     MeetingStatus,
@@ -55,6 +56,35 @@ def test_meeting_is_tenant_safe(repository):
     )
     repository.save(meeting)
     assert repository.get(tenant_id=f"tenant-b-{suffix}", meeting_id=meeting.meeting_id) is None
+
+
+def test_audio_asset_survives_repository_recreation(repository):
+    suffix = uuid.uuid4().hex[:8]
+    tenant_id = f"tenant-audio-{suffix}"
+    meeting_id = f"meeting-audio-{suffix}"
+    repository.save(Meeting(meeting_id, tenant_id, "Audio", "owner"))
+    asset = AudioAsset(
+        asset_id=f"asset-{suffix}",
+        meeting_id=meeting_id,
+        tenant_id=tenant_id,
+        original_filename="codir.wav",
+        content_type="audio/wav",
+        size_bytes=1024,
+        sha256="a" * 64,
+        storage_key=f"{tenant_id}/{meeting_id}/asset-{suffix}/codir.wav",
+        created_at=datetime.now(UTC),
+    )
+    repository.save_audio_asset(asset)
+
+    recreated = PostgresMeetingRepository(DATABASE_URL)
+    assert recreated.list_audio_assets(
+        tenant_id=tenant_id,
+        meeting_id=meeting_id,
+    ) == [asset]
+    assert recreated.list_audio_assets(
+        tenant_id=f"other-{tenant_id}",
+        meeting_id=meeting_id,
+    ) == []
 
 
 def test_full_meeting_record_is_persisted(repository):
