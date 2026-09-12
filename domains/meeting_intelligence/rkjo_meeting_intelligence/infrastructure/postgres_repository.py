@@ -7,6 +7,7 @@ import psycopg
 from rkjo_meeting_intelligence.domain.models import (
     ActionItem,
     ActionStatus,
+    AudioAsset,
     Decision,
     DecisionStatus,
     Meeting,
@@ -42,6 +43,26 @@ class PostgresMeetingRepository:
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     PRIMARY KEY (tenant_id, meeting_id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS meeting_intelligence_audio_assets (
+                    tenant_id TEXT NOT NULL,
+                    meeting_id TEXT NOT NULL,
+                    asset_id TEXT NOT NULL,
+                    original_filename TEXT NOT NULL,
+                    content_type TEXT NOT NULL,
+                    size_bytes BIGINT NOT NULL CHECK (size_bytes > 0),
+                    sha256 TEXT NOT NULL,
+                    storage_key TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    PRIMARY KEY (tenant_id, meeting_id, asset_id),
+                    UNIQUE (tenant_id, meeting_id, storage_key),
+                    FOREIGN KEY (tenant_id, meeting_id)
+                        REFERENCES meeting_intelligence_meetings(tenant_id, meeting_id)
+                        ON DELETE CASCADE
                 )
                 """
             )
@@ -115,6 +136,9 @@ class PostgresMeetingRepository:
             )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS ix_meeting_status ON meeting_intelligence_meetings (tenant_id, status)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS ix_audio_created_at ON meeting_intelligence_audio_assets (tenant_id, meeting_id, created_at)"
             )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS ix_action_due_at ON meeting_intelligence_actions (tenant_id, status, due_at)"
@@ -193,6 +217,65 @@ class PostgresMeetingRepository:
             for row in rows
         ]
 
+    def save_audio_asset(self, asset: AudioAsset) -> AudioAsset:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO meeting_intelligence_audio_assets (
+                    tenant_id, meeting_id, asset_id, original_filename,
+                    content_type, size_bytes, sha256, storage_key, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (tenant_id, meeting_id, asset_id)
+                DO UPDATE SET
+                    original_filename = EXCLUDED.original_filename,
+                    content_type = EXCLUDED.content_type,
+                    size_bytes = EXCLUDED.size_bytes,
+                    sha256 = EXCLUDED.sha256,
+                    storage_key = EXCLUDED.storage_key,
+                    created_at = EXCLUDED.created_at
+                """,
+                (
+                    asset.tenant_id,
+                    asset.meeting_id,
+                    asset.asset_id,
+                    asset.original_filename,
+                    asset.content_type,
+                    asset.size_bytes,
+                    asset.sha256,
+                    asset.storage_key,
+                    asset.created_at,
+                ),
+            )
+        return asset
+
+    def list_audio_assets(self, *, tenant_id: str, meeting_id: str) -> list[AudioAsset]:
+        tenant_id = tenant_id.strip(); meeting_id = meeting_id.strip()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT asset_id, original_filename, content_type, size_bytes,
+                       sha256, storage_key, created_at
+                FROM meeting_intelligence_audio_assets
+                WHERE tenant_id = %s AND meeting_id = %s
+                ORDER BY created_at, asset_id
+                """,
+                (tenant_id, meeting_id),
+            ).fetchall()
+        return [
+            AudioAsset(
+                asset_id=row[0],
+                meeting_id=meeting_id,
+                tenant_id=tenant_id,
+                original_filename=row[1],
+                content_type=row[2],
+                size_bytes=row[3],
+                sha256=row[4],
+                storage_key=row[5],
+                created_at=row[6],
+            )
+            for row in rows
+        ]
+
     def save_participant(self, participant: Participant) -> Participant:
         with self._connect() as connection:
             connection.execute(
@@ -211,6 +294,7 @@ class PostgresMeetingRepository:
         return participant
 
     def list_participants(self, *, tenant_id: str, meeting_id: str) -> list[Participant]:
+        tenant_id = tenant_id.strip(); meeting_id = meeting_id.strip()
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -219,9 +303,15 @@ class PostgresMeetingRepository:
                 WHERE tenant_id = %s AND meeting_id = %s
                 ORDER BY display_name, participant_id
                 """,
-                (tenant_id.strip(), meeting_id.strip()),
+                (tenant_id, meeting_id),
             ).fetchall()
-        return [Participant(row[0], meeting_id.strip(), tenant_id.strip(), row[1], row[2], row[3]) for row in rows]
+        return [
+            Participant(
+                participant_id=row[0], meeting_id=meeting_id, tenant_id=tenant_id,
+                display_name=row[1], role=row[2], email=row[3],
+            )
+            for row in rows
+        ]
 
     def save_transcript_segment(self, segment: TranscriptSegment) -> TranscriptSegment:
         with self._connect() as connection:
@@ -255,7 +345,14 @@ class PostgresMeetingRepository:
                 """,
                 (tenant_id, meeting_id),
             ).fetchall()
-        return [TranscriptSegment(row[0], meeting_id, tenant_id, row[1], row[2], row[3], row[4], row[5]) for row in rows]
+        return [
+            TranscriptSegment(
+                segment_id=row[0], meeting_id=meeting_id, tenant_id=tenant_id,
+                text=row[1], start_seconds=row[2], end_seconds=row[3],
+                speaker_id=row[4], confidence=row[5],
+            )
+            for row in rows
+        ]
 
     def save_decision(self, decision: Decision) -> Decision:
         with self._connect() as connection:
@@ -286,7 +383,13 @@ class PostgresMeetingRepository:
                 """,
                 (tenant_id, meeting_id),
             ).fetchall()
-        return [Decision(row[0], meeting_id, tenant_id, row[1], row[2], DecisionStatus(row[3])) for row in rows]
+        return [
+            Decision(
+                decision_id=row[0], meeting_id=meeting_id, tenant_id=tenant_id,
+                text=row[1], source_segment_id=row[2], status=DecisionStatus(row[3]),
+            )
+            for row in rows
+        ]
 
     def save_action(self, action: ActionItem) -> ActionItem:
         with self._connect() as connection:
@@ -320,4 +423,11 @@ class PostgresMeetingRepository:
                 """,
                 (tenant_id, meeting_id),
             ).fetchall()
-        return [ActionItem(row[0], meeting_id, tenant_id, row[1], row[2], row[3], row[4], ActionStatus(row[5])) for row in rows]
+        return [
+            ActionItem(
+                action_id=row[0], meeting_id=meeting_id, tenant_id=tenant_id,
+                title=row[1], source_segment_id=row[2], assignee_id=row[3],
+                due_at=row[4], status=ActionStatus(row[5]),
+            )
+            for row in rows
+        ]
