@@ -441,6 +441,7 @@ def start_execution(
                 queue_name=route.queue_name,
                 execution_id=execution.execution_id,
                 reply_queue="rkjo.workflow.results",
+                target_agent_name=route.agent_name,
             )
 
             uow.outbox.add(
