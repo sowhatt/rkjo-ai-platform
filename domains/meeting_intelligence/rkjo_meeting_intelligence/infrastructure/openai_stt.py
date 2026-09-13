@@ -10,8 +10,8 @@ from openai import OpenAI
 from rkjo_meeting_intelligence.application.transcription import STTSegment
 
 
-class OpenAIWhisperSTTProvider:
-    """Timestamped file transcription adapter using OpenAI Whisper."""
+class OpenAIGPTTranscribeProvider:
+    """High-accuracy file transcription adapter using GPT-Transcribe."""
 
     def __init__(
         self,
@@ -23,7 +23,7 @@ class OpenAIWhisperSTTProvider:
         if not resolved_key:
             raise RuntimeError("OPENAI_API_KEY is required for transcription.")
         self.client = OpenAI(api_key=resolved_key)
-        self.model = (model or os.getenv("RKJO_MEETING_STT_MODEL", "whisper-1")).strip()
+        self.model = (model or os.getenv("RKJO_MEETING_STT_MODEL", "gpt-transcribe")).strip()
 
     def transcribe(
         self,
@@ -40,17 +40,17 @@ class OpenAIWhisperSTTProvider:
         result = self.client.audio.transcriptions.create(
             model=self.model,
             file=media,
-            response_format="verbose_json",
-            timestamp_granularities=["segment"],
+            response_format="json",
         )
 
-        segments = getattr(result, "segments", None) or []
+        text = str(getattr(result, "text", "")).strip()
+        if not text:
+            return []
+
         return [
             STTSegment(
-                text=str(segment.text).strip(),
-                start_seconds=float(segment.start),
-                end_seconds=float(segment.end),
+                text=text,
+                start_seconds=0.0,
+                end_seconds=0.0,
             )
-            for segment in segments
-            if str(segment.text).strip()
         ]
