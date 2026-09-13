@@ -5,15 +5,22 @@ import pytest
 
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.registry.descriptor import AgentStatus
+from rkjo_kernel.registry.registry import AgentRegistry
+from rkjo_worker.agent_catalog import build_platform_worker_descriptor
+import rkjo_worker.workflow_result_consumer as result_consumer_module
 from rkjo_worker.workflow_result_consumer import (
     WorkflowResultConsumer,
     build_result_handler,
 )
 
 
-def test_result_consumer_bootstraps_routable_worker(
+def test_result_consumer_uses_shared_postgres_registry(
     monkeypatch,
 ) -> None:
+    monkeypatch.setenv(
+        "RKJO_DATABASE_URL",
+        "postgresql://shared-registry.test/rkjo",
+    )
     monkeypatch.setenv(
         "RKJO_WORKER_AGENT_NAME",
         "rkjo.result.worker",
@@ -31,6 +38,34 @@ def test_result_consumer_bootstraps_routable_worker(
         "rkjo.workflow.results.test",
     )
 
+    created_registries = []
+
+    class FakePostgresAgentRegistry(AgentRegistry):
+        def __init__(self, database_url: str) -> None:
+            super().__init__()
+            self.database_url = database_url
+            self.schema_initialized = False
+            self.register_calls = 0
+
+            descriptor = build_platform_worker_descriptor(
+                status=AgentStatus.AVAILABLE,
+            )
+            super().register(descriptor)
+            created_registries.append(self)
+
+        def initialize_schema(self) -> None:
+            self.schema_initialized = True
+
+        def register(self, descriptor) -> None:
+            self.register_calls += 1
+            return super().register(descriptor)
+
+    monkeypatch.setattr(
+        result_consumer_module,
+        "PostgresAgentRegistry",
+        FakePostgresAgentRegistry,
+    )
+
     event_bus = Mock(
         spec=EventBus
     )
@@ -38,6 +73,15 @@ def test_result_consumer_bootstraps_routable_worker(
     result_queue, handler = build_result_handler(
         event_bus=event_bus,
     )
+
+    assert len(created_registries) == 1
+    registry = created_registries[0]
+
+    assert registry.database_url == (
+        "postgresql://shared-registry.test/rkjo"
+    )
+    assert registry.schema_initialized is True
+    assert registry.register_calls == 0
 
     descriptor = (
         handler.router.registry_service.get_agent(
