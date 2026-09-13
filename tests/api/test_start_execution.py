@@ -10,6 +10,7 @@ from rkjo_api.dependencies import (
 )
 from rkjo_api.main import app
 from rkjo_kernel.events.event_bus import EventBus
+from rkjo_kernel.registry.capability import AgentCapability
 from rkjo_kernel.registry.descriptor import (
     AgentDescriptor,
     AgentStatus,
@@ -107,6 +108,14 @@ def router():
             product="ADIP",
             queue_name="weather.queue",
             status=AgentStatus.AVAILABLE,
+            capabilities=[
+                AgentCapability(
+                    name="platform_task",
+                    description="Generic platform task",
+                    input_schema={},
+                    output_schema={},
+                )
+            ],
         )
     )
 
@@ -261,6 +270,43 @@ def test_start_execution_enqueues_first_step_without_direct_publish(
     assert outbox_message.message.metadata[
         "reply_queue"
     ] == "rkjo.workflow.results"
+
+
+def test_start_capability_routed_execution_targets_resolved_agent(
+    client,
+    engine,
+    uow,
+):
+    definition = WorkflowDefinition(
+        workflow_id="capability-start-api",
+        name="Capability Start API",
+        steps=[
+            WorkflowStep(
+                step_id="platform",
+                name="Platform Task",
+                capability_name="platform_task",
+            )
+        ],
+    )
+
+    engine.create_execution(
+        definition,
+        execution_id="capability-start-api-001",
+    )
+
+    response = client.post(
+        "/workflows/executions/capability-start-api-001/start"
+    )
+
+    assert response.status_code == 202
+
+    pending = uow.outbox.pending()
+    assert len(pending) == 1
+    assert pending[0].queue_name == "weather.queue"
+    assert pending[0].message.target == "weather.agent"
+    assert pending[0].message.metadata[
+        "capability_name"
+    ] == "platform_task"
 
 
 def test_start_unknown_execution_returns_404(
