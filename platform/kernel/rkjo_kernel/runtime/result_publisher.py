@@ -8,6 +8,35 @@ from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.messages.agent_message import AgentMessage
 
 
+_TRACE_METADATA_KEYS = (
+    "trace_id",
+    "mission_id",
+    "workflow_execution_id",
+    "workflow_step_id",
+    "agent_id",
+    "capability_name",
+    "tool_call_id",
+    "tenant_id",
+    "user_id",
+    "request_id",
+    "parent_span_id",
+)
+
+
+def _result_metadata(request: AgentMessage) -> dict[str, Any]:
+    """Build result metadata while preserving transverse trace identity."""
+    metadata: dict[str, Any] = {
+        "request_message_id": request.message_id,
+    }
+
+    for key in _TRACE_METADATA_KEYS:
+        value = request.metadata.get(key)
+        if value is not None:
+            metadata[key] = value
+
+    return metadata
+
+
 class AgentResultPublisher:
     """Publish workflow step results through EventBus."""
 
@@ -44,19 +73,7 @@ class AgentResultPublisher:
                 "success": True,
                 "result": result,
             },
-            metadata={
-                "request_message_id": request.message_id,
-                "workflow_execution_id": (
-                    request.metadata.get(
-                        "workflow_execution_id"
-                    )
-                ),
-                "workflow_step_id": (
-                    request.metadata.get(
-                        "workflow_step_id"
-                    )
-                ),
-            },
+            metadata=_result_metadata(request),
         )
 
         self.event_bus.publish_agent_message(
@@ -90,19 +107,7 @@ class AgentResultPublisher:
                 "success": False,
                 "error": str(error),
             },
-            metadata={
-                "request_message_id": request.message_id,
-                "workflow_execution_id": (
-                    request.metadata.get(
-                        "workflow_execution_id"
-                    )
-                ),
-                "workflow_step_id": (
-                    request.metadata.get(
-                        "workflow_step_id"
-                    )
-                ),
-            },
+            metadata=_result_metadata(request),
         )
 
         self.event_bus.publish_agent_message(
