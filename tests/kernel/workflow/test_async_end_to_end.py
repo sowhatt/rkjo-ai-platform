@@ -8,6 +8,7 @@ import pytest
 
 from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
+from rkjo_kernel.mission import ExecutionContext
 from rkjo_kernel.registry.descriptor import AgentDescriptor, AgentStatus
 from rkjo_kernel.registry.registry import AgentRegistry
 from rkjo_kernel.runtime.agent_runtime import AgentRuntime
@@ -38,8 +39,6 @@ class WeatherAgent(BaseAgent):
             "provider": "test",
         }
 
-        # The RabbitMQ BlockingConnection consumer must be
-        # stopped from the same thread that owns it.
         self.event_bus.channel.stop_consuming()
 
         return result
@@ -115,6 +114,14 @@ def test_async_workflow_end_to_end(repository):
         },
     )
 
+    execution.bind_execution_context(
+        ExecutionContext(
+            mission_id="mission-e2e-success",
+            trace_id="trace-e2e-success",
+            tenant_id="tenant-e2e",
+        )
+    )
+
     engine.start(execution)
     step = engine.start_next_step(execution)
 
@@ -185,6 +192,17 @@ def test_async_workflow_end_to_end(repository):
 
     try:
         assert len(received_results) == 1
+
+        result_message = received_results[0]
+        assert result_message.metadata["mission_id"] == (
+            "mission-e2e-success"
+        )
+        assert result_message.metadata["trace_id"] == (
+            "trace-e2e-success"
+        )
+        assert result_message.metadata[
+            "workflow_execution_id"
+        ] == execution.execution_id
 
         restored = repository.get(
             execution.execution_id
