@@ -54,7 +54,6 @@ def make_execution() -> WorkflowExecution:
             WorkflowStep(
                 step_id="teach",
                 name="Teach",
-                agent_name="education.tutor",
                 capability_name="education.explain",
                 position=0,
             )
