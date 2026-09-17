@@ -323,6 +323,34 @@ def create_competency(
     )
 
 
+@router.get(
+    "/learners/{learner_id}/courses/{course_id}/progress",
+    response_model=ProgressResponse,
+)
+def get_progress(
+    learner_id: UUID,
+    course_id: UUID,
+    request: Request,
+    service: LearningService = Depends(get_education_learning_service),
+) -> ProgressResponse:
+    try:
+        progress = service.get_progress(
+            tenant_id=require_uuid_tenant(request),
+            learner_id=learner_id,
+            course_id=course_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return ProgressResponse(
+        id=progress.id,
+        learner_id=progress.learner_id,
+        course_id=progress.course_id,
+        completion_percent=progress.completion_percent,
+        competency_scores=progress.competency_scores,
+    )
+
+
 @router.post("/progress", response_model=ProgressResponse)
 def record_progress(
     payload: ProgressRequest,

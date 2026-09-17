@@ -73,3 +73,52 @@ def test_education_write_requires_operator_role(client, monkeypatch):
         },
     )
     assert response.status_code == 403
+
+def test_get_learning_progress(client, monkeypatch):
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    course_id = uuid4()
+
+    monkeypatch.setenv("RKJO_OPERATOR_TENANT_ID", str(tenant_id))
+    headers = {"X-API-Key": "rkjo-operator-key"}
+
+    recorded = client.post(
+        "/education/progress",
+        headers=headers,
+        json={
+            "learner_id": str(learner_id),
+            "course_id": str(course_id),
+            "completion_percent": 68,
+            "competency_scores": {
+                "MATH.FRACTION": 55,
+                "MATH.ADD": 90,
+            },
+        },
+    )
+    assert recorded.status_code == 200
+
+    response = client.get(
+        f"/education/learners/{learner_id}/courses/{course_id}/progress",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["learner_id"] == str(learner_id)
+    assert payload["course_id"] == str(course_id)
+    assert payload["completion_percent"] == 68
+    assert payload["competency_scores"]["MATH.FRACTION"] == 55
+
+
+def test_get_missing_learning_progress_returns_404(client, monkeypatch):
+    tenant_id = uuid4()
+    monkeypatch.setenv("RKJO_OPERATOR_TENANT_ID", str(tenant_id))
+    headers = {"X-API-Key": "rkjo-operator-key"}
+
+    response = client.get(
+        f"/education/learners/{uuid4()}/courses/{uuid4()}/progress",
+        headers=headers,
+    )
+
+    assert response.status_code == 404

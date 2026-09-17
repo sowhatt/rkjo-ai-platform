@@ -50,6 +50,22 @@ class LearningService:
         competency = Competency(tenant_id=tenant_id, code=code, label=label)
         return self._repository.save_competency(competency)
 
+    def get_progress(
+        self,
+        *,
+        tenant_id: UUID,
+        learner_id: UUID,
+        course_id: UUID,
+    ) -> LearningProgress:
+        progress = self._repository.find_progress(
+            tenant_id=tenant_id,
+            learner_id=learner_id,
+            course_id=course_id,
+        )
+        if progress is None:
+            raise LookupError("learning progress not found")
+        return progress
+
     def record_progress(
         self,
         *,
