@@ -581,3 +581,534 @@ body {
     align-items: flex-start;
   }
 }
+
+/* ==========================================================
+   RKJO EDUCATION — PWA HOME
+   ========================================================== */
+
+.rkjo-edu-app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  background: #f5f7fb;
+  color: #172033;
+}
+
+.rkjo-edu-side {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 28px 20px;
+  background: #ffffff;
+  border-right: 1px solid #e5eaf1;
+  display: flex;
+  flex-direction: column;
+}
+
+.rkjo-edu-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rkjo-edu-brand > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.rkjo-edu-brand strong {
+  font-size: 18px;
+}
+
+.rkjo-edu-brand small,
+.rkjo-edu-profile small {
+  color: #8490a3;
+}
+
+.rkjo-edu-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: #17345f;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 20px;
+}
+
+.rkjo-edu-navigation {
+  margin-top: 46px;
+  display: grid;
+  gap: 7px;
+}
+
+.rkjo-edu-navigation a {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  color: #647084;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rkjo-edu-navigation a:hover {
+  background: #f5f7fb;
+}
+
+.rkjo-edu-navigation a.active {
+  background: #edf4ff;
+  color: #245aa7;
+}
+
+.rkjo-edu-navigation a span {
+  width: 20px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.rkjo-edu-profile {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid #edf0f4;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.rkjo-edu-profile > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.rkjo-edu-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #eaf1ff;
+  color: #245aa7;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.rkjo-edu-content {
+  width: 100%;
+  max-width: 1280px;
+  padding: 42px 48px 70px;
+}
+
+.rkjo-edu-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 30px;
+}
+
+.rkjo-edu-topbar h1 {
+  margin: 6px 0 4px;
+  font-size: clamp(28px, 4vw, 38px);
+  line-height: 1.1;
+}
+
+.rkjo-edu-topbar p {
+  color: #718096;
+}
+
+.rkjo-edu-kicker {
+  display: block;
+  color: #3970b9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.rkjo-edu-switch {
+  display: flex;
+  padding: 4px;
+  border: 1px solid #dfe5ed;
+  background: #ffffff;
+  border-radius: 12px;
+}
+
+.rkjo-edu-switch button {
+  border: 0;
+  background: transparent;
+  padding: 9px 13px;
+  border-radius: 9px;
+  color: #6d7787;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rkjo-edu-switch button.active {
+  background: #17345f;
+  color: #ffffff;
+}
+
+.rkjo-edu-summary {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.rkjo-edu-summary article {
+  min-height: 125px;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #e5e9f0;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rkjo-edu-summary article > span {
+  color: #778398;
+  font-size: 13px;
+}
+
+.rkjo-edu-summary strong {
+  margin-top: 10px;
+  font-size: 25px;
+}
+
+.rkjo-edu-summary small {
+  margin-top: 7px;
+  color: #7b8798;
+}
+
+.rkjo-progress {
+  height: 6px;
+  margin-top: auto;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8edf4;
+}
+
+.rkjo-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2d6cc0;
+}
+
+.rkjo-today-card {
+  margin-top: 22px;
+  min-height: 330px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.5fr);
+  overflow: hidden;
+  border-radius: 22px;
+  background: #17345f;
+  color: #ffffff;
+  box-shadow: 0 18px 45px rgba(31, 57, 91, 0.14);
+}
+
+.rkjo-today-copy {
+  padding: 38px;
+}
+
+.rkjo-today-card .rkjo-edu-kicker {
+  color: #a9cbff;
+}
+
+.rkjo-today-card h2 {
+  margin-top: 12px;
+  font-size: clamp(28px, 4vw, 38px);
+}
+
+.rkjo-today-copy > p {
+  margin-top: 12px;
+  max-width: 640px;
+  color: #d8e4f4;
+  line-height: 1.65;
+}
+
+.rkjo-ai-recommendation {
+  margin-top: 25px;
+  max-width: 650px;
+  padding: 15px 17px;
+  display: flex;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 13px;
+}
+
+.rkjo-ai-recommendation > span {
+  font-size: 20px;
+}
+
+.rkjo-ai-recommendation p {
+  display: grid;
+  gap: 4px;
+  color: #dbe7f6;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.rkjo-ai-recommendation strong {
+  color: #ffffff;
+}
+
+.rkjo-today-actions {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.rkjo-start,
+.rkjo-ask {
+  padding: 12px 17px;
+  border-radius: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rkjo-start {
+  background: #ffffff;
+  color: #17345f;
+}
+
+.rkjo-ask {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+.rkjo-session-visual {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(113, 168, 241, 0.28),
+      rgba(23, 52, 95, 0) 67%
+    );
+}
+
+.rkjo-session-ring {
+  width: 170px;
+  height: 170px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  border-radius: 50%;
+  border: 12px solid rgba(255, 255, 255, 0.14);
+  outline: 2px solid rgba(255, 255, 255, 0.28);
+}
+
+.rkjo-session-ring strong {
+  font-size: 29px;
+}
+
+.rkjo-session-ring span {
+  margin-top: 4px;
+  color: #b9cce5;
+  font-size: 12px;
+}
+
+.rkjo-learning-grid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 20px;
+}
+
+.rkjo-learning-grid h2 {
+  margin-top: 6px;
+  font-size: 25px;
+}
+
+.rkjo-skill-list {
+  margin-top: 17px;
+  display: grid;
+  gap: 10px;
+}
+
+.rkjo-skill-list article {
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #e4e9f0;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rkjo-skill-list article > div {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.rkjo-skill-list article > div > div {
+  display: grid;
+  gap: 3px;
+}
+
+.rkjo-skill-list small {
+  color: #8993a2;
+}
+
+.rkjo-skill-icon {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  font-weight: 900;
+}
+
+.rkjo-skill-icon.warning {
+  background: #fff3dc;
+  color: #a96508;
+}
+
+.rkjo-skill-icon.success {
+  background: #eaf7ef;
+  color: #267748;
+}
+
+.rkjo-professor-card {
+  padding: 25px;
+  border: 1px solid #e2e7ef;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.rkjo-professor-avatar {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #edf4ff;
+  color: #245aa7;
+  font-size: 22px;
+}
+
+.rkjo-professor-card p {
+  margin-top: 12px;
+  color: #6f7c8e;
+  line-height: 1.55;
+}
+
+.rkjo-professor-card a {
+  display: inline-block;
+  margin-top: 20px;
+  color: #245aa7;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rkjo-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .rkjo-edu-app {
+    display: block;
+  }
+
+  .rkjo-edu-side {
+    display: none;
+  }
+
+  .rkjo-edu-content {
+    padding: 30px 24px 100px;
+  }
+
+  .rkjo-today-card {
+    grid-template-columns: 1fr;
+  }
+
+  .rkjo-session-visual {
+    display: none;
+  }
+
+  .rkjo-learning-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rkjo-mobile-nav {
+    position: fixed;
+    z-index: 50;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding:
+      8px
+      5px
+      calc(8px + env(safe-area-inset-bottom));
+    border: 1px solid #dfe5ed;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 35px rgba(20, 34, 55, 0.14);
+    backdrop-filter: blur(15px);
+  }
+
+  .rkjo-mobile-nav a {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    color: #7b8797;
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .rkjo-mobile-nav a span {
+    font-size: 20px;
+  }
+
+  .rkjo-mobile-nav a.active {
+    color: #245aa7;
+  }
+}
+
+@media (max-width: 650px) {
+  .rkjo-edu-content {
+    padding: 22px 16px 105px;
+  }
+
+  .rkjo-edu-topbar {
+    flex-direction: column;
+  }
+
+  .rkjo-edu-switch {
+    width: 100%;
+  }
+
+  .rkjo-edu-switch button {
+    flex: 1;
+  }
+
+  .rkjo-edu-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .rkjo-today-copy {
+    padding: 26px 22px;
+  }
+
+  .rkjo-today-actions {
+    display: grid;
+  }
+
+  .rkjo-start,
+  .rkjo-ask {
+    text-align: center;
+  }
+}
