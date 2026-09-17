@@ -6,7 +6,7 @@ export default function DashboardPage() {
       </h1>
 
       <p className="mt-3 text-zinc-600">
-        Vue d'ensemble de la plateforme.
+        Vue d&apos;ensemble de la plateforme.
       </p>
     </main>
   );
