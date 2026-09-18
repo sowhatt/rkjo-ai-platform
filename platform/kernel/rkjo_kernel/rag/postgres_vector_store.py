@@ -295,6 +295,14 @@ class PostgresPgVectorStore(VectorStore):
                 else {}
             )
         )
+        document_ids = (
+            list(filters.document_ids)
+            if (
+                filters is not None
+                and filters.document_ids is not None
+            )
+            else None
+        )
 
         with self._connect() as connection:
             if self.embedding_space is None:
@@ -313,6 +321,10 @@ class PostgresPgVectorStore(VectorStore):
                         FROM {}
                         WHERE
                             metadata @> %s
+                            AND (
+                                %s IS NULL
+                                OR document_id = ANY(%s)
+                            )
                         ORDER BY
                             embedding <=> %s
                         LIMIT %s
@@ -325,6 +337,8 @@ class PostgresPgVectorStore(VectorStore):
                     (
                         query_vector,
                         metadata_filter,
+                        document_ids,
+                        document_ids,
                         query_vector,
                         limit,
                     ),
@@ -349,6 +363,10 @@ class PostgresPgVectorStore(VectorStore):
                             AND embedding_model = %s
                             AND embedding_dimensions = %s
                             AND metadata @> %s
+                            AND (
+                                %s IS NULL
+                                OR document_id = ANY(%s)
+                            )
                         ORDER BY
                             embedding <=> %s
                         LIMIT %s
@@ -364,6 +382,8 @@ class PostgresPgVectorStore(VectorStore):
                         self.embedding_space.model,
                         self.embedding_space.dimensions,
                         metadata_filter,
+                        document_ids,
+                        document_ids,
                         query_vector,
                         limit,
                     ),
