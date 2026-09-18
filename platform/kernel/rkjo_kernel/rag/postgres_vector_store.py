@@ -322,8 +322,8 @@ class PostgresPgVectorStore(VectorStore):
                         WHERE
                             metadata @> %s
                             AND (
-                                %s IS NULL
-                                OR document_id = ANY(%s)
+                                %s::text[] IS NULL
+                                OR document_id = ANY(%s::text[])
                             )
                         ORDER BY
                             embedding <=> %s
@@ -364,8 +364,8 @@ class PostgresPgVectorStore(VectorStore):
                             AND embedding_dimensions = %s
                             AND metadata @> %s
                             AND (
-                                %s IS NULL
-                                OR document_id = ANY(%s)
+                                %s::text[] IS NULL
+                                OR document_id = ANY(%s::text[])
                             )
                         ORDER BY
                             embedding <=> %s
