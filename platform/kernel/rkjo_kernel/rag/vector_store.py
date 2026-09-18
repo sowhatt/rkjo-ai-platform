@@ -106,7 +106,8 @@ class InMemoryVectorStore(
             )
             for record in self._records
             if active_filters.matches(
-                record.chunk.metadata
+                record.chunk.metadata,
+                document_id=record.chunk.document_id,
             )
         ]
 
