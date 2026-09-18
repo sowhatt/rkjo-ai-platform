@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
+from rkjo_education.course.repository import CourseRepository
 from rkjo_education.learner.repository import LearnerRepository
 from rkjo_education.learning.repository import LearningRepository
 
@@ -16,7 +17,13 @@ class GroundedTutorAnswer(Protocol):
 
 
 class TutorAnswerer(Protocol):
-    def answer(self, question: str, *, tenant_id: UUID) -> GroundedTutorAnswer: ...
+    def answer(
+        self,
+        question: str,
+        *,
+        tenant_id: UUID,
+        document_ids: list[str],
+    ) -> GroundedTutorAnswer: ...
 
 
 class TutorService:
@@ -25,11 +32,13 @@ class TutorService:
         *,
         learner_repository: LearnerRepository,
         learning_repository: LearningRepository,
+        course_repository: CourseRepository,
         answerer: TutorAnswerer,
         weak_competency_threshold: int = 70,
     ) -> None:
         self._learner_repository = learner_repository
         self._learning_repository = learning_repository
+        self._course_repository = course_repository
         self._answerer = answerer
         self._weak_competency_threshold = weak_competency_threshold
 
@@ -51,6 +60,13 @@ class TutorService:
         )
         if learner is None:
             raise LookupError("learner not found")
+
+        course = self._course_repository.get(
+            tenant_id=str(tenant_id),
+            course_id=str(course_id),
+        )
+        if course is None:
+            raise LookupError("course not found")
 
         progress = self._learning_repository.find_progress(
             tenant_id=tenant_id,
@@ -79,7 +95,11 @@ class TutorService:
             f"Question de l'élève: {normalized_question}"
         )
 
-        grounded = self._answerer.answer(adapted_question, tenant_id=tenant_id)
+        grounded = self._answerer.answer(
+            adapted_question,
+            tenant_id=tenant_id,
+            document_ids=course.document_ids,
+        )
 
         return TutorAnswer(
             learner_id=learner_id,
