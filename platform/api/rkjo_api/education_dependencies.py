@@ -22,48 +22,15 @@ class TenantScopedRAGAnswerer:
         tenant_id: UUID,
         document_ids: list[str],
     ):
-        service = get_rag_answering_service()
-
-        if not document_ids:
-            return service.answer(
-                question,
-                filters=RetrievalFilters(
-                    metadata={
-                        "tenant_id": str(tenant_id),
-                        "document_id": "__no_document__",
-                    }
-                ),
-            )
-
-        candidates = [
-            service.answer(
-                question,
-                filters=RetrievalFilters(
-                    metadata={
-                        "tenant_id": str(tenant_id),
-                        "document_id": document_id,
-                    }
-                ),
-            )
-            for document_id in document_ids
-        ]
-
-        sourced = [
-            candidate
-            for candidate in candidates
-            if candidate.sources
-        ]
-
-        if sourced:
-            return max(
-                sourced,
-                key=lambda candidate: max(
-                    source.score
-                    for source in candidate.sources
-                ),
-            )
-
-        return candidates[0]
+        return get_rag_answering_service().answer(
+            question,
+            filters=RetrievalFilters(
+                metadata={
+                    "tenant_id": str(tenant_id),
+                },
+                document_ids=tuple(document_ids),
+            ),
+        )
 
 
 def get_education_learner_service() -> LearnerService:
