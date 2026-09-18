@@ -151,8 +151,8 @@ class PostgresLexicalRetriever:
                             @@ lexical_query.query
                             AND metadata @> %s
                             AND (
-                                %s IS NULL
-                                OR document_id = ANY(%s)
+                                %s::text[] IS NULL
+                                OR document_id = ANY(%s::text[])
                             )
                         ORDER BY
                             score DESC,
@@ -203,8 +203,8 @@ class PostgresLexicalRetriever:
                             @@ lexical_query.query
                             AND metadata @> %s
                             AND (
-                                %s IS NULL
-                                OR document_id = ANY(%s)
+                                %s::text[] IS NULL
+                                OR document_id = ANY(%s::text[])
                             )
                             AND embedding_provider = %s
                             AND embedding_model = %s
