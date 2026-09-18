@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from uuid import uuid4
 
+import pytest
+
+from rkjo_education.course.models import Course
+from rkjo_education.course.repository import InMemoryCourseRepository
 from rkjo_education.learner.repository import InMemoryLearnerRepository
 from rkjo_education.learner.service import LearnerService
 from rkjo_education.learning.repository import InMemoryLearningRepository
@@ -31,17 +35,31 @@ class FakeAnswerer:
     def __init__(self):
         self.question = None
         self.tenant_id = None
+        self.document_ids = None
 
-    def answer(self, question: str, *, tenant_id):
+    def answer(self, question: str, *, tenant_id, document_ids):
         self.question = question
         self.tenant_id = tenant_id
+        self.document_ids = document_ids
         return Answer()
+
+
+def _course(*, tenant_id, course_id, document_ids):
+    return Course(
+        tenant_id=str(tenant_id),
+        course_id=str(course_id),
+        title="Fractions",
+        subject="Mathématiques",
+        level="CE2",
+        document_ids=document_ids,
+    )
 
 
 def test_tutor_adapts_rag_prompt_to_learner_progress():
     tenant_id = uuid4()
     learner_repo = InMemoryLearnerRepository()
     learning_repo = InMemoryLearningRepository()
+    course_repo = InMemoryCourseRepository()
     learner = LearnerService(learner_repo).create(
         tenant_id=tenant_id,
         first_name="Awa",
@@ -49,6 +67,13 @@ def test_tutor_adapts_rag_prompt_to_learner_progress():
         level="CE2",
     )
     course_id = uuid4()
+    course_repo.save(
+        _course(
+            tenant_id=tenant_id,
+            course_id=course_id,
+            document_ids=["doc-1"],
+        )
+    )
     LearningService(learning_repo).record_progress(
         tenant_id=tenant_id,
         learner_id=learner.id,
@@ -60,6 +85,7 @@ def test_tutor_adapts_rag_prompt_to_learner_progress():
     tutor = TutorService(
         learner_repository=learner_repo,
         learning_repository=learning_repo,
+        course_repository=course_repo,
         answerer=answerer,
     )
 
@@ -77,4 +103,33 @@ def test_tutor_adapts_rag_prompt_to_learner_progress():
     assert "45%" in result.adapted_question
     assert "MATH.FRACTION" in result.adapted_question
     assert answerer.tenant_id == tenant_id
+    assert answerer.document_ids == ["doc-1"]
     assert result.sources[0].document_id == "doc-1"
+
+
+def test_tutor_refuses_unknown_course_before_rag():
+    tenant_id = uuid4()
+    learner_repo = InMemoryLearnerRepository()
+    learner = LearnerService(learner_repo).create(
+        tenant_id=tenant_id,
+        first_name="Awa",
+        last_name="Mensah",
+        level="CE2",
+    )
+    answerer = FakeAnswerer()
+    tutor = TutorService(
+        learner_repository=learner_repo,
+        learning_repository=InMemoryLearningRepository(),
+        course_repository=InMemoryCourseRepository(),
+        answerer=answerer,
+    )
+
+    with pytest.raises(LookupError, match="course not found"):
+        tutor.ask(
+            tenant_id=tenant_id,
+            learner_id=learner.id,
+            course_id=uuid4(),
+            question="Explique-moi les fractions",
+        )
+
+    assert answerer.question is None
