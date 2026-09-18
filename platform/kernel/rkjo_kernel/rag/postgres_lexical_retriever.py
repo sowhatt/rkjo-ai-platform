@@ -104,6 +104,14 @@ class PostgresLexicalRetriever:
             if filters is not None
             else {}
         )
+        document_ids = (
+            list(filters.document_ids)
+            if (
+                filters is not None
+                and filters.document_ids is not None
+            )
+            else None
+        )
 
         with psycopg.connect(
             self.database_url,
@@ -142,6 +150,10 @@ class PostgresLexicalRetriever:
                             )
                             @@ lexical_query.query
                             AND metadata @> %s
+                            AND (
+                                %s IS NULL
+                                OR document_id = ANY(%s)
+                            )
                         ORDER BY
                             score DESC,
                             chunk_id ASC
@@ -151,6 +163,8 @@ class PostgresLexicalRetriever:
                     (
                         query,
                         Jsonb(metadata_filter),
+                        document_ids,
+                        document_ids,
                         limit,
                     ),
                 ).fetchall()
@@ -188,6 +202,10 @@ class PostgresLexicalRetriever:
                             )
                             @@ lexical_query.query
                             AND metadata @> %s
+                            AND (
+                                %s IS NULL
+                                OR document_id = ANY(%s)
+                            )
                             AND embedding_provider = %s
                             AND embedding_model = %s
                             AND embedding_dimensions = %s
@@ -200,6 +218,8 @@ class PostgresLexicalRetriever:
                     (
                         query,
                         Jsonb(metadata_filter),
+                        document_ids,
+                        document_ids,
                         self.embedding_space.provider,
                         self.embedding_space.model,
                         self.embedding_space.dimensions,
