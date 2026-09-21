@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from rkjo_api.education import require_uuid_tenant
 from rkjo_api.education_dependencies import get_education_tutor_service
+from rkjo_education.policy import AssistanceLevel, LearningMode
 from rkjo_education.tutor.service import TutorService
 
 router = APIRouter(prefix="/education", tags=["education"])
@@ -16,6 +17,8 @@ class TutorAskRequest(BaseModel):
     learner_id: UUID
     course_id: UUID
     question: str = Field(min_length=1, max_length=4000)
+    mode: LearningMode = LearningMode.PRACTICE
+    requested_assistance: AssistanceLevel | None = None
 
 
 class TutorSourceResponse(BaseModel):
@@ -47,6 +50,8 @@ def ask_tutor(
             learner_id=payload.learner_id,
             course_id=payload.course_id,
             question=payload.question,
+            mode=payload.mode,
+            requested_assistance=payload.requested_assistance,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

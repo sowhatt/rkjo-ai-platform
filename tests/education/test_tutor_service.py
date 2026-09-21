@@ -133,3 +133,149 @@ def test_tutor_refuses_unknown_course_before_rag():
         )
 
     assert answerer.question is None
+
+
+def test_tutor_socratic_policy_prevents_direct_solution():
+    from uuid import uuid4
+
+    from rkjo_education.course.models import Course
+    from rkjo_education.course.repository import InMemoryCourseRepository
+    from rkjo_education.learner.models import LearnerProfile
+    from rkjo_education.learner.repository import InMemoryLearnerRepository
+    from rkjo_education.learning.repository import InMemoryLearningRepository
+    from rkjo_education.policy import AssistanceLevel, LearningMode
+    from rkjo_education.tutor.service import TutorService
+
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    course_id = uuid4()
+
+    learner_repository = InMemoryLearnerRepository()
+    learner_repository.save(
+        LearnerProfile(
+            tenant_id=tenant_id,
+            id=learner_id,
+            first_name="Test",
+            last_name="Learner",
+            level="CE1",
+        )
+    )
+
+    course_repository = InMemoryCourseRepository()
+    course_repository.save(
+        Course(
+            tenant_id=str(tenant_id),
+            course_id=str(course_id),
+            title="Mathématiques",
+            subject="Mathématiques",
+            level="CE1",
+        )
+    )
+
+    class CapturingAnswerer:
+        def __init__(self):
+            self.question = None
+
+        def answer(self, question, *, tenant_id, document_ids):
+            self.question = question
+
+            class Result:
+                answer = "Question guidante"
+                sanitized_query = ""
+                sources = []
+
+            return Result()
+
+    answerer = CapturingAnswerer()
+
+    service = TutorService(
+        learner_repository=learner_repository,
+        learning_repository=InMemoryLearningRepository(),
+        course_repository=course_repository,
+        answerer=answerer,
+    )
+
+    service.ask(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        course_id=course_id,
+        question="Donne-moi directement la réponse.",
+        mode=LearningMode.SOCRATIC,
+        requested_assistance=AssistanceLevel.EXPLAINED_SOLUTION,
+    )
+
+    assert "Ne donne pas la solution" in answerer.question
+    assert "QUESTION_ONLY" not in answerer.question
+
+
+def test_tutor_exam_policy_forbids_help():
+    from uuid import uuid4
+
+    from rkjo_education.course.models import Course
+    from rkjo_education.course.repository import InMemoryCourseRepository
+    from rkjo_education.learner.models import LearnerProfile
+    from rkjo_education.learner.repository import InMemoryLearnerRepository
+    from rkjo_education.learning.repository import InMemoryLearningRepository
+    from rkjo_education.policy import AssistanceLevel, LearningMode
+    from rkjo_education.tutor.service import TutorService
+
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    course_id = uuid4()
+
+    learner_repository = InMemoryLearnerRepository()
+    learner_repository.save(
+        LearnerProfile(
+            tenant_id=tenant_id,
+            id=learner_id,
+            first_name="Test",
+            last_name="Learner",
+            level="CE1",
+        )
+    )
+
+    course_repository = InMemoryCourseRepository()
+    course_repository.save(
+        Course(
+            tenant_id=str(tenant_id),
+            course_id=str(course_id),
+            title="Mathématiques",
+            subject="Mathématiques",
+            level="CE1",
+        )
+    )
+
+    class CapturingAnswerer:
+        def __init__(self):
+            self.question = None
+
+        def answer(self, question, *, tenant_id, document_ids):
+            self.question = question
+
+            class Result:
+                answer = "Réponse contrôlée"
+                sanitized_query = ""
+                sources = []
+
+            return Result()
+
+    answerer = CapturingAnswerer()
+
+    service = TutorService(
+        learner_repository=learner_repository,
+        learning_repository=InMemoryLearningRepository(),
+        course_repository=course_repository,
+        answerer=answerer,
+    )
+
+    service.ask(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        course_id=course_id,
+        question="Donne-moi la réponse.",
+        mode=LearningMode.EXAM,
+        requested_assistance=AssistanceLevel.EXPLAINED_SOLUTION,
+    )
+
+    assert "Mode examen" in answerer.question
+    assert "aucune solution" in answerer.question

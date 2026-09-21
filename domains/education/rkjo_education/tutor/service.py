@@ -6,6 +6,11 @@ from uuid import UUID
 from rkjo_education.course.repository import CourseRepository
 from rkjo_education.learner.repository import LearnerRepository
 from rkjo_education.learning.repository import LearningRepository
+from rkjo_education.policy import (
+    AssistanceLevel,
+    LearningMode,
+    LearningPolicyService,
+)
 
 from .models import TutorAnswer, TutorSource
 
@@ -34,12 +39,14 @@ class TutorService:
         learning_repository: LearningRepository,
         course_repository: CourseRepository,
         answerer: TutorAnswerer,
+        policy_service: LearningPolicyService | None = None,
         weak_competency_threshold: int = 70,
     ) -> None:
         self._learner_repository = learner_repository
         self._learning_repository = learning_repository
         self._course_repository = course_repository
         self._answerer = answerer
+        self._policy_service = policy_service or LearningPolicyService()
         self._weak_competency_threshold = weak_competency_threshold
 
     def ask(
@@ -49,6 +56,8 @@ class TutorService:
         learner_id: UUID,
         course_id: UUID,
         question: str,
+        mode: LearningMode = LearningMode.PRACTICE,
+        requested_assistance: AssistanceLevel | None = None,
     ) -> TutorAnswer:
         normalized_question = question.strip()
         if not normalized_question:
@@ -86,8 +95,15 @@ class TutorService:
             if weak_competencies
             else "aucune faiblesse identifiée"
         )
+
+        policy = self._policy_service.decide(
+            mode=mode,
+            requested_assistance=requested_assistance,
+        )
+
         adapted_question = (
             f"Tu es un tuteur pédagogique. Réponds à un élève de niveau {learner.level}. "
+            f"RÈGLE PÉDAGOGIQUE OBLIGATOIRE: {policy.instruction} "
             f"Le cours est complété à {completion_percent}%. "
             f"Compétences à renforcer: {weakness_instruction}. "
             "Explique simplement, étape par étape, sans donner plus d'informations que nécessaire, "

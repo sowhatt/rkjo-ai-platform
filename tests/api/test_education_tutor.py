@@ -8,7 +8,16 @@ from rkjo_education.tutor.models import TutorAnswer, TutorSource
 
 @dataclass
 class FakeTutorService:
-    def ask(self, *, tenant_id, learner_id, course_id, question):
+    def ask(
+        self,
+        *,
+        tenant_id,
+        learner_id,
+        course_id,
+        question,
+        mode=None,
+        requested_assistance=None,
+    ):
         return TutorAnswer(
             learner_id=learner_id,
             course_id=course_id,
