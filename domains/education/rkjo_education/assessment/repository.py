@@ -9,6 +9,26 @@ from .models import Assessment, Attempt, Question
 class AssessmentRepository(Protocol):
     def save_assessment(self, assessment: Assessment) -> Assessment: ...
     def get_assessment(self, *, tenant_id: UUID, assessment_id: UUID) -> Assessment | None: ...
+    def list_assessments(
+        self,
+        *,
+        tenant_id: UUID,
+        course_id: UUID,
+    ) -> list[Assessment]: ...
+    def list_assessments(
+        self,
+        *,
+        tenant_id: UUID,
+        course_id: UUID,
+    ) -> list[Assessment]:
+        return [
+            assessment
+            for (item_tenant_id, _), assessment
+            in self._assessments.items()
+            if item_tenant_id == tenant_id
+            and assessment.course_id == course_id
+        ]
+
     def get_question(
         self,
         *,

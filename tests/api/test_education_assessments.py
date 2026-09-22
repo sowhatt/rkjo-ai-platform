@@ -250,3 +250,111 @@ def test_assessment_submit_returns_learning_and_proof_challenge(
     assert proof_payload["competency_code"] == "MATH.ADD"
     assert proof_payload["status"] == "required"
     assert "correct_answer" not in proof_payload
+
+
+def test_course_assessments_are_learner_safe(client, monkeypatch):
+    tenant_id = uuid4()
+    monkeypatch.setenv(
+        "RKJO_OPERATOR_TENANT_ID",
+        str(tenant_id),
+    )
+    headers = {"X-API-Key": "rkjo-operator-key"}
+    course_id = uuid4()
+
+    first = client.post(
+        "/education/assessments",
+        headers=headers,
+        json={
+            "course_id": str(course_id),
+            "title": "Addition",
+            "questions": [
+                {
+                    "prompt": "7 + 5 ?",
+                    "correct_answer": "12",
+                    "points": 1,
+                    "competency_code": "MATH.ADD",
+                }
+            ],
+        },
+    )
+    assert first.status_code == 201
+
+    other = client.post(
+        "/education/assessments",
+        headers=headers,
+        json={
+            "course_id": str(uuid4()),
+            "title": "Autre cours",
+            "questions": [
+                {
+                    "prompt": "1 + 1 ?",
+                    "correct_answer": "2",
+                    "points": 1,
+                    "competency_code": "MATH.ADD",
+                }
+            ],
+        },
+    )
+    assert other.status_code == 201
+
+    response = client.get(
+        f"/education/courses/{course_id}/assessments",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert len(payload) == 1
+    assert payload[0]["title"] == "Addition"
+    assert payload[0]["course_id"] == str(course_id)
+    assert payload[0]["questions"][0]["prompt"] == "7 + 5 ?"
+    assert payload[0]["questions"][0]["competency_code"] == "MATH.ADD"
+
+    serialized = str(payload).casefold()
+    assert "correct_answer" not in serialized
+    assert '"12"' not in serialized
+
+
+def test_course_assessments_are_tenant_scoped(client, monkeypatch):
+    first_tenant = uuid4()
+    second_tenant = uuid4()
+    course_id = uuid4()
+
+    monkeypatch.setenv(
+        "RKJO_OPERATOR_TENANT_ID",
+        str(first_tenant),
+    )
+    headers = {"X-API-Key": "rkjo-operator-key"}
+
+    create = client.post(
+        "/education/assessments",
+        headers=headers,
+        json={
+            "course_id": str(course_id),
+            "title": "Privé",
+            "questions": [
+                {
+                    "prompt": "8 + 2 ?",
+                    "correct_answer": "10",
+                    "points": 1,
+                    "competency_code": "MATH.ADD",
+                }
+            ],
+        },
+    )
+    assert create.status_code == 201
+
+    monkeypatch.setenv(
+        "RKJO_OPERATOR_TENANT_ID",
+        str(second_tenant),
+    )
+
+    response = client.get(
+        f"/education/courses/{course_id}/assessments",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []

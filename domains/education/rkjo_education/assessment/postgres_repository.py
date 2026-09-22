@@ -176,6 +176,36 @@ class PostgresAssessmentRepository:
             ],
         )
 
+    def list_assessments(
+        self,
+        *,
+        tenant_id: UUID,
+        course_id: UUID,
+    ) -> list[Assessment]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT assessment_id
+                FROM education_assessments
+                WHERE tenant_id = %s
+                  AND course_id = %s
+                ORDER BY created_at, assessment_id
+                """,
+                (tenant_id, course_id),
+            ).fetchall()
+
+        assessments: list[Assessment] = []
+
+        for row in rows:
+            assessment = self.get_assessment(
+                tenant_id=tenant_id,
+                assessment_id=row[0],
+            )
+            if assessment is not None:
+                assessments.append(assessment)
+
+        return assessments
+
     def get_question(
         self,
         *,

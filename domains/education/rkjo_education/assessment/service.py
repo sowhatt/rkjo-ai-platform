@@ -57,6 +57,17 @@ class AssessmentService:
             raise AssessmentNotFoundError("assessment not found")
         return assessment
 
+    def list_assessments(
+        self,
+        *,
+        tenant_id: UUID,
+        course_id: UUID,
+    ) -> list[Assessment]:
+        return self._repository.list_assessments(
+            tenant_id=tenant_id,
+            course_id=course_id,
+        )
+
     def start_attempt(
         self,
         *,

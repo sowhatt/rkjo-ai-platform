@@ -131,6 +131,20 @@ class AssessmentResponse(BaseModel):
     max_score: int
 
 
+class LearnerQuestionResponse(BaseModel):
+    id: UUID
+    prompt: str
+    points: int
+    competency_code: str | None = None
+
+
+class LearnerAssessmentResponse(BaseModel):
+    id: UUID
+    course_id: UUID
+    title: str
+    questions: list[LearnerQuestionResponse]
+
+
 class AttemptStartRequest(BaseModel):
     assessment_id: UUID
     learner_id: UUID
@@ -454,6 +468,41 @@ def get_assessment(
         question_ids=[question.id for question in assessment.questions],
         max_score=sum(question.points for question in assessment.questions),
     )
+
+
+@router.get(
+    "/courses/{course_id}/assessments",
+    response_model=list[LearnerAssessmentResponse],
+)
+def list_course_assessments(
+    course_id: UUID,
+    request: Request,
+    service: AssessmentService = Depends(
+        get_education_assessment_service
+    ),
+) -> list[LearnerAssessmentResponse]:
+    assessments = service.list_assessments(
+        tenant_id=require_uuid_tenant(request),
+        course_id=course_id,
+    )
+
+    return [
+        LearnerAssessmentResponse(
+            id=assessment.id,
+            course_id=assessment.course_id,
+            title=assessment.title,
+            questions=[
+                LearnerQuestionResponse(
+                    id=question.id,
+                    prompt=question.prompt,
+                    points=question.points,
+                    competency_code=question.competency_code,
+                )
+                for question in assessment.questions
+            ],
+        )
+        for assessment in assessments
+    ]
 
 
 @router.post("/attempts", response_model=AttemptResponse, status_code=201)
