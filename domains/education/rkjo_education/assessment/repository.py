@@ -3,12 +3,18 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
-from .models import Assessment, Attempt
+from .models import Assessment, Attempt, Question
 
 
 class AssessmentRepository(Protocol):
     def save_assessment(self, assessment: Assessment) -> Assessment: ...
     def get_assessment(self, *, tenant_id: UUID, assessment_id: UUID) -> Assessment | None: ...
+    def get_question(
+        self,
+        *,
+        tenant_id: UUID,
+        question_id: UUID,
+    ) -> Question | None: ...
     def save_attempt(self, attempt: Attempt) -> Attempt: ...
     def get_attempt(self, *, tenant_id: UUID, attempt_id: UUID) -> Attempt | None: ...
 
@@ -24,6 +30,20 @@ class InMemoryAssessmentRepository:
 
     def get_assessment(self, *, tenant_id: UUID, assessment_id: UUID) -> Assessment | None:
         return self._assessments.get((tenant_id, assessment_id))
+
+    def get_question(
+        self,
+        *,
+        tenant_id: UUID,
+        question_id: UUID,
+    ) -> Question | None:
+        for (item_tenant_id, _), assessment in self._assessments.items():
+            if item_tenant_id != tenant_id:
+                continue
+            for question in assessment.questions:
+                if question.id == question_id:
+                    return question
+        return None
 
     def save_attempt(self, attempt: Attempt) -> Attempt:
         self._attempts[(attempt.tenant_id, attempt.id)] = attempt

@@ -80,6 +80,16 @@ class PostgresAssessmentRepository:
                 ADD COLUMN IF NOT EXISTS evidence JSONB NOT NULL DEFAULT '{}'::jsonb
                 """
             )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_education_assessment_questions_tenant_question
+                ON education_assessment_questions (
+                    tenant_id,
+                    question_id
+                )
+                """
+            )
 
     def save_assessment(self, assessment: Assessment) -> Assessment:
         with self._connect() as connection:
@@ -164,6 +174,40 @@ class PostgresAssessmentRepository:
                 )
                 for q in question_rows
             ],
+        )
+
+    def get_question(
+        self,
+        *,
+        tenant_id: UUID,
+        question_id: UUID,
+    ) -> Question | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    prompt,
+                    correct_answer,
+                    points,
+                    competency_code
+                FROM education_assessment_questions
+                WHERE tenant_id = %s
+                  AND question_id = %s
+                LIMIT 1
+                """,
+                (tenant_id, question_id),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return Question(
+            tenant_id=tenant_id,
+            id=question_id,
+            prompt=row[0],
+            correct_answer=row[1],
+            points=row[2],
+            competency_code=row[3],
         )
 
     def save_attempt(self, attempt: Attempt) -> Attempt:
