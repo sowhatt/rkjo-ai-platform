@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import get_education_course_service
 from rkjo_api.education_dependencies import (
+    get_education_assessment_learning_service,
     get_education_assessment_service,
     get_education_learner_service,
     get_education_learning_service,
@@ -155,6 +156,23 @@ class AttemptResponse(BaseModel):
     score: int
     max_score: int
     percentage: int
+
+
+class QuestionLearningResponse(BaseModel):
+    question_id: UUID
+    competency_code: str
+    correct: bool
+    autonomy_score: int = Field(ge=0, le=100)
+    independently_correct: bool
+    mastery: str
+    proof_required: bool
+    proof_challenge_id: UUID | None = None
+
+
+class AttemptSubmitResponse(AttemptResponse):
+    learning: list[QuestionLearningResponse] = Field(
+        default_factory=list
+    )
 
 
 def require_tenant(request: Request) -> str:
@@ -463,15 +481,20 @@ def start_attempt(
     )
 
 
-@router.post("/attempts/{attempt_id}/submit", response_model=AttemptResponse)
+@router.post(
+    "/attempts/{attempt_id}/submit",
+    response_model=AttemptSubmitResponse,
+)
 def submit_attempt(
     attempt_id: UUID,
     payload: AttemptSubmitRequest,
     request: Request,
-    service: AssessmentService = Depends(get_education_assessment_service),
-) -> AttemptResponse:
+    service=Depends(
+        get_education_assessment_learning_service
+    ),
+) -> AttemptSubmitResponse:
     try:
-        attempt = service.submit_attempt(
+        result = service.submit_attempt(
             tenant_id=require_uuid_tenant(request),
             attempt_id=attempt_id,
             answers=payload.answers,
@@ -486,10 +509,19 @@ def submit_attempt(
             },
         )
     except (AssessmentNotFoundError, AttemptNotFoundError) as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return AttemptResponse(
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    attempt = result.attempt
+
+    return AttemptSubmitResponse(
         id=attempt.id,
         assessment_id=attempt.assessment_id,
         learner_id=attempt.learner_id,
@@ -497,6 +529,19 @@ def submit_attempt(
         score=attempt.score,
         max_score=attempt.max_score,
         percentage=attempt.percentage,
+        learning=[
+            QuestionLearningResponse(
+                question_id=item.question_id,
+                competency_code=item.competency_code,
+                correct=item.correct,
+                autonomy_score=item.autonomy_score,
+                independently_correct=item.independently_correct,
+                mastery=item.mastery,
+                proof_required=item.proof_required,
+                proof_challenge_id=item.proof_challenge_id,
+            )
+            for item in result.learning
+        ],
     )
 
 

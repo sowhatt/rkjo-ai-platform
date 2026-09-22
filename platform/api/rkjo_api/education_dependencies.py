@@ -75,3 +75,44 @@ def get_education_proof_service():
         assessment_repository=PostgresAssessmentRepository(database_url),
         proof_repository=PostgresProofChallengeRepository(database_url),
     )
+
+
+def get_education_assessment_learning_service():
+    from rkjo_education.intelligence.assessment_learning import (
+        AssessmentLearningService,
+    )
+    from rkjo_education.intelligence.learning_evaluation import (
+        LearningEvaluationService,
+    )
+    from rkjo_education.intelligence.proof_application import (
+        ProofApplicationService,
+    )
+    from rkjo_education.intelligence.proof_postgres_repository import (
+        PostgresProofChallengeRepository,
+    )
+
+    database_url = get_database_url()
+
+    assessment_repository = PostgresAssessmentRepository(
+        database_url
+    )
+
+    assessment_service = AssessmentService(
+        assessment_repository
+    )
+
+    proof_service = ProofApplicationService(
+        assessment_repository=assessment_repository,
+        proof_repository=PostgresProofChallengeRepository(
+            database_url
+        ),
+    )
+
+    learning_evaluation_service = LearningEvaluationService(
+        proof_service=proof_service,
+    )
+
+    return AssessmentLearningService(
+        assessment_service=assessment_service,
+        learning_evaluation_service=learning_evaluation_service,
+    )
