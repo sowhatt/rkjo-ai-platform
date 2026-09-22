@@ -23,3 +23,17 @@ __all__ += [
     "MasteryObservation",
     "MasteryResult",
 ]
+
+from .proof import (
+    ProofChallenge,
+    ProofOfLearningService,
+    ProofResult,
+    ProofStatus,
+)
+
+__all__ += [
+    "ProofChallenge",
+    "ProofOfLearningService",
+    "ProofResult",
+    "ProofStatus",
+]
