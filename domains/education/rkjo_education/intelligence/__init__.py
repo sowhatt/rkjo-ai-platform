@@ -37,3 +37,15 @@ __all__ += [
     "ProofResult",
     "ProofStatus",
 ]
+
+from .proof_repository import (
+    InMemoryProofChallengeRepository,
+    ProofChallengeRepository,
+    StoredProofChallenge,
+)
+
+__all__ += [
+    "InMemoryProofChallengeRepository",
+    "ProofChallengeRepository",
+    "StoredProofChallenge",
+]
