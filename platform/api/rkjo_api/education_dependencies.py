@@ -59,3 +59,19 @@ def get_education_tutor_service() -> TutorService:
         course_repository=PostgresCourseRepository(database_url),
         answerer=TenantScopedRAGAnswerer(),
     )
+
+
+def get_education_proof_service():
+    from rkjo_education.intelligence.proof_application import (
+        ProofApplicationService,
+    )
+    from rkjo_education.intelligence.proof_postgres_repository import (
+        PostgresProofChallengeRepository,
+    )
+
+    database_url = get_database_url()
+
+    return ProofApplicationService(
+        assessment_repository=PostgresAssessmentRepository(database_url),
+        proof_repository=PostgresProofChallengeRepository(database_url),
+    )

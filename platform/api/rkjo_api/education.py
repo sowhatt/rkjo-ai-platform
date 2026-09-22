@@ -12,6 +12,7 @@ from rkjo_api.education_dependencies import (
     get_education_assessment_service,
     get_education_learner_service,
     get_education_learning_service,
+    get_education_proof_service,
 )
 from rkjo_api.identity import get_authenticated_identity
 from rkjo_education.assessment.models import AttemptAnswerEvidence
@@ -24,6 +25,12 @@ from rkjo_education.course.models import Course
 from rkjo_education.course.service import CourseService
 from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
 from rkjo_education.learning.service import DuplicateEnrollmentError, LearningService
+from rkjo_education.intelligence.proof_application import (
+    ProofApplicationService,
+    ProofChallengeCompletedError,
+    ProofChallengeNotFoundError,
+    ProofQuestionNotFoundError,
+)
 
 router = APIRouter(prefix="/education", tags=["education"])
 
@@ -490,4 +497,118 @@ def submit_attempt(
         score=attempt.score,
         max_score=attempt.max_score,
         percentage=attempt.percentage,
+    )
+
+
+class ProofChallengeResponse(BaseModel):
+    id: UUID
+    learner_id: UUID
+    course_id: UUID
+    competency_code: str
+    verification_question_id: UUID
+    prompt: str
+    status: str
+
+
+class ProofSubmitRequest(BaseModel):
+    answer: str = Field(min_length=1, max_length=1000)
+
+
+class ProofSubmitResponse(BaseModel):
+    challenge_id: UUID
+    competency_code: str
+    status: str
+    independently_verified: bool
+
+
+@router.get(
+    "/proof-challenges/{challenge_id}",
+    response_model=ProofChallengeResponse,
+)
+def get_proof_challenge(
+    challenge_id: UUID,
+    request: Request,
+    service: ProofApplicationService = Depends(
+        get_education_proof_service
+    ),
+):
+    identity = get_authenticated_identity(request)
+    tenant_id = UUID(str(identity.tenant_id))
+
+    try:
+        challenge = service.get_challenge(
+            tenant_id=tenant_id,
+            challenge_id=challenge_id,
+        )
+        question = service.get_verification_question(
+            tenant_id=tenant_id,
+            challenge_id=challenge_id,
+        )
+    except (
+        ProofChallengeNotFoundError,
+        ProofQuestionNotFoundError,
+    ) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    return ProofChallengeResponse(
+        id=challenge.id,
+        learner_id=challenge.learner_id,
+        course_id=challenge.course_id,
+        competency_code=challenge.competency_code,
+        verification_question_id=(
+            challenge.verification_question_id
+        ),
+        prompt=question.prompt,
+        status=challenge.status.value,
+    )
+
+
+@router.post(
+    "/proof-challenges/{challenge_id}/submit",
+    response_model=ProofSubmitResponse,
+)
+def submit_proof_challenge(
+    challenge_id: UUID,
+    payload: ProofSubmitRequest,
+    request: Request,
+    service: ProofApplicationService = Depends(
+        get_education_proof_service
+    ),
+):
+    identity = get_authenticated_identity(request)
+    tenant_id = UUID(str(identity.tenant_id))
+
+    try:
+        challenge = service.get_challenge(
+            tenant_id=tenant_id,
+            challenge_id=challenge_id,
+        )
+
+        result = service.submit(
+            tenant_id=tenant_id,
+            challenge_id=challenge_id,
+            answer=payload.answer,
+        )
+    except (
+        ProofChallengeNotFoundError,
+        ProofQuestionNotFoundError,
+    ) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+    except ProofChallengeCompletedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    return ProofSubmitResponse(
+        challenge_id=challenge.id,
+        competency_code=result.competency_code,
+        status=result.status.value,
+        independently_verified=result.independently_verified,
     )
