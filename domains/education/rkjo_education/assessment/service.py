@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from .models import Assessment, Attempt, Question
+from .models import Assessment, Attempt, AttemptAnswerEvidence, Question
 from .repository import AssessmentRepository
 
 
@@ -79,6 +79,7 @@ class AssessmentService:
         tenant_id: UUID,
         attempt_id: UUID,
         answers: dict[UUID, str],
+        evidence: dict[UUID, AttemptAnswerEvidence] | None = None,
     ) -> Attempt:
         attempt = self._repository.get_attempt(
             tenant_id=tenant_id,
@@ -90,7 +91,22 @@ class AssessmentService:
             tenant_id=tenant_id,
             assessment_id=attempt.assessment_id,
         )
+        evidence = evidence or {}
+
+        unknown_evidence = set(evidence) - set(answers)
+        if unknown_evidence:
+            raise ValueError("evidence must reference a submitted answer")
+
+        assessment_question_ids = {question.id for question in assessment.questions}
+        unknown_answers = set(answers) - assessment_question_ids
+        if unknown_answers:
+            raise ValueError("answer must reference an assessment question")
+
         for question_id, answer in answers.items():
-            attempt.answer(question_id, answer)
+            attempt.answer(
+                question_id,
+                answer,
+                evidence=evidence.get(question_id),
+            )
         attempt.submit(assessment)
         return self._repository.save_attempt(attempt)

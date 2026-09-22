@@ -7,7 +7,13 @@ from uuid import UUID
 import psycopg
 from psycopg.types.json import Jsonb
 
-from .models import Assessment, Attempt, AttemptStatus, Question
+from .models import (
+    Assessment,
+    Attempt,
+    AttemptAnswerEvidence,
+    AttemptStatus,
+    Question,
+)
 
 
 class PostgresAssessmentRepository:
@@ -56,6 +62,7 @@ class PostgresAssessmentRepository:
                     assessment_id UUID NOT NULL,
                     learner_id UUID NOT NULL,
                     answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
                     status TEXT NOT NULL,
                     score INTEGER NOT NULL,
                     max_score INTEGER NOT NULL,
@@ -65,6 +72,12 @@ class PostgresAssessmentRepository:
                     PRIMARY KEY (tenant_id, attempt_id),
                     CHECK (percentage BETWEEN 0 AND 100)
                 )
+                """
+            )
+            connection.execute(
+                """
+                ALTER TABLE education_assessment_attempts
+                ADD COLUMN IF NOT EXISTS evidence JSONB NOT NULL DEFAULT '{}'::jsonb
                 """
             )
 
@@ -155,17 +168,27 @@ class PostgresAssessmentRepository:
 
     def save_attempt(self, attempt: Attempt) -> Attempt:
         answers = {str(key): value for key, value in attempt.answers.items()}
+        evidence = {
+            str(question_id): {
+                "assistance_level": int(item.assistance_level),
+                "hints_used": item.hints_used,
+                "attempt_count": item.attempt_count,
+                "response_time_seconds": item.response_time_seconds,
+            }
+            for question_id, item in attempt.evidence.items()
+        }
         with self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO education_assessment_attempts (
                     tenant_id, attempt_id, assessment_id, learner_id,
-                    answers, status, score, max_score, percentage,
+                    answers, evidence, status, score, max_score, percentage,
                     started_at, submitted_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (tenant_id, attempt_id)
                 DO UPDATE SET
                     answers = EXCLUDED.answers,
+                    evidence = EXCLUDED.evidence,
                     status = EXCLUDED.status,
                     score = EXCLUDED.score,
                     max_score = EXCLUDED.max_score,
@@ -178,6 +201,7 @@ class PostgresAssessmentRepository:
                     attempt.assessment_id,
                     attempt.learner_id,
                     Jsonb(answers),
+                    Jsonb(evidence),
                     attempt.status.value,
                     attempt.score,
                     attempt.max_score,
@@ -192,7 +216,7 @@ class PostgresAssessmentRepository:
         with self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT assessment_id, learner_id, answers, status, score,
+                SELECT assessment_id, learner_id, answers, evidence, status, score,
                        max_score, percentage, started_at, submitted_at
                 FROM education_assessment_attempts
                 WHERE tenant_id = %s AND attempt_id = %s
@@ -202,16 +226,26 @@ class PostgresAssessmentRepository:
         if row is None:
             return None
         answers = {UUID(key): value for key, value in dict(row[2]).items()}
+        evidence = {
+            UUID(key): AttemptAnswerEvidence(
+                assistance_level=value["assistance_level"],
+                hints_used=value.get("hints_used", 0),
+                attempt_count=value.get("attempt_count", 1),
+                response_time_seconds=value.get("response_time_seconds"),
+            )
+            for key, value in dict(row[3] or {}).items()
+        }
         return Attempt(
             tenant_id=tenant_id,
             assessment_id=row[0],
             learner_id=row[1],
             id=attempt_id,
             answers=answers,
-            status=AttemptStatus(row[3]),
-            score=row[4],
-            max_score=row[5],
-            percentage=row[6],
-            started_at=row[7],
-            submitted_at=row[8],
+            evidence=evidence,
+            status=AttemptStatus(row[4]),
+            score=row[5],
+            max_score=row[6],
+            percentage=row[7],
+            started_at=row[8],
+            submitted_at=row[9],
         )

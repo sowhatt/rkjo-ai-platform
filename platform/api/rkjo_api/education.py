@@ -14,6 +14,7 @@ from rkjo_api.education_dependencies import (
     get_education_learning_service,
 )
 from rkjo_api.identity import get_authenticated_identity
+from rkjo_education.assessment.models import AttemptAnswerEvidence
 from rkjo_education.assessment.service import (
     AssessmentNotFoundError,
     AssessmentService,
@@ -127,8 +128,16 @@ class AttemptStartRequest(BaseModel):
     learner_id: UUID
 
 
+class AttemptEvidenceRequest(BaseModel):
+    assistance_level: int = Field(default=0, ge=0, le=5)
+    hints_used: int = Field(default=0, ge=0)
+    attempt_count: int = Field(default=1, ge=1)
+    response_time_seconds: int | None = Field(default=None, ge=0)
+
+
 class AttemptSubmitRequest(BaseModel):
     answers: dict[UUID, str]
+    evidence: dict[UUID, AttemptEvidenceRequest] = Field(default_factory=dict)
 
 
 class AttemptResponse(BaseModel):
@@ -459,6 +468,15 @@ def submit_attempt(
             tenant_id=require_uuid_tenant(request),
             attempt_id=attempt_id,
             answers=payload.answers,
+            evidence={
+                question_id: AttemptAnswerEvidence(
+                    assistance_level=item.assistance_level,
+                    hints_used=item.hints_used,
+                    attempt_count=item.attempt_count,
+                    response_time_seconds=item.response_time_seconds,
+                )
+                for question_id, item in payload.evidence.items()
+            },
         )
     except (AssessmentNotFoundError, AttemptNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
