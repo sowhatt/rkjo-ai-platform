@@ -67,3 +67,11 @@ class LearnerSupervisionProjection:
     def get(self, *, tenant_id: UUID, learner_id: UUID) -> LearnerSupervisionState | None:
         state = self._states.get((tenant_id, learner_id))
         return None if state is None else state.model_copy(deep=True)
+
+    def list_for_tenant(self, *, tenant_id: UUID) -> list[LearnerSupervisionState]:
+        states = [
+            state.model_copy(deep=True)
+            for (state_tenant_id, _), state in self._states.items()
+            if state_tenant_id == tenant_id
+        ]
+        return sorted(states, key=lambda state: str(state.learner_id))
