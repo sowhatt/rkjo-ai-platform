@@ -611,7 +611,7 @@ export default function EducationSession() {
             </p>
 
             <Link
-              href="/courses"
+              href="/education/courses"
               className="rkjo-start"
             >
               Choisir un cours

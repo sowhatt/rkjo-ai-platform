@@ -1509,3 +1509,267 @@ body {
     width: 100%;
   }
 }
+
+.rkjo-demo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 36px;
+}
+
+.rkjo-demo-header h1 {
+  margin: 8px 0 8px;
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  letter-spacing: -0.04em;
+}
+
+.rkjo-demo-header p {
+  max-width: 720px;
+  margin: 0;
+  color: #718096;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.rkjo-demo-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  gap: 20px;
+}
+
+.rkjo-demo-course,
+.rkjo-resource-grid article,
+.rkjo-demo-info-grid article,
+.rkjo-mastery-panel,
+.rkjo-progress-summary article {
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.rkjo-demo-course {
+  padding: 28px;
+}
+
+.rkjo-demo-course.featured {
+  box-shadow: 0 18px 50px rgba(25, 55, 95, 0.08);
+}
+
+.rkjo-demo-course h2 {
+  margin: 12px 0 10px;
+  font-size: 1.8rem;
+}
+
+.rkjo-demo-course p {
+  color: #718096;
+  line-height: 1.6;
+}
+
+.rkjo-demo-tag {
+  color: #3972bd;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.rkjo-demo-progress-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 28px 0 10px;
+}
+
+.rkjo-demo-course .rkjo-action-primary,
+.rkjo-professor-hero .rkjo-action-primary {
+  display: inline-flex;
+  margin-top: 24px;
+  text-decoration: none;
+}
+
+.rkjo-professor-hero {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 38px;
+  align-items: center;
+  padding: 42px;
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, #173b6d 0%, #234f87 100%);
+  color: white;
+}
+
+.rkjo-professor-orb {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  font-size: 3.5rem;
+}
+
+.rkjo-professor-hero h2 {
+  margin: 10px 0;
+  font-size: 2rem;
+}
+
+.rkjo-professor-hero p {
+  max-width: 720px;
+  color: #d8e5f5;
+  line-height: 1.7;
+}
+
+.rkjo-help-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.rkjo-help-levels span {
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.85rem;
+}
+
+.rkjo-demo-info-grid,
+.rkjo-resource-grid,
+.rkjo-progress-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.rkjo-demo-info-grid article {
+  padding: 22px;
+}
+
+.rkjo-demo-info-grid p {
+  margin: 8px 0 0;
+  color: #718096;
+  line-height: 1.55;
+}
+
+.rkjo-resource-grid article {
+  display: flex;
+  gap: 18px;
+  padding: 26px;
+}
+
+.rkjo-resource-icon {
+  display: grid;
+  flex: 0 0 48px;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #edf4ff;
+  color: #245b9e;
+  font-weight: 800;
+}
+
+.rkjo-resource-grid small {
+  color: #3972bd;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.rkjo-resource-grid h2 {
+  margin: 7px 0;
+  font-size: 1.2rem;
+}
+
+.rkjo-resource-grid p {
+  margin: 0;
+  color: #718096;
+  line-height: 1.55;
+}
+
+.rkjo-demo-note {
+  margin-top: 24px;
+  padding: 18px 22px;
+  border-radius: 16px;
+  background: #f5f8fc;
+  color: #66758a;
+}
+
+.rkjo-progress-summary article {
+  padding: 24px;
+}
+
+.rkjo-progress-summary span,
+.rkjo-progress-summary small {
+  display: block;
+  color: #718096;
+}
+
+.rkjo-progress-summary strong {
+  display: block;
+  margin: 10px 0 5px;
+  font-size: 2rem;
+}
+
+.rkjo-mastery-panel {
+  margin-top: 24px;
+  padding: 28px;
+}
+
+.rkjo-mastery-heading h2 {
+  margin: 7px 0 22px;
+}
+
+.rkjo-mastery-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 15px;
+  align-items: center;
+  padding: 18px 0;
+  border-top: 1px solid #edf0f4;
+}
+
+.rkjo-mastery-row small {
+  display: block;
+  margin-top: 4px;
+  color: #718096;
+}
+
+.rkjo-proof-value {
+  display: flex;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 22px;
+  border-radius: 18px;
+  background: #edf7f1;
+}
+
+.rkjo-proof-value > span {
+  font-size: 1.5rem;
+}
+
+.rkjo-proof-value p {
+  margin: 5px 0 0;
+  color: #60736a;
+  line-height: 1.55;
+}
+
+@media (max-width: 850px) {
+  .rkjo-demo-grid,
+  .rkjo-demo-info-grid,
+  .rkjo-resource-grid,
+  .rkjo-progress-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .rkjo-professor-hero {
+    grid-template-columns: 1fr;
+    padding: 28px;
+  }
+
+  .rkjo-professor-orb {
+    width: 100px;
+    height: 100px;
+  }
+}

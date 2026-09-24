@@ -85,22 +85,22 @@ export default function EducationHome() {
             Aujourd&apos;hui
           </Link>
 
-          <Link href="/courses">
+          <Link href="/education/courses">
             <span>▤</span>
             Mes cours
           </Link>
 
-          <Link href="/assistant">
+          <Link href="/education/tutor">
             <span>✦</span>
             Professeur IA
           </Link>
 
-          <Link href="/documents">
+          <Link href="/education/resources">
             <span>□</span>
             Ressources
           </Link>
 
-          <Link href="/dashboard">
+          <Link href="/education/progress">
             <span>◫</span>
             Progression
           </Link>
@@ -202,7 +202,7 @@ export default function EducationHome() {
                 ▶ Commencer ma session
               </Link>
 
-              <Link href="/assistant" className="rkjo-ask">
+              <Link href="/education/tutor" className="rkjo-ask">
                 Demander au professeur IA
               </Link>
             </div>
@@ -274,7 +274,7 @@ export default function EducationHome() {
               te donner la réponse.
             </p>
 
-            <Link href="/assistant">
+            <Link href="/education/tutor">
               Parler à mon professeur →
             </Link>
           </aside>
@@ -287,17 +287,17 @@ export default function EducationHome() {
           Aujourd&apos;hui
         </Link>
 
-        <Link href="/courses">
+        <Link href="/education/courses">
           <span>▤</span>
           Cours
         </Link>
 
-        <Link href="/assistant">
+        <Link href="/education/tutor">
           <span>✦</span>
           Professeur
         </Link>
 
-        <Link href="/dashboard">
+        <Link href="/education/progress">
           <span>◫</span>
           Progrès
         </Link>
