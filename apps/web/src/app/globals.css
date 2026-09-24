@@ -1773,3 +1773,16 @@ body {
     height: 100px;
   }
 }
+
+
+/* RKJO Education — teacher live supervision */
+.supervision-live { padding: 9px 13px; border-radius: 999px; background: #f1f3f6; color: #687386; font-size: 13px; font-weight: 700; }
+.supervision-live.online { background: #e9f8ef; color: #167647; }
+.supervision-panel { margin-top: 28px; background: #fff; border: 1px solid #e5e9ef; border-radius: 16px; padding: 22px; }
+.supervision-table-wrap { overflow-x: auto; }
+.supervision-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.supervision-table th { padding: 12px; text-align: left; color: #718096; border-bottom: 1px solid #e8ebf0; font-size: 12px; }
+.supervision-table td { padding: 15px 12px; border-bottom: 1px solid #eef0f3; }
+.supervision-table td small { display: block; margin-top: 4px; color: #8a94a4; }
+.supervision-status { display: inline-flex; padding: 5px 9px; border-radius: 999px; background: #f1f3f6; color: #687386; font-size: 12px; font-weight: 700; }
+.supervision-status.active { background: #e9f8ef; color: #167647; }
