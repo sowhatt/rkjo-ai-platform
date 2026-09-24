@@ -5,6 +5,7 @@ import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.responses import StreamingResponse
 
 from rkjo_api.education import require_uuid_tenant
 from rkjo_education.supervision import (
