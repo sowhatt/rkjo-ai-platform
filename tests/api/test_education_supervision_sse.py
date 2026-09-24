@@ -48,7 +48,7 @@ async def test_sse_initial_snapshot_is_tenant_scoped():
         learner_id=learner_b,
     ))
 
-    chunks = await collect_chunks(
+    async def scenario():\n        return await collect_chunks(
         supervision_event_stream(
             request=DisconnectAfter(1),
             tenant_id=TENANT_A,
@@ -95,12 +95,12 @@ async def test_sse_emits_again_only_after_state_changes():
 
     third = await anext(stream)
     fourth = await anext(stream)
-    assert third == "event: supervision.snapshot\n"
+    assert third == "event: supervision.snapshot\n    "
     assert '"autonomy_score":91' in fourth
     await stream.aclose()
 
 
-def test_sse_route_requires_authentication(client):
+\n    first, second, third, fourth = asyncio.run(scenario())\n    assert first == \"event: supervision.snapshot\\n\"\n    assert '\"autonomy_score\":null' in second\n    assert third == \"event: supervision.snapshot\\n\"\n    assert '\"autonomy_score\":91' in fourth\n\ndef test_sse_route_requires_authentication(client):
     response = client.get(
         "/education/supervision/stream",
         headers={"X-API-Key": "invalid"},
