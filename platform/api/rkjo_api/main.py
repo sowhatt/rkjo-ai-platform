@@ -17,6 +17,9 @@ from rkjo_api.education import (
 from rkjo_api.education_tutor import (
     router as education_tutor_router,
 )
+from rkjo_api.education_supervision import (
+    router as education_supervision_router,
+)
 
 from rkjo_api.security import (
     API_KEY_HEADER,
@@ -64,6 +67,9 @@ app.include_router(
 )
 app.include_router(
     education_tutor_router
+)
+app.include_router(
+    education_supervision_router
 )
 
 
