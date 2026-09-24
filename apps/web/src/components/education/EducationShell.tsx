@@ -8,7 +8,7 @@ type EducationSection =
   | "courses"
   | "tutor"
   | "resources"
-  | "progress";
+  | "progress"\n  | "supervision";
 
 type EducationShellProps = {
   active: EducationSection;
