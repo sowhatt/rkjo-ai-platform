@@ -47,6 +47,12 @@ const navigation = [
     icon: "◫",
     label: "Progression",
   },
+  {
+    key: "supervision" as const,
+    href: "/education/supervision",
+    icon: "◎",
+    label: "Supervision",
+  },
 ];
 
 export default function EducationShell({
@@ -82,8 +88,8 @@ export default function EducationShell({
         <div className="rkjo-edu-profile">
           <span className="rkjo-edu-avatar">RK</span>
           <span>
-            <strong>Compte pilote</strong>
-            <small>Démo Education</small>
+            <strong>RKJO Education</strong>
+            <small>Espace pédagogique</small>
           </span>
         </div>
       </aside>
