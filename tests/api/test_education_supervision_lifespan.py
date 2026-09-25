@@ -1,8 +1,12 @@
 import importlib
 from unittest.mock import patch
 
+import pytest
 
-def test_supervision_consumer_is_disabled_by_default(monkeypatch):
+pytestmark = pytest.mark.anyio
+
+
+async def test_supervision_consumer_is_disabled_by_default(monkeypatch):
     monkeypatch.delenv(
         "RKJO_EDUCATION_SUPERVISION_CONSUMER_ENABLED",
         raising=False,
@@ -13,13 +17,13 @@ def test_supervision_consumer_is_disabled_by_default(monkeypatch):
         main_module,
         "get_event_bus",
     ) as get_event_bus:
-        with main_module.app.router.lifespan_context(main_module.app):
+        async with main_module.app.router.lifespan_context(main_module.app):
             pass
 
     get_event_bus.assert_not_called()
 
 
-def test_supervision_consumer_can_be_enabled(monkeypatch):
+async def test_supervision_consumer_can_be_enabled(monkeypatch):
     monkeypatch.setenv(
         "RKJO_EDUCATION_SUPERVISION_CONSUMER_ENABLED",
         "true",
@@ -40,5 +44,5 @@ def test_supervision_consumer_can_be_enabled(monkeypatch):
         "get_event_bus",
         return_value=fake_bus,
     ):
-        with main_module.app.router.lifespan_context(main_module.app):
+        async with main_module.app.router.lifespan_context(main_module.app):
             pass
