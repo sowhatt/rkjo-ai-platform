@@ -1,3 +1,7 @@
+from contextlib import asynccontextmanager
+import asyncio
+import os
+
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import Any
@@ -32,6 +36,7 @@ from rkjo_api.security import (
 
 from rkjo_api.dependencies import (
     get_async_dispatcher,
+    get_event_bus,
     get_metrics_registry,
     get_workflow_agent_router,
     get_workflow_engine,
@@ -51,11 +56,48 @@ from rkjo_kernel.workflow.models.workflow_step import (
 from rkjo_kernel.workflow.repository.postgres import (
     PostgreSQLWorkflowRepository,
 )
+from rkjo_education.supervision import EducationSupervisionEventConsumer
+from rkjo_api.education_supervision import get_supervision_projection
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start optional live Education supervision ingestion with clean shutdown."""
+    task = None
+    event_bus = None
+
+    enabled = os.getenv(
+        "RKJO_EDUCATION_SUPERVISION_CONSUMER_ENABLED",
+        "false",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    if enabled:
+        event_bus = get_event_bus()
+        consumer = EducationSupervisionEventConsumer(
+            event_bus=event_bus,
+            projection=get_supervision_projection(),
+        )
+        task = asyncio.create_task(
+            asyncio.to_thread(consumer.consume),
+            name="education-supervision-consumer",
+        )
+
+    try:
+        yield
+    finally:
+        if event_bus is not None:
+            event_bus.close()
+        if task is not None:
+            try:
+                await asyncio.wait_for(task, timeout=2.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                task.cancel()
 
 
 app = FastAPI(
     title="RKJO AI Platform API",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 
