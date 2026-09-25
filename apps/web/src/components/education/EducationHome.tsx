@@ -104,6 +104,11 @@ export default function EducationHome() {
             <span>◫</span>
             Progression
           </Link>
+
+          <Link href="/education/supervision">
+            <span>◎</span>
+            Supervision
+          </Link>
         </nav>
 
         <div className="rkjo-edu-profile">
@@ -113,7 +118,7 @@ export default function EducationHome() {
 
           <span>
             <strong>{profile.label}</strong>
-            <small>Profil démonstration</small>
+            <small>Espace d’apprentissage</small>
           </span>
         </div>
       </aside>
