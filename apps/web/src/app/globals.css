@@ -1,28 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* RKJO Education — Academic Intelligence Design System v1 */
+  --rkjo-navy: #102a43;
+  --rkjo-blue: #2563eb;
+  --rkjo-blue-soft: #eff6ff;
+  --rkjo-ai: #6366f1;
+  --rkjo-ai-soft: #eef2ff;
+  --rkjo-success: #15803d;
+  --rkjo-success-soft: #f0fdf4;
+  --rkjo-warning: #d97706;
+  --rkjo-warning-soft: #fffbeb;
+  --rkjo-danger: #dc2626;
+  --rkjo-danger-soft: #fef2f2;
+  --rkjo-background: #f8fafc;
+  --rkjo-surface: #ffffff;
+  --rkjo-text: #0f172a;
+  --rkjo-muted: #64748b;
+  --rkjo-border: #e2e8f0;
+  --rkjo-radius-sm: 8px;
+  --rkjo-radius-md: 12px;
+  --rkjo-radius-lg: 16px;
+  --rkjo-shadow-card: 0 8px 28px rgb(15 23 42 / 6%);
+  --background: var(--rkjo-background);
+  --foreground: var(--rkjo-text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-rkjo-sans);
+  --font-mono: var(--font-rkjo-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-rkjo-sans), Inter, Arial, Helvetica, sans-serif;
 }
 
 .edu-shell {
@@ -1786,3 +1800,167 @@ body {
 .supervision-table td small { display: block; margin-top: 4px; color: #8a94a4; }
 .supervision-status { display: inline-flex; padding: 5px 9px; border-radius: 999px; background: #f1f3f6; color: #687386; font-size: 12px; font-weight: 700; }
 .supervision-status.active { background: #e9f8ef; color: #167647; }
+
+
+/* ==========================================================
+   RKJO EDUCATION — ACADEMIC INTELLIGENCE DESIGN SYSTEM V1
+   One professional identity for learners, students, teachers
+   and families. Role-specific density, shared visual language.
+   ========================================================== */
+
+.rkjo-edu-app {
+  background: var(--rkjo-background);
+  color: var(--rkjo-text);
+}
+
+.rkjo-edu-side {
+  background: var(--rkjo-surface);
+  border-color: var(--rkjo-border);
+}
+
+.rkjo-edu-mark {
+  background: var(--rkjo-navy);
+  border-radius: var(--rkjo-radius-md);
+}
+
+.rkjo-edu-brand strong {
+  color: var(--rkjo-navy);
+  letter-spacing: -0.02em;
+}
+
+.rkjo-edu-brand small,
+.rkjo-edu-profile small,
+.rkjo-edu-topbar p {
+  color: var(--rkjo-muted);
+}
+
+.rkjo-edu-navigation a {
+  color: var(--rkjo-muted);
+  border-radius: var(--rkjo-radius-md);
+}
+
+.rkjo-edu-navigation a:hover {
+  background: var(--rkjo-blue-soft);
+  color: var(--rkjo-navy);
+}
+
+.rkjo-edu-navigation a.active {
+  background: var(--rkjo-blue-soft);
+  color: var(--rkjo-blue);
+}
+
+.rkjo-edu-kicker {
+  color: var(--rkjo-blue);
+}
+
+.rkjo-edu-topbar h1,
+.course-section-header h2 {
+  color: var(--rkjo-navy);
+  letter-spacing: -0.025em;
+}
+
+.rkjo-edu-summary article,
+.supervision-panel {
+  background: var(--rkjo-surface);
+  border-color: var(--rkjo-border);
+  box-shadow: var(--rkjo-shadow-card);
+}
+
+.rkjo-edu-summary article {
+  border-radius: var(--rkjo-radius-lg);
+}
+
+.rkjo-edu-summary article > span {
+  color: var(--rkjo-muted);
+}
+
+.rkjo-edu-summary strong {
+  color: var(--rkjo-navy);
+}
+
+.supervision-live {
+  border: 1px solid var(--rkjo-border);
+  background: var(--rkjo-surface);
+  color: var(--rkjo-muted);
+}
+
+.supervision-live.online {
+  border-color: #bbf7d0;
+  background: var(--rkjo-success-soft);
+  color: var(--rkjo-success);
+}
+
+.supervision-table th {
+  color: var(--rkjo-muted);
+  background: #f8fafc;
+  border-color: var(--rkjo-border);
+}
+
+.supervision-table td {
+  border-color: var(--rkjo-border);
+}
+
+.supervision-status {
+  background: #f1f5f9;
+  color: var(--rkjo-muted);
+}
+
+.supervision-status.active {
+  background: var(--rkjo-success-soft);
+  color: var(--rkjo-success);
+}
+
+.rkjo-status-success {
+  background: var(--rkjo-success-soft);
+  color: var(--rkjo-success);
+}
+
+.rkjo-status-warning {
+  background: var(--rkjo-warning-soft);
+  color: var(--rkjo-warning);
+}
+
+.rkjo-status-danger {
+  background: var(--rkjo-danger-soft);
+  color: var(--rkjo-danger);
+}
+
+.rkjo-status-ai {
+  background: var(--rkjo-ai-soft);
+  color: var(--rkjo-ai);
+}
+
+.edu-primary,
+.edu-primary-link,
+.rkjo-action-primary {
+  background: var(--rkjo-blue);
+}
+
+.edu-primary:hover,
+.edu-primary-link:hover,
+.rkjo-action-primary:hover {
+  background: #1d4ed8;
+}
+
+.edu-message {
+  background: var(--rkjo-warning-soft);
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+@media (max-width: 650px) {
+  .rkjo-edu-topbar h1 {
+    font-size: 30px;
+  }
+
+  .rkjo-edu-content {
+    font-size: 16px;
+  }
+
+  .rkjo-edu-navigation a,
+  button,
+  input,
+  textarea {
+    min-height: 44px;
+  }
+}
