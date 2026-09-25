@@ -1964,3 +1964,85 @@ body {
     min-height: 44px;
   }
 }
+
+
+/* Design System v1 — shared academic surfaces */
+.rkjo-demo-course,
+.rkjo-demo-info-grid article,
+.rkjo-resource-grid article,
+.rkjo-progress-summary article,
+.rkjo-mastery-panel,
+.rkjo-professor-card,
+.rkjo-session-main,
+.rkjo-session-sidebar article {
+  border-color: var(--rkjo-border);
+  border-radius: var(--rkjo-radius-lg);
+  box-shadow: var(--rkjo-shadow-card);
+}
+
+.rkjo-demo-tag,
+.rkjo-resource-grid small {
+  color: var(--rkjo-blue);
+}
+
+.rkjo-resource-icon,
+.rkjo-professor-avatar,
+.rkjo-competency-badge,
+.rkjo-proof-intro {
+  background: var(--rkjo-blue-soft);
+  color: var(--rkjo-blue);
+}
+
+.rkjo-professor-hero {
+  background: linear-gradient(135deg, var(--rkjo-navy) 0%, #1e4976 100%);
+}
+
+.rkjo-tutor-avatar {
+  background: var(--rkjo-ai);
+}
+
+.rkjo-tutor-intro,
+.rkjo-tutor-answer {
+  background: var(--rkjo-ai-soft);
+}
+
+.rkjo-progress i {
+  background: var(--rkjo-blue);
+}
+
+.rkjo-skill-icon.success,
+.rkjo-result-banner.success,
+.rkjo-proof-final.success,
+.rkjo-proof-value {
+  background: var(--rkjo-success-soft);
+  color: var(--rkjo-success);
+}
+
+.rkjo-skill-icon.warning,
+.rkjo-result-banner.warning,
+.rkjo-proof-final.warning,
+.rkjo-hint {
+  background: var(--rkjo-warning-soft);
+  color: var(--rkjo-warning);
+}
+
+.rkjo-session-error {
+  background: var(--rkjo-danger-soft);
+  color: var(--rkjo-danger);
+}
+
+:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 35%);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
