@@ -5,3 +5,5 @@ __all__ = [
     "LearnerSupervisionProjection",
     "LearnerSupervisionState",
 ]
+
+from .consumer import EducationSupervisionEventConsumer
