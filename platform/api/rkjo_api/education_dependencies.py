@@ -119,6 +119,11 @@ def get_education_assessment_learning_service():
 
 
 def get_education_event_publisher():
+    """Provide a request-scoped publisher and always release its AMQP connection."""
     from rkjo_education.events import EducationEventPublisher
 
-    return EducationEventPublisher(get_event_bus())
+    publisher = EducationEventPublisher(get_event_bus())
+    try:
+        yield publisher
+    finally:
+        publisher.close()
