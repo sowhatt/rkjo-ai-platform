@@ -583,11 +583,54 @@ export default function EducationSession() {
     }
   }
 
-  function requestHint() {
-    setHintsUsed((value) => value + 1);
-    setAssistanceLevel((value) =>
-      Math.max(value, 2),
-    );
+  async function requestHint() {
+    if (!assessment || !currentQuestion || !learnerId) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      await ensureAttempt();
+
+      const response = await fetch(
+        "/api/education/hints",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            learner_id: learnerId,
+            course_id: courseId || null,
+            assessment_id: assessment.id,
+            question_id: currentQuestion.id,
+            competency_code:
+              currentQuestion.competency_code,
+          }),
+        },
+      );
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          payload.detail ??
+            "Impossible d'enregistrer l'indice.",
+        );
+      }
+
+      setHintsUsed((value) => value + 1);
+      setAssistanceLevel((value) =>
+        Math.max(value, 2),
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Une erreur est survenue.",
+      );
+    }
   }
 
   if (!learnerId || !courseId) {
