@@ -354,6 +354,19 @@ class RabbitMQEventBus(EventBus):
     def _dlq_name(self, queue_name: str) -> str:
         return f"{queue_name}{self.dlq_suffix}"
 
+    def stop_consuming(self) -> None:
+        """Request a blocking consumer stop on its connection thread."""
+        if not self.connection or not self.connection.is_open:
+            return
+        if not self.channel or not self.channel.is_open:
+            return
+        if not self.channel.is_consuming:
+            return
+
+        self.connection.add_callback_threadsafe(
+            self.channel.stop_consuming
+        )
+
     def close(self) -> None:
         """Close the RabbitMQ connection cleanly."""
         if self.connection and self.connection.is_open:
