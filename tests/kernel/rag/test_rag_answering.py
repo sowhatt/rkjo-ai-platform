@@ -105,3 +105,42 @@ def test_no_sources_does_not_call_generator():
         "do not provide enough information"
         in result.answer
     )
+
+
+class ContextAwareGenerator:
+    def __init__(self):
+        self.execution_context = None
+
+    def generate(
+        self,
+        *,
+        question,
+        context,
+        execution_context=None,
+    ):
+        self.execution_context = execution_context
+        return "Réponse gouvernée [1]."
+
+
+def test_answer_propagates_execution_context_to_generator():
+    from rkjo_kernel.mission.execution_context import ExecutionContext
+
+    generator = ContextAwareGenerator()
+    service = RAGAnsweringService(
+        search_service=FakeSearch(
+            [source()]
+        ),
+        generator=generator,
+    )
+    execution_context = ExecutionContext(
+        mission_id="rag-1",
+        tenant_id="tenant-1",
+        trace_id="trace-1",
+    )
+
+    service.answer(
+        "Question",
+        execution_context=execution_context,
+    )
+
+    assert generator.execution_context is execution_context
