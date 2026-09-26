@@ -1,3 +1,5 @@
+import pytest
+
 from rkjo_kernel.llm.models import (
     LLMResponse,
 )
