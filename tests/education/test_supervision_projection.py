@@ -47,7 +47,7 @@ def test_projection_builds_live_learner_state():
         EducationEventType.AUTONOMY_UPDATED,
         tenant_id=tenant_id,
         learner_id=learner_id,
-        payload={"score": 81},
+        payload={"autonomy_score": 81},
     ))
     state = projection.apply(event(
         EducationEventType.MASTERY_UPDATED,
@@ -122,13 +122,13 @@ def test_projection_is_strictly_tenant_isolated():
         EducationEventType.AUTONOMY_UPDATED,
         tenant_id=tenant_a,
         learner_id=learner_id,
-        payload={"score": 91},
+        payload={"autonomy_score": 91},
     ))
     projection.apply(event(
         EducationEventType.AUTONOMY_UPDATED,
         tenant_id=tenant_b,
         learner_id=learner_id,
-        payload={"score": 34},
+        payload={"autonomy_score": 34},
     ))
 
     assert projection.get(tenant_id=tenant_a, learner_id=learner_id).autonomy_score == 91
@@ -144,7 +144,7 @@ def test_projection_ignores_invalid_autonomy_payload():
         EducationEventType.AUTONOMY_UPDATED,
         tenant_id=tenant_id,
         learner_id=learner_id,
-        payload={"score": 150},
+        payload={"autonomy_score": 150},
     ))
 
     assert state.autonomy_score is None
