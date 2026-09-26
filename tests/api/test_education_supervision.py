@@ -27,7 +27,7 @@ def projection_with_states():
         event_type=EducationEventType.AUTONOMY_UPDATED,
         tenant_id=TENANT_A,
         learner_id=learner_a,
-        payload={"score": 82},
+        payload={"autonomy_score": 82},
     ))
     projection.apply(EducationLearningEvent(
         event_type=EducationEventType.SESSION_STARTED,
