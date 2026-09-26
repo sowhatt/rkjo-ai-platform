@@ -473,6 +473,44 @@ def get_assessment(
 
 
 @router.get(
+    "/assessments/{assessment_id}/learner",
+    response_model=LearnerAssessmentResponse,
+)
+def get_learner_assessment(
+    assessment_id: UUID,
+    request: Request,
+    service: AssessmentService = Depends(
+        get_education_assessment_service
+    ),
+) -> LearnerAssessmentResponse:
+    try:
+        assessment = service.get_assessment(
+            tenant_id=require_uuid_tenant(request),
+            assessment_id=assessment_id,
+        )
+    except AssessmentNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Assessment not found.",
+        ) from exc
+
+    return LearnerAssessmentResponse(
+        id=assessment.id,
+        course_id=assessment.course_id,
+        title=assessment.title,
+        questions=[
+            LearnerQuestionResponse(
+                id=question.id,
+                prompt=question.prompt,
+                points=question.points,
+                competency_code=question.competency_code,
+            )
+            for question in assessment.questions
+        ],
+    )
+
+
+@router.get(
     "/courses/{course_id}/assessments",
     response_model=list[LearnerAssessmentResponse],
 )
