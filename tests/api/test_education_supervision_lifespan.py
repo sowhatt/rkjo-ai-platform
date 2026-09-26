@@ -20,6 +20,9 @@ async def test_supervision_consumer_is_disabled_by_default(monkeypatch):
         async with main_module.app.router.lifespan_context(main_module.app):
             pass
 
+    assert fake_bus.stopped is True
+    assert fake_bus.closed is True
+
     get_event_bus.assert_not_called()
 
 
@@ -32,11 +35,18 @@ async def test_supervision_consumer_can_be_enabled(monkeypatch):
     importlib.reload(main_module)
 
     class FakeBus:
+        def __init__(self):
+            self.stopped = False
+            self.closed = False
+
         def consume(self, queue_name, callback):
             return None
 
+        def stop_consuming(self):
+            self.stopped = True
+
         def close(self):
-            return None
+            self.closed = True
 
     fake_bus = FakeBus()
     with patch.object(
