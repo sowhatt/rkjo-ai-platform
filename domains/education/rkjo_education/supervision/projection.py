@@ -45,7 +45,7 @@ class LearnerSupervisionProjection:
         elif event.event_type == EducationEventType.TUTOR_REQUESTED:
             updates["tutor_requests"] = current.tutor_requests + 1
         elif event.event_type == EducationEventType.AUTONOMY_UPDATED:
-            score = event.payload.get("score")
+            score = event.payload.get("autonomy_score")
             if isinstance(score, int) and not isinstance(score, bool) and 0 <= score <= 100:
                 updates["autonomy_score"] = score
         elif event.event_type == EducationEventType.MASTERY_UPDATED:
