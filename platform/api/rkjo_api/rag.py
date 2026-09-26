@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+from uuid import uuid4
 
 from fastapi import (
     APIRouter,
@@ -37,6 +38,7 @@ from rkjo_api.identity import (
     bind_identity_tenant,
     get_authenticated_identity,
 )
+from rkjo_kernel.mission.execution_context import ExecutionContext
 from rkjo_kernel.rag.ingestion import (
     DocumentIngestionPipeline,
 )
@@ -841,10 +843,42 @@ def rag_answer(
             filters=filters,
         )
 
+        request_id = (
+            http_request.headers.get("x-request-id")
+            or str(uuid4())
+        )
+        trace_id = (
+            http_request.headers.get("x-trace-id")
+            or request_id
+        )
+
+        execution_context = ExecutionContext(
+            mission_id=f"rag-answer:{request_id}",
+            trace_id=trace_id,
+            tenant_id=identity.tenant_id,
+            user_id=identity.subject,
+            request_id=request_id,
+            policy_context=getattr(
+                http_request.state,
+                "llm_policy_context",
+                {},
+            ),
+            budget=getattr(
+                http_request.state,
+                "llm_budget",
+                {},
+            ),
+            metadata={
+                "api_role": identity.role.value,
+                "workload": "rag_answer",
+            },
+        )
+
         result = service.answer(
             request.question,
             limit=request.limit,
             filters=filters,
+            execution_context=execution_context,
         )
 
     except ValueError as exc:
