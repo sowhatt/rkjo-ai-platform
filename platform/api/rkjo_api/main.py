@@ -89,12 +89,20 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         if event_bus is not None:
-            event_bus.close()
+            event_bus.stop_consuming()
         if task is not None:
             try:
                 await asyncio.wait_for(task, timeout=2.0)
-            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+            except (asyncio.TimeoutError, asyncio.CancelledError):
                 task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            except Exception:
+                pass
+        if event_bus is not None:
+            event_bus.close()
 
 
 app = FastAPI(
