@@ -58,7 +58,12 @@ from rkjo_kernel.rag.reranking_factory import (
 )
 
 from rkjo_kernel.rag.context_builder import CitationContextBuilder
-from rkjo_kernel.rag.openai_generation import OpenAIAnswerGenerator
+from rkjo_kernel.llm.gateway import LLMGateway
+from rkjo_kernel.llm.ollama_adapter import OllamaLLMAdapter
+from rkjo_kernel.llm.openai_adapter import OpenAILLMAdapter
+from rkjo_kernel.llm.registry import LLMProviderRegistry
+from rkjo_kernel.llm.router import LLMRouter
+from rkjo_kernel.rag.llm_generation import LLMBackedAnswerGenerator
 from rkjo_kernel.rag.rag_answering import RAGAnsweringService
 from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
@@ -393,37 +398,101 @@ def get_rag_search_service() -> SemanticSearchService:
     )
 
 
-def get_rag_answering_service() -> RAGAnsweringService:
-    """Build grounded production RAG answer generation."""
+def get_llm_gateway() -> LLMGateway:
+    """Build the configured provider-neutral LLM gateway."""
 
-    api_key = os.getenv(
+    default_provider = os.getenv(
+        "RKJO_LLM_PROVIDER",
+        "openai",
+    ).strip().lower()
+
+    registry = LLMProviderRegistry()
+
+    openai_key = os.getenv(
         "OPENAI_API_KEY",
         "",
     ).strip()
 
-    if not api_key:
-        raise RuntimeError(
-            "OPENAI_API_KEY is required for RAG generation."
+    if openai_key:
+        registry.register(
+            "openai",
+            OpenAILLMAdapter(
+                api_key=openai_key,
+                default_model=os.getenv(
+                    "RKJO_OPENAI_MODEL",
+                    os.getenv(
+                        "RKJO_GENERATION_MODEL",
+                        "gpt-5-mini",
+                    ),
+                ).strip(),
+                timeout_seconds=float(
+                    os.getenv(
+                        "RKJO_GENERATION_TIMEOUT_SECONDS",
+                        "20",
+                    )
+                ),
+                max_retries=int(
+                    os.getenv(
+                        "RKJO_GENERATION_MAX_RETRIES",
+                        "2",
+                    )
+                ),
+            ),
         )
+
+    ollama_enabled = os.getenv(
+        "RKJO_OLLAMA_ENABLED",
+        "false",
+    ).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    if ollama_enabled or default_provider == "ollama":
+        registry.register(
+            "ollama",
+            OllamaLLMAdapter(
+                base_url=os.getenv(
+                    "RKJO_OLLAMA_BASE_URL",
+                    "http://127.0.0.1:11434",
+                ),
+                default_model=os.getenv(
+                    "RKJO_OLLAMA_MODEL",
+                    "qwen3:8b",
+                ),
+                timeout_seconds=float(
+                    os.getenv(
+                        "RKJO_OLLAMA_TIMEOUT_SECONDS",
+                        "60",
+                    )
+                ),
+            ),
+            is_local=True,
+        )
+
+    if not registry.contains(default_provider):
+        raise RuntimeError(
+            f"Configured LLM provider '{default_provider}' is unavailable. "
+            "Check provider credentials and RKJO LLM configuration."
+        )
+
+    return LLMGateway(
+        router=LLMRouter(
+            registry=registry,
+            default_provider=default_provider,
+        )
+    )
+
+
+def get_rag_answering_service() -> RAGAnsweringService:
+    """Build grounded RAG generation through the RKJO LLM gateway."""
 
     model = os.getenv(
         "RKJO_GENERATION_MODEL",
-        "gpt-5-mini",
-    ).strip()
-
-    timeout_seconds = float(
-        os.getenv(
-            "RKJO_GENERATION_TIMEOUT_SECONDS",
-            "20",
-        )
-    )
-
-    max_retries = int(
-        os.getenv(
-            "RKJO_GENERATION_MAX_RETRIES",
-            "2",
-        )
-    )
+        "",
+    ).strip() or None
 
     max_context_characters = int(
         os.getenv(
@@ -434,11 +503,9 @@ def get_rag_answering_service() -> RAGAnsweringService:
 
     return RAGAnsweringService(
         search_service=get_rag_search_service(),
-        generator=OpenAIAnswerGenerator(
-            api_key=api_key,
+        generator=LLMBackedAnswerGenerator(
+            gateway=get_llm_gateway(),
             model=model,
-            timeout_seconds=timeout_seconds,
-            max_retries=max_retries,
         ),
         context_builder=CitationContextBuilder(
             max_characters=max_context_characters,
@@ -450,7 +517,6 @@ def get_rag_answering_service() -> RAGAnsweringService:
             ),
         ),
     )
-
 
 def get_education_course_service():
     from rkjo_education.course.postgres_repository import (
