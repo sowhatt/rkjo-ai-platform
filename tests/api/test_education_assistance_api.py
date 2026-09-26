@@ -33,7 +33,8 @@ def test_hint_request_publishes_canonical_event(monkeypatch):
     monkeypatch.setenv("RKJO_OPERATOR_TENANT_ID", str(TENANT_ID))
     app.dependency_overrides[get_education_event_publisher] = lambda: publisher
     try:
-        with TestClient(app) as client:
+        client = TestClient(app)
+        try:
             response = client.post(
                 "/education/hints",
                 headers={"X-API-Key": "rkjo-operator-key"},
@@ -45,6 +46,8 @@ def test_hint_request_publishes_canonical_event(monkeypatch):
                     "competency_code": "MATH.ADD",
                 },
             )
+        finally:
+            client.close()
     finally:
         app.dependency_overrides.clear()
 
