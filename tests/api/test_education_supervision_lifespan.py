@@ -1,4 +1,3 @@
-import importlib
 from unittest.mock import patch
 
 import pytest
@@ -29,7 +28,6 @@ async def test_supervision_consumer_can_be_enabled(monkeypatch):
         "true",
     )
     import rkjo_api.main as main_module
-    importlib.reload(main_module)
 
     class FakeBus:
         def __init__(self):
@@ -46,12 +44,18 @@ async def test_supervision_consumer_can_be_enabled(monkeypatch):
             self.closed = True
 
     fake_bus = FakeBus()
-    with patch.object(
-        main_module,
-        "get_event_bus",
-        return_value=fake_bus,
+    with (
+        patch.object(
+            main_module,
+            "get_event_bus",
+            return_value=fake_bus,
+        ),
+        patch.object(
+            main_module,
+            "get_supervision_projection",
+        ),
     ):
-        async with main_module.app.router.lifespan_context(main_module.app):
+        async with main_module.lifespan(main_module.app):
             pass
 
     assert fake_bus.stopped is True
