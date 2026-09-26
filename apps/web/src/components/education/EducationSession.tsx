@@ -101,6 +101,7 @@ export default function EducationSession() {
 
   const learnerId = searchParams.get("learnerId") ?? "";
   const courseId = searchParams.get("courseId") ?? "";
+  const assessmentId = searchParams.get("assessmentId") ?? "";
 
   const [progress, setProgress] =
     useState<Progress | null>(null);
@@ -268,14 +269,19 @@ export default function EducationSession() {
       setError("");
 
       try {
-        const response = await fetch(
-          `/api/education/courses/${encodeURIComponent(
-            courseId,
-          )}/assessments`,
-          {
-            cache: "no-store",
-          },
-        );
+        const response = assessmentId
+          ? await fetch(
+              `/api/education/assessments/${encodeURIComponent(
+                assessmentId,
+              )}/learner`,
+              { cache: "no-store" },
+            )
+          : await fetch(
+              `/api/education/courses/${encodeURIComponent(
+                courseId,
+              )}/assessments`,
+              { cache: "no-store" },
+            );
 
         const payload = await response.json();
 
@@ -288,7 +294,9 @@ export default function EducationSession() {
 
         if (!cancelled) {
           setAssessments(
-            payload as LearnerAssessment[],
+            assessmentId
+              ? [payload as LearnerAssessment]
+              : (payload as LearnerAssessment[]),
           );
         }
       } catch (cause) {
@@ -311,7 +319,7 @@ export default function EducationSession() {
     return () => {
       cancelled = true;
     };
-  }, [learnerId, courseId]);
+  }, [learnerId, courseId, assessmentId]);
 
   async function ensureAttempt() {
     if (attempt) {
