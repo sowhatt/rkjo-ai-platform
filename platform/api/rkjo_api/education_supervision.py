@@ -12,6 +12,11 @@ from rkjo_education.supervision import (
     LearnerSupervisionProjection,
     LearnerSupervisionState,
 )
+from rkjo_education.supervision.alerts import SupervisionAlert, alerts_for_state
+
+class LearnerSupervisionDetail(LearnerSupervisionState):
+    alerts: list[SupervisionAlert] = []
+
 
 router = APIRouter(
     prefix="/education/supervision",
@@ -44,6 +49,30 @@ def get_learner_snapshot(
             detail="Learner supervision state not found.",
         )
     return state
+
+
+@router.get(
+    "/learners/{learner_id}/detail",
+    response_model=LearnerSupervisionDetail,
+)
+def get_learner_detail(
+    learner_id: UUID,
+    request: Request,
+    projection: LearnerSupervisionProjection = Depends(get_supervision_projection),
+) -> LearnerSupervisionDetail:
+    state = projection.get(
+        tenant_id=require_uuid_tenant(request),
+        learner_id=learner_id,
+    )
+    if state is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Learner supervision state not found.",
+        )
+    return LearnerSupervisionDetail(
+        **state.model_dump(),
+        alerts=alerts_for_state(state),
+    )
 
 
 @router.get(
