@@ -151,13 +151,18 @@ def test_projection_ignores_invalid_autonomy_payload():
 
 
 def test_assessment_started_marks_learner_active():
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    assessment_id = uuid4()
     projection = LearnerSupervisionProjection()
-    event = make_event(
+    started = event(
         EducationEventType.ASSESSMENT_STARTED,
-        assessment_id=uuid4(),
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        assessment_id=assessment_id,
     )
 
-    state = projection.apply(event)
+    state = projection.apply(started)
 
     assert state.active is True
-    assert state.assessment_id == event.assessment_id
+    assert state.assessment_id == assessment_id
