@@ -34,7 +34,10 @@ class LearnerSupervisionProjection:
             "last_event_id": event.event_id,
         }
 
-        if event.event_type == EducationEventType.SESSION_STARTED:
+        if event.event_type in (
+            EducationEventType.SESSION_STARTED,
+            EducationEventType.ASSESSMENT_STARTED,
+        ):
             updates["active"] = True
         elif event.event_type == EducationEventType.SESSION_COMPLETED:
             updates["active"] = False
