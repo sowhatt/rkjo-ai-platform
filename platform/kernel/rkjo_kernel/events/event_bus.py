@@ -78,6 +78,16 @@ class EventBus(ABC):
 
         pass
 
+    def stop_consuming(self) -> None:
+        """
+        Demande au consommateur bloquant de s'arrêter proprement.
+
+        Les implémentations sans boucle de consommation peuvent conserver
+        ce comportement par défaut.
+        """
+
+        return None
+
     @abstractmethod
     def close(self) -> None:
         """
