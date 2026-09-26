@@ -1,4 +1,4 @@
-const API_URL = process.env.RKJO_API_URL ?? "http://127.0.0.1:8000";
+const API_URL = process.env.RKJO_API_URL ?? "http://127.0.0.1:8100";
 const API_KEY = process.env.RKJO_VIEWER_API_KEY ?? process.env.RKJO_OPERATOR_API_KEY ?? "";
 
 export async function GET() {
