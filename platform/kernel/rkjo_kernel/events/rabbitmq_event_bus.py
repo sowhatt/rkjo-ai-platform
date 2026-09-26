@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from threading import Event
 
 import pika
 
@@ -36,6 +37,7 @@ class RabbitMQEventBus(EventBus):
         self.max_delivery_attempts = max_delivery_attempts
         self.dlq_suffix = dlq_suffix.strip()
         self.logger = get_logger("rkjo.events.rabbitmq")
+        self._stop_requested = Event()
 
         self.logger.info("Connecting to RabbitMQ...")
 
@@ -127,7 +129,7 @@ class RabbitMQEventBus(EventBus):
             queue_name,
         )
 
-        self.channel.start_consuming()
+        self._consume_until_stopped()
 
     def publish_agent_message(
         self,
@@ -226,7 +228,15 @@ class RabbitMQEventBus(EventBus):
             queue_name,
         )
 
-        self.channel.start_consuming()
+        self._consume_until_stopped()
+
+    def _consume_until_stopped(self) -> None:
+        """Drive Pika on the owning thread until shutdown is requested."""
+        while not self._stop_requested.is_set():
+            self.connection.process_data_events(time_limit=0.25)
+
+        if self.channel and self.channel.is_open:
+            self.channel.stop_consuming()
 
     def _retry_or_dead_letter(
         self,
@@ -355,17 +365,8 @@ class RabbitMQEventBus(EventBus):
         return f"{queue_name}{self.dlq_suffix}"
 
     def stop_consuming(self) -> None:
-        """Request a blocking consumer stop on its connection thread."""
-        if not self.connection or not self.connection.is_open:
-            return
-        if not self.channel or not self.channel.is_open:
-            return
-        if not self.channel.is_consuming:
-            return
-
-        self.connection.add_callback_threadsafe(
-            self.channel.stop_consuming
-        )
+        """Signal the consumer loop without touching Pika cross-thread."""
+        self._stop_requested.set()
 
     def close(self) -> None:
         """Close the RabbitMQ connection cleanly."""
