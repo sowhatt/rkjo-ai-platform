@@ -21,6 +21,9 @@ from rkjo_api.education import (
 from rkjo_api.education_tutor import (
     router as education_tutor_router,
 )
+from rkjo_api.education_assistance import (
+    router as education_assistance_router,
+)
 from rkjo_api.education_supervision import (
     router as education_supervision_router,
 )
@@ -109,6 +112,9 @@ app.include_router(
 )
 app.include_router(
     education_tutor_router
+)
+app.include_router(
+    education_assistance_router
 )
 app.include_router(
     education_supervision_router
