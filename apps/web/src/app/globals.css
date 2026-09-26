@@ -2046,3 +2046,86 @@ body {
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/* RKJO Education — learner supervision detail */
+.supervision-detail {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid var(--rkjo-border);
+  border-radius: var(--rkjo-radius-lg);
+  background: var(--rkjo-surface);
+  box-shadow: var(--rkjo-shadow-card);
+}
+.supervision-detail-button,
+.supervision-detail-close {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--rkjo-border);
+  border-radius: var(--rkjo-radius-md);
+  background: var(--rkjo-surface);
+  color: var(--rkjo-blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+.supervision-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+.supervision-detail-grid article {
+  padding: 18px;
+  border: 1px solid var(--rkjo-border);
+  border-radius: var(--rkjo-radius-md);
+  background: #f8fafc;
+}
+.supervision-detail-grid span,
+.supervision-detail-context span,
+.supervision-alert span {
+  display: block;
+  color: var(--rkjo-muted);
+}
+.supervision-detail-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--rkjo-navy);
+  font-size: 1.35rem;
+}
+.supervision-detail-context {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+  margin-top: 18px;
+}
+.supervision-detail-context p {
+  margin: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rkjo-border);
+}
+.supervision-alerts { margin-top: 22px; }
+.supervision-alert {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px solid #fde68a;
+  border-radius: var(--rkjo-radius-md);
+  background: var(--rkjo-warning-soft);
+  color: var(--rkjo-warning);
+}
+.supervision-alert.critical {
+  border-color: #fecaca;
+  background: var(--rkjo-danger-soft);
+  color: var(--rkjo-danger);
+}
+.supervision-alert span { margin-top: 4px; }
+.supervision-alert-ok {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: var(--rkjo-radius-md);
+  background: var(--rkjo-success-soft);
+  color: var(--rkjo-success);
+}
+@media (max-width: 850px) {
+  .supervision-detail-grid,
+  .supervision-detail-context { grid-template-columns: 1fr; }
+}
