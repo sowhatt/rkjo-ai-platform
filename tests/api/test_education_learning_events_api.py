@@ -104,7 +104,8 @@ def test_start_attempt_publishes_assessment_started(monkeypatch):
     app.dependency_overrides[get_education_assessment_service] = lambda: FakeAssessmentService()
     app.dependency_overrides[get_education_event_publisher] = lambda: publisher
     try:
-        with TestClient(app) as client:
+        client = TestClient(app)
+        try:
             response = client.post(
                 "/education/attempts",
                 headers=_headers(monkeypatch),
@@ -113,6 +114,8 @@ def test_start_attempt_publishes_assessment_started(monkeypatch):
                     "learner_id": str(LEARNER_ID),
                 },
             )
+        finally:
+            client.close()
     finally:
         app.dependency_overrides.clear()
 
@@ -133,7 +136,8 @@ def test_submit_attempt_publishes_learning_chain(monkeypatch):
     )
     app.dependency_overrides[get_education_event_publisher] = lambda: publisher
     try:
-        with TestClient(app) as client:
+        client = TestClient(app)
+        try:
             response = client.post(
                 f"/education/attempts/{ATTEMPT_ID}/submit",
                 headers=_headers(monkeypatch),
@@ -148,6 +152,8 @@ def test_submit_attempt_publishes_learning_chain(monkeypatch):
                     },
                 },
             )
+        finally:
+            client.close()
     finally:
         app.dependency_overrides.clear()
 
