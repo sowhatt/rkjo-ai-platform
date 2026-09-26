@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from time import perf_counter
 
+from rkjo_kernel.mission.execution_context import ExecutionContext
 from rkjo_kernel.rag.context_builder import (
     CitationContextBuilder,
 )
@@ -47,6 +48,7 @@ class RAGAnsweringService:
         *,
         limit: int = 5,
         filters: RetrievalFilters | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> RAGAnswer:
         if not question.strip():
             raise ValueError(
@@ -114,10 +116,15 @@ class RAGAnsweringService:
 
         generation_started = perf_counter()
 
-        answer = self.generator.generate(
-            question=search.sanitized_query,
-            context=context.content,
-        )
+        generation_kwargs = {
+            "question": search.sanitized_query,
+            "context": context.content,
+        }
+
+        if execution_context is not None:
+            generation_kwargs["execution_context"] = execution_context
+
+        answer = self.generator.generate(**generation_kwargs)
 
         generation_ms = int(
             (
