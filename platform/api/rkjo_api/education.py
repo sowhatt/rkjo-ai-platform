@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from rkjo_api.dependencies import get_education_course_service
 from rkjo_api.education_dependencies import (
     get_education_assessment_learning_service,
+    get_education_event_publisher,
     get_education_assessment_service,
     get_education_learner_service,
     get_education_learning_service,
@@ -17,6 +18,7 @@ from rkjo_api.education_dependencies import (
 )
 from rkjo_api.identity import get_authenticated_identity
 from rkjo_education.assessment.models import AttemptAnswerEvidence
+from rkjo_education.events import EducationEventPublisher, EducationEventType, EducationLearningEvent
 from rkjo_education.assessment.service import (
     AssessmentNotFoundError,
     AssessmentService,
@@ -510,13 +512,21 @@ def start_attempt(
     payload: AttemptStartRequest,
     request: Request,
     service: AssessmentService = Depends(get_education_assessment_service),
+    event_publisher: EducationEventPublisher = Depends(get_education_event_publisher),
 ) -> AttemptResponse:
+    tenant_id = require_uuid_tenant(request)
     try:
         attempt = service.start_attempt(
-            tenant_id=require_uuid_tenant(request),
+            tenant_id=tenant_id,
             assessment_id=payload.assessment_id,
             learner_id=payload.learner_id,
         )
+        event_publisher.publish(EducationLearningEvent(
+            event_type=EducationEventType.ASSESSMENT_STARTED,
+            tenant_id=tenant_id,
+            learner_id=payload.learner_id,
+            assessment_id=payload.assessment_id,
+        ))
     except AssessmentNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Assessment not found.") from exc
     return AttemptResponse(
@@ -541,10 +551,12 @@ def submit_attempt(
     service=Depends(
         get_education_assessment_learning_service
     ),
+    event_publisher: EducationEventPublisher = Depends(get_education_event_publisher),
 ) -> AttemptSubmitResponse:
+    tenant_id = require_uuid_tenant(request)
     try:
         result = service.submit_attempt(
-            tenant_id=require_uuid_tenant(request),
+            tenant_id=tenant_id,
             attempt_id=attempt_id,
             answers=payload.answers,
             evidence={
@@ -569,6 +581,53 @@ def submit_attempt(
         ) from exc
 
     attempt = result.attempt
+
+    for item in result.learning:
+        event_publisher.publish(EducationLearningEvent(
+            event_type=EducationEventType.ANSWER_SUBMITTED,
+            tenant_id=tenant_id,
+            learner_id=attempt.learner_id,
+            assessment_id=attempt.assessment_id,
+            question_id=item.question_id,
+            competency_code=item.competency_code,
+            payload={"correct": item.correct},
+        ))
+        event_publisher.publish(EducationLearningEvent(
+            event_type=EducationEventType.AUTONOMY_UPDATED,
+            tenant_id=tenant_id,
+            learner_id=attempt.learner_id,
+            assessment_id=attempt.assessment_id,
+            question_id=item.question_id,
+            competency_code=item.competency_code,
+            payload={"autonomy_score": item.autonomy_score},
+        ))
+        event_publisher.publish(EducationLearningEvent(
+            event_type=EducationEventType.MASTERY_UPDATED,
+            tenant_id=tenant_id,
+            learner_id=attempt.learner_id,
+            assessment_id=attempt.assessment_id,
+            question_id=item.question_id,
+            competency_code=item.competency_code,
+            payload={"mastery": item.mastery},
+        ))
+        if item.proof_required:
+            event_publisher.publish(EducationLearningEvent(
+                event_type=EducationEventType.PROOF_REQUESTED,
+                tenant_id=tenant_id,
+                learner_id=attempt.learner_id,
+                assessment_id=attempt.assessment_id,
+                question_id=item.question_id,
+                competency_code=item.competency_code,
+                payload={"proof_challenge_id": str(item.proof_challenge_id)},
+            ))
+
+    event_publisher.publish(EducationLearningEvent(
+        event_type=EducationEventType.ASSESSMENT_COMPLETED,
+        tenant_id=tenant_id,
+        learner_id=attempt.learner_id,
+        assessment_id=attempt.assessment_id,
+        payload={"percentage": attempt.percentage},
+    ))
 
     return AttemptSubmitResponse(
         id=attempt.id,
