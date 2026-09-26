@@ -730,6 +730,9 @@ def submit_proof_challenge(
     service: ProofApplicationService = Depends(
         get_education_proof_service
     ),
+    event_publisher: EducationEventPublisher = Depends(
+        get_education_event_publisher
+    ),
 ):
     identity = get_authenticated_identity(request)
     tenant_id = UUID(str(identity.tenant_id))
@@ -758,6 +761,19 @@ def submit_proof_challenge(
             status_code=409,
             detail=str(exc),
         ) from exc
+
+    event_publisher.publish(EducationLearningEvent(
+        event_type=(
+            EducationEventType.PROOF_PASSED
+            if result.independently_verified
+            else EducationEventType.PROOF_FAILED
+        ),
+        tenant_id=tenant_id,
+        learner_id=challenge.learner_id,
+        course_id=challenge.course_id,
+        competency_code=result.competency_code,
+        payload={"challenge_id": str(challenge.id)},
+    ))
 
     return ProofSubmitResponse(
         challenge_id=challenge.id,
