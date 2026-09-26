@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from rkjo_api.dependencies import get_database_url, get_rag_answering_service
+from rkjo_api.dependencies import get_database_url, get_event_bus, get_rag_answering_service
 from rkjo_education.assessment.postgres_repository import PostgresAssessmentRepository
 from rkjo_education.course.postgres_repository import PostgresCourseRepository
 from rkjo_education.assessment.service import AssessmentService
@@ -116,3 +116,9 @@ def get_education_assessment_learning_service():
         assessment_service=assessment_service,
         learning_evaluation_service=learning_evaluation_service,
     )
+
+
+def get_education_event_publisher():
+    from rkjo_education.events import EducationEventPublisher
+
+    return EducationEventPublisher(get_event_bus())
