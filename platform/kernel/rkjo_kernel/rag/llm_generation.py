@@ -6,7 +6,9 @@ from rkjo_kernel.llm.models import (
     LLMMessage,
     LLMRequest,
 )
+from rkjo_kernel.llm.gateway import LLMGateway
 from rkjo_kernel.llm.port import LLMPort
+from rkjo_kernel.mission.execution_context import ExecutionContext
 from rkjo_kernel.rag.generation_models import (
     AnswerGenerator,
 )
@@ -34,13 +36,20 @@ class LLMBackedAnswerGenerator(AnswerGenerator):
     def __init__(
         self,
         *,
-        llm: LLMPort,
+        llm: LLMPort | None = None,
+        gateway: LLMGateway | None = None,
         model: str | None = None,
     ) -> None:
+        if (llm is None) == (gateway is None):
+            raise ValueError(
+                "Exactly one of llm or gateway must be provided."
+            )
+
         if model is not None and not model.strip():
             raise ValueError("model must not be empty.")
 
         self.llm = llm
+        self.gateway = gateway
         self.model = model
 
     def generate(
@@ -48,6 +57,7 @@ class LLMBackedAnswerGenerator(AnswerGenerator):
         *,
         question: str,
         context: str,
+        execution_context: ExecutionContext | None = None,
     ) -> str:
         if not question.strip():
             raise ValueError("question must not be empty.")
@@ -55,8 +65,7 @@ class LLMBackedAnswerGenerator(AnswerGenerator):
         if not context.strip():
             raise ValueError("context must not be empty.")
 
-        response = self.llm.generate(
-            LLMRequest(
+        request = LLMRequest(
                 messages=(
                     LLMMessage(
                         role="system",
@@ -73,10 +82,22 @@ class LLMBackedAnswerGenerator(AnswerGenerator):
                     ),
                 ),
                 model=self.model,
-                metadata={
-                    "workload": "rag_answer_generation",
-                },
-            )
+            metadata={
+                "workload": "rag_answer_generation",
+            },
         )
+
+        if self.gateway is not None:
+            if execution_context is None:
+                raise ValueError(
+                    "execution_context is required when using LLMGateway."
+                )
+            response = self.gateway.generate(
+                request,
+                context=execution_context,
+            )
+        else:
+            assert self.llm is not None
+            response = self.llm.generate(request)
 
         return response.content
