@@ -28,3 +28,7 @@ class EducationEventPublisher:
             self._queue_name,
             event.model_dump_json(),
         )
+
+    def close(self) -> None:
+        """Release the underlying EventBus resources owned by this publisher."""
+        self._event_bus.close()
