@@ -17,7 +17,7 @@ from rkjo_education.supervision.alerts import SupervisionAlert, alerts_for_state
 from rkjo_education.supervision.history import PostgresLearningEventHistory
 from rkjo_education.supervision.interventions import (
     TeacherIntervention,
-    TeacherInterventionStore,
+    PostgresTeacherInterventionStore,
     TeacherInterventionType,
 )
 from pydantic import BaseModel, Field
@@ -37,7 +37,6 @@ router = APIRouter(
 )
 
 _projection = LearnerSupervisionProjection()
-_interventions = TeacherInterventionStore()
 
 
 def get_supervision_projection() -> LearnerSupervisionProjection:
@@ -133,7 +132,9 @@ def create_teacher_intervention(
     tenant_id = require_uuid_tenant(request)
     if projection.get(tenant_id=tenant_id, learner_id=learner_id) is None:
         raise HTTPException(status_code=404, detail="Learner supervision state not found.")
-    return _interventions.create(TeacherIntervention(
+    interventions = PostgresTeacherInterventionStore(get_database_url())
+    interventions.initialize_schema()
+    return interventions.create(TeacherIntervention(
         tenant_id=tenant_id,
         learner_id=learner_id,
         intervention_type=payload.intervention_type,
@@ -149,7 +150,9 @@ def list_teacher_interventions(
     learner_id: UUID,
     request: Request,
 ) -> list[TeacherIntervention]:
-    return _interventions.list_for_learner(
+    interventions = PostgresTeacherInterventionStore(get_database_url())
+    interventions.initialize_schema()
+    return interventions.list_for_learner(
         tenant_id=require_uuid_tenant(request),
         learner_id=learner_id,
     )
