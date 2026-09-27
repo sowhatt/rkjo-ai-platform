@@ -39,6 +39,26 @@ export default function SupervisionPage() {
   const [message, setMessage] = useState("");
   const [selected, setSelected] = useState<LearnerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [interventionBusy, setInterventionBusy] = useState(false);
+
+  async function intervene(interventionType: "request_new_proof" | "assign_consolidation" | "send_message") {
+    if (!selected) return;
+    setInterventionBusy(true);
+    try {
+      const response = await fetch(`/api/education/supervision/learners/${selected.learner_id}/interventions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intervention_type: interventionType }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail ?? "Intervention impossible.");
+      setMessage("Intervention professeur enregistrée.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erreur inconnue.");
+    } finally {
+      setInterventionBusy(false);
+    }
+  }
 
   async function openLearner(learnerId: string) {
     setDetailLoading(true);
@@ -161,6 +181,14 @@ export default function SupervisionPage() {
                 <p><strong>Cours</strong><span>{selected.course_id ?? "Non renseigné"}</span></p>
                 <p><strong>Évaluation</strong><span>{selected.assessment_id ?? "Non renseignée"}</span></p>
                 <p><strong>Réponses</strong><span>{selected.answers_submitted}</span></p>
+              </div>
+              <div className="supervision-interventions">
+                <h3>Intervenir maintenant</h3>
+                <div className="supervision-intervention-actions">
+                  <button disabled={interventionBusy} onClick={() => void intervene("request_new_proof")}>Demander une nouvelle preuve</button>
+                  <button disabled={interventionBusy} onClick={() => void intervene("assign_consolidation")}>Exercice de consolidation</button>
+                  <button disabled={interventionBusy} onClick={() => void intervene("send_message")}>Envoyer un message</button>
+                </div>
               </div>
               <div className="supervision-alerts">
                 <h3>Alertes pédagogiques</h3>
