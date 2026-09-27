@@ -813,6 +813,15 @@ export default function EducationSession() {
                         ? "Ton professeur te demande une nouvelle preuve d’apprentissage."
                         : "Ton professeur t’a proposé un exercice de consolidation."}
                   </p>
+                  {item.intervention_type === "request_new_proof" && item.message ? (
+                    <button
+                      type="button"
+                      className="rkjo-start"
+                      onClick={() => void loadProof(item.message!)}
+                    >
+                      Commencer la nouvelle preuve
+                    </button>
+                  ) : null}
                   {item.status !== "acknowledged" ? (
                     <button
                       type="button"
