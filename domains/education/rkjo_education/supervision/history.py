@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from uuid import UUID
 
 import psycopg
@@ -38,11 +37,30 @@ class PostgresLearningEventHistory:
                    (event_id, tenant_id, learner_id, occurred_at, event_type, event_json)
                    VALUES (%s, %s, %s, %s, %s, %s::jsonb)
                    ON CONFLICT (event_id) DO NOTHING""",
-                (event.event_id, event.tenant_id, event.learner_id, event.occurred_at,
-                 event.event_type.value, event.model_dump_json()),
+                (
+                    event.event_id,
+                    event.tenant_id,
+                    event.learner_id,
+                    event.occurred_at,
+                    event.event_type.value,
+                    event.model_dump_json(),
+                ),
             )
 
-    def list_for_learner(self, *, tenant_id: UUID, learner_id: UUID) -> list[EducationLearningEvent]:
+    def list_all(self) -> list[EducationLearningEvent]:
+        with psycopg.connect(self._database_url) as connection:
+            rows = connection.execute(
+                """SELECT event_json FROM education_learning_events
+                   ORDER BY occurred_at ASC, event_id ASC"""
+            ).fetchall()
+        return [EducationLearningEvent.model_validate(row[0]) for row in rows]
+
+    def list_for_learner(
+        self,
+        *,
+        tenant_id: UUID,
+        learner_id: UUID,
+    ) -> list[EducationLearningEvent]:
         with psycopg.connect(self._database_url) as connection:
             rows = connection.execute(
                 """SELECT event_json FROM education_learning_events
