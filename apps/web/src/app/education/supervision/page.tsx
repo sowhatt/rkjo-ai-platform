@@ -27,6 +27,13 @@ type LearnerState = {
 
 type LearnerDetail = LearnerState & { alerts: SupervisionAlert[] };
 
+type LearningEvent = {
+  event_id: string;
+  event_type: string;
+  occurred_at: string;
+  payload: Record<string, unknown>;
+};
+
 function alertLabel(code: SupervisionAlert["code"]) {
   if (code === "low_autonomy") return "Autonomie faible";
   if (code === "proof_failed") return "Preuve échouée";
@@ -40,6 +47,7 @@ export default function SupervisionPage() {
   const [selected, setSelected] = useState<LearnerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [interventionBusy, setInterventionBusy] = useState(false);
+  const [history, setHistory] = useState<LearningEvent[]>([]);
 
   async function intervene(interventionType: "request_new_proof" | "assign_consolidation" | "send_message") {
     if (!selected) return;
@@ -67,6 +75,10 @@ export default function SupervisionPage() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail ?? "Détail élève indisponible.");
       setSelected(body);
+      const historyResponse = await fetch(`/api/education/supervision/learners/${learnerId}/history`, { cache: "no-store" });
+      const historyBody = await historyResponse.json();
+      if (!historyResponse.ok) throw new Error(historyBody.detail ?? "Historique élève indisponible.");
+      setHistory(historyBody);
       setMessage("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur inconnue.");
@@ -189,6 +201,17 @@ export default function SupervisionPage() {
                   <button disabled={interventionBusy} onClick={() => void intervene("assign_consolidation")}>Exercice de consolidation</button>
                   <button disabled={interventionBusy} onClick={() => void intervene("send_message")}>Envoyer un message</button>
                 </div>
+              </div>
+              <div className="supervision-alerts">
+                <h3>Historique d’apprentissage</h3>
+                {history.length === 0 ? (
+                  <div className="supervision-alert-ok">Aucun événement pédagogique enregistré.</div>
+                ) : history.slice().reverse().map((event) => (
+                  <div key={event.event_id} className="supervision-alert">
+                    <strong>{event.event_type.replace("learner.", "").replaceAll(".", " ")}</strong>
+                    <span>{new Date(event.occurred_at).toLocaleString("fr-FR")}</span>
+                  </div>
+                ))}
               </div>
               <div className="supervision-alerts">
                 <h3>Alertes pédagogiques</h3>
