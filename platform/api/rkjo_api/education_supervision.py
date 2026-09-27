@@ -158,6 +158,43 @@ def list_teacher_interventions(
     )
 
 
+@router.post(
+    "/learners/{learner_id}/interventions/delivered",
+    response_model=list[TeacherIntervention],
+)
+def mark_teacher_interventions_delivered(
+    learner_id: UUID,
+    request: Request,
+) -> list[TeacherIntervention]:
+    interventions = PostgresTeacherInterventionStore(get_database_url())
+    interventions.initialize_schema()
+    return interventions.mark_delivered(
+        tenant_id=require_uuid_tenant(request),
+        learner_id=learner_id,
+    )
+
+
+@router.post(
+    "/learners/{learner_id}/interventions/{intervention_id}/acknowledge",
+    response_model=TeacherIntervention,
+)
+def acknowledge_teacher_intervention(
+    learner_id: UUID,
+    intervention_id: UUID,
+    request: Request,
+) -> TeacherIntervention:
+    interventions = PostgresTeacherInterventionStore(get_database_url())
+    interventions.initialize_schema()
+    intervention = interventions.acknowledge(
+        tenant_id=require_uuid_tenant(request),
+        learner_id=learner_id,
+        intervention_id=intervention_id,
+    )
+    if intervention is None:
+        raise HTTPException(status_code=404, detail="Teacher intervention not found.")
+    return intervention
+
+
 @router.get(
     "/snapshot",
     response_model=list[LearnerSupervisionState],
