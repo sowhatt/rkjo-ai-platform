@@ -7,6 +7,7 @@ from rkjo_education.events import (
     EducationLearningEvent,
 )
 from rkjo_education.supervision import LearnerSupervisionProjection
+from rkjo_education.supervision.history import PostgresLearningEventHistory
 
 
 class EducationSupervisionEventConsumer:
@@ -18,6 +19,7 @@ class EducationSupervisionEventConsumer:
         event_bus: EventBus,
         projection: LearnerSupervisionProjection,
         queue_name: str = EDUCATION_EVENTS_QUEUE,
+        history: PostgresLearningEventHistory | None = None,
     ) -> None:
         normalized_queue = queue_name.strip()
         if not normalized_queue:
@@ -25,6 +27,7 @@ class EducationSupervisionEventConsumer:
         self._event_bus = event_bus
         self._projection = projection
         self._queue_name = normalized_queue
+        self._history = history
 
     def consume(self) -> None:
         self._event_bus.consume(
@@ -34,4 +37,6 @@ class EducationSupervisionEventConsumer:
 
     def _handle_message(self, message: str) -> None:
         event = EducationLearningEvent.model_validate_json(message)
+        if self._history is not None:
+            self._history.append(event)
         self._projection.apply(event)
