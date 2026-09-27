@@ -27,6 +27,16 @@ type LearnerState = {
 
 type LearnerDetail = LearnerState & { alerts: SupervisionAlert[] };
 
+type TeacherIntervention = {
+  intervention_id: string;
+  intervention_type: "request_new_proof" | "assign_consolidation" | "send_message";
+  message: string | null;
+  requested_at: string;
+  status: "requested" | "delivered" | "acknowledged";
+  delivered_at: string | null;
+  acknowledged_at: string | null;
+};
+
 type LearningEvent = {
   event_id: string;
   event_type: string;
@@ -48,6 +58,7 @@ export default function SupervisionPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [interventionBusy, setInterventionBusy] = useState(false);
   const [history, setHistory] = useState<LearningEvent[]>([]);
+  const [interventions, setInterventions] = useState<TeacherIntervention[]>([]);
   const [teacherMessage, setTeacherMessage] = useState("");
 
   async function intervene(interventionType: "request_new_proof" | "assign_consolidation" | "send_message", interventionMessage?: string) {
@@ -63,11 +74,22 @@ export default function SupervisionPage() {
       if (!response.ok) throw new Error(body.detail ?? "Intervention impossible.");
       setMessage("Intervention professeur enregistrée.");
       if (interventionType === "send_message") setTeacherMessage("");
+      await loadInterventions(selected.learner_id);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur inconnue.");
     } finally {
       setInterventionBusy(false);
     }
+  }
+
+  async function loadInterventions(learnerId: string) {
+    const response = await fetch(
+      `/api/education/supervision/learners/${learnerId}/interventions`,
+      { cache: "no-store" },
+    );
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail ?? "Interventions indisponibles.");
+    setInterventions(body as TeacherIntervention[]);
   }
 
   async function openLearner(learnerId: string) {
@@ -81,6 +103,7 @@ export default function SupervisionPage() {
       const historyBody = await historyResponse.json();
       if (!historyResponse.ok) throw new Error(historyBody.detail ?? "Historique élève indisponible.");
       setHistory(historyBody);
+      await loadInterventions(learnerId);
       setMessage("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur inconnue.");
@@ -218,6 +241,36 @@ export default function SupervisionPage() {
                     Envoyer le message
                   </button>
                 </div>
+              </div>
+              <div className="supervision-alerts">
+                <h3>Suivi des interventions professeur</h3>
+                {interventions.length === 0 ? (
+                  <div className="supervision-alert-ok">Aucune intervention envoyée.</div>
+                ) : interventions.slice().reverse().map((item) => (
+                  <div key={item.intervention_id} className="supervision-alert">
+                    <strong>
+                      {item.intervention_type === "send_message"
+                        ? "Message"
+                        : item.intervention_type === "request_new_proof"
+                          ? "Nouvelle preuve"
+                          : "Consolidation"}
+                    </strong>
+                    <span>
+                      {item.status === "acknowledged"
+                        ? "✓ Pris en compte par l’élève"
+                        : item.status === "delivered"
+                          ? "Remis à l’élève"
+                          : "En attente de remise"}
+                    </span>
+                    {item.message ? <span>{item.message}</span> : null}
+                    <small>
+                      Envoyé {new Date(item.requested_at).toLocaleString("fr-FR")}
+                      {item.acknowledged_at
+                        ? ` · Pris en compte ${new Date(item.acknowledged_at).toLocaleString("fr-FR")}`
+                        : ""}
+                    </small>
+                  </div>
+                ))}
               </div>
               <div className="supervision-alerts">
                 <h3>Historique d’apprentissage</h3>
