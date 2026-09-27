@@ -57,7 +57,9 @@ type ProofChallenge = {
   id: string;
   competency_code: string;
   prompt: string;
-  status: string;
+  status: "requested" | "delivered" | "acknowledged";
+  delivered_at?: string | null;
+  acknowledged_at?: string | null;
 };
 
 type ProofResult = {
@@ -215,7 +217,16 @@ export default function EducationSession() {
         );
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail ?? "Interventions professeur indisponibles.");
-        if (!cancelled) setTeacherInterventions(payload as TeacherIntervention[]);
+        let items = payload as TeacherIntervention[];
+        if (items.some((item) => item.status === "requested")) {
+          const deliveredResponse = await fetch(
+            `/api/education/learners/${encodeURIComponent(learnerId)}/interventions/delivered`,
+            { method: "POST", cache: "no-store" },
+          );
+          const deliveredPayload = await deliveredResponse.json();
+          if (deliveredResponse.ok) items = deliveredPayload as TeacherIntervention[];
+        }
+        if (!cancelled) setTeacherInterventions(items);
       } catch {
         if (!cancelled) setTeacherInterventions([]);
       }
@@ -231,7 +242,26 @@ export default function EducationSession() {
   }, [learnerId]);
 
   useEffect(() => {
-    if (!learnerId || !courseId) {
+    async function acknowledgeTeacherIntervention(interventionId: string) {
+    setError("");
+    try {
+      const response = await fetch(
+        `/api/education/learners/${encodeURIComponent(learnerId)}/interventions/${encodeURIComponent(interventionId)}/acknowledge`,
+        { method: "POST", cache: "no-store" },
+      );
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Impossible de confirmer la prise en compte.");
+      setTeacherInterventions((items) =>
+        items.map((item) =>
+          item.intervention_id === interventionId ? (payload as TeacherIntervention) : item,
+        ),
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Une erreur est survenue.");
+    }
+  }
+
+  if (!learnerId || !courseId) {
       return;
     }
 
@@ -775,13 +805,26 @@ export default function EducationSession() {
             {teacherInterventions.slice(-3).reverse().map((item) => (
               <div key={item.intervention_id} className="rkjo-tutor-intro">
                 <span>👩‍🏫</span>
-                <p>
-                  {item.intervention_type === "send_message"
-                    ? item.message ?? "Ton professeur t’a envoyé un message."
-                    : item.intervention_type === "request_new_proof"
-                      ? "Ton professeur te demande une nouvelle preuve d’apprentissage."
-                      : "Ton professeur t’a proposé un exercice de consolidation."}
-                </p>
+                <div>
+                  <p>
+                    {item.intervention_type === "send_message"
+                      ? item.message ?? "Ton professeur t’a envoyé un message."
+                      : item.intervention_type === "request_new_proof"
+                        ? "Ton professeur te demande une nouvelle preuve d’apprentissage."
+                        : "Ton professeur t’a proposé un exercice de consolidation."}
+                  </p>
+                  {item.status !== "acknowledged" ? (
+                    <button
+                      type="button"
+                      className="rkjo-start"
+                      onClick={() => void acknowledgeTeacherIntervention(item.intervention_id)}
+                    >
+                      J’ai pris en compte
+                    </button>
+                  ) : (
+                    <small>✓ Pris en compte</small>
+                  )}
+                </div>
               </div>
             ))}
           </section>
