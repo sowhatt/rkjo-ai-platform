@@ -76,12 +76,13 @@ async def lifespan(app: FastAPI):
         "false",
     ).strip().lower() in {"1", "true", "yes", "on"}
 
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    projection = get_supervision_projection()
+    projection.restore(history.list_all())
+
     if enabled:
         event_bus = get_event_bus()
-        history = PostgresLearningEventHistory(get_database_url())
-        history.initialize_schema()
-        projection = get_supervision_projection()
-        projection.restore(history.list_all())
         consumer = EducationSupervisionEventConsumer(
             event_bus=event_bus,
             projection=projection,
