@@ -72,3 +72,36 @@ def test_intervention_insert_is_idempotent():
         tenant_id=intervention.tenant_id,
         learner_id=intervention.learner_id,
     ) == [intervention]
+
+
+def test_intervention_delivery_and_acknowledgement_lifecycle():
+    store = PostgresTeacherInterventionStore(DATABASE_URL)
+    store.initialize_schema()
+    tenant_id, learner_id = uuid4(), uuid4()
+    created = store.create(TeacherIntervention(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        intervention_type=TeacherInterventionType.SEND_MESSAGE,
+        message="Je suis ton travail.",
+    ))
+
+    delivered = store.mark_delivered(tenant_id=tenant_id, learner_id=learner_id)
+    current = next(item for item in delivered if item.intervention_id == created.intervention_id)
+    assert current.status.value == "delivered"
+    assert current.delivered_at is not None
+    assert current.acknowledged_at is None
+
+    acknowledged = store.acknowledge(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        intervention_id=created.intervention_id,
+    )
+    assert acknowledged is not None
+    assert acknowledged.status.value == "acknowledged"
+    assert acknowledged.delivered_at is not None
+    assert acknowledged.acknowledged_at is not None
+
+    restarted = PostgresTeacherInterventionStore(DATABASE_URL)
+    saved = restarted.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+    current = next(item for item in saved if item.intervention_id == created.intervention_id)
+    assert current.status.value == "acknowledged"
