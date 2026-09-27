@@ -8,6 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import StreamingResponse
 
 from rkjo_api.education import require_uuid_tenant
+from rkjo_api.education_dependencies import get_education_event_publisher, get_education_proof_service
+from rkjo_education.events import EducationEventPublisher, EducationEventType, EducationLearningEvent
+from rkjo_education.intelligence.proof_application import ProofApplicationService, ProofQuestionNotFoundError
 from rkjo_api.dependencies import get_database_url
 from rkjo_education.supervision import (
     LearnerSupervisionProjection,
@@ -128,17 +131,88 @@ def create_teacher_intervention(
     payload: TeacherInterventionRequest,
     request: Request,
     projection: LearnerSupervisionProjection = Depends(get_supervision_projection),
+    proof_service: ProofApplicationService = Depends(get_education_proof_service),
+    event_publisher: EducationEventPublisher = Depends(get_education_event_publisher),
 ) -> TeacherIntervention:
     tenant_id = require_uuid_tenant(request)
-    if projection.get(tenant_id=tenant_id, learner_id=learner_id) is None:
+    state = projection.get(tenant_id=tenant_id, learner_id=learner_id)
+    if state is None:
         raise HTTPException(status_code=404, detail="Learner supervision state not found.")
+
+    message = payload.message
+    if payload.intervention_type == TeacherInterventionType.REQUEST_NEW_PROOF:
+        if state.assessment_id is None:
+            raise HTTPException(status_code=409, detail="No active assessment is available for a proof request.")
+
+        history = PostgresLearningEventHistory(get_database_url())
+        history.initialize_schema()
+        events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+        source_event = next(
+            (
+                event for event in reversed(events)
+                if event.assessment_id == state.assessment_id
+                and event.question_id is not None
+                and event.competency_code
+                and event.event_type in {
+                    EducationEventType.ANSWER_SUBMITTED,
+                    EducationEventType.MASTERY_UPDATED,
+                    EducationEventType.AUTONOMY_UPDATED,
+                }
+            ),
+            None,
+        )
+        if source_event is None:
+            raise HTTPException(status_code=409, detail="No assessed competency is available for a proof request.")
+
+        from rkjo_api.education_dependencies import get_education_assessment_service
+        assessment = get_education_assessment_service().get_assessment(
+            tenant_id=tenant_id,
+            assessment_id=state.assessment_id,
+        )
+        verification = next(
+            (
+                question for question in assessment.questions
+                if question.id != source_event.question_id
+                and (question.competency_code or "").strip() == source_event.competency_code
+            ),
+            None,
+        )
+        if verification is None:
+            raise HTTPException(
+                status_code=409,
+                detail="A different question testing the same competency is required for a new proof.",
+            )
+
+        try:
+            challenge = proof_service.create_challenge(
+                tenant_id=tenant_id,
+                learner_id=learner_id,
+                assessment_id=state.assessment_id,
+                source_question_id=source_event.question_id,
+                verification_question_id=verification.id,
+            )
+        except (ProofQuestionNotFoundError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+        event_publisher.publish(EducationLearningEvent(
+            event_type=EducationEventType.PROOF_REQUESTED,
+            tenant_id=tenant_id,
+            learner_id=learner_id,
+            course_id=state.course_id,
+            assessment_id=state.assessment_id,
+            question_id=source_event.question_id,
+            competency_code=source_event.competency_code,
+            payload={"proof_challenge_id": str(challenge.id), "requested_by": "teacher"},
+        ))
+        message = str(challenge.id)
+
     interventions = PostgresTeacherInterventionStore(get_database_url())
     interventions.initialize_schema()
     return interventions.create(TeacherIntervention(
         tenant_id=tenant_id,
         learner_id=learner_id,
         intervention_type=payload.intervention_type,
-        message=payload.message,
+        message=message,
     ))
 
 
