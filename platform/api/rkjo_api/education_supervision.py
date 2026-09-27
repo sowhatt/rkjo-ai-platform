@@ -13,9 +13,20 @@ from rkjo_education.supervision import (
     LearnerSupervisionState,
 )
 from rkjo_education.supervision.alerts import SupervisionAlert, alerts_for_state
+from rkjo_education.supervision.interventions import (
+    TeacherIntervention,
+    TeacherInterventionStore,
+    TeacherInterventionType,
+)
+from pydantic import BaseModel, Field
 
 class LearnerSupervisionDetail(LearnerSupervisionState):
-    alerts: list[SupervisionAlert] = []
+    alerts: list[SupervisionAlert] = Field(default_factory=list)
+
+
+class TeacherInterventionRequest(BaseModel):
+    intervention_type: TeacherInterventionType
+    message: str | None = None
 
 
 router = APIRouter(
@@ -24,6 +35,7 @@ router = APIRouter(
 )
 
 _projection = LearnerSupervisionProjection()
+_interventions = TeacherInterventionStore()
 
 
 def get_supervision_projection() -> LearnerSupervisionProjection:
@@ -72,6 +84,42 @@ def get_learner_detail(
     return LearnerSupervisionDetail(
         **state.model_dump(),
         alerts=alerts_for_state(state),
+    )
+
+
+@router.post(
+    "/learners/{learner_id}/interventions",
+    response_model=TeacherIntervention,
+    status_code=201,
+)
+def create_teacher_intervention(
+    learner_id: UUID,
+    payload: TeacherInterventionRequest,
+    request: Request,
+    projection: LearnerSupervisionProjection = Depends(get_supervision_projection),
+) -> TeacherIntervention:
+    tenant_id = require_uuid_tenant(request)
+    if projection.get(tenant_id=tenant_id, learner_id=learner_id) is None:
+        raise HTTPException(status_code=404, detail="Learner supervision state not found.")
+    return _interventions.create(TeacherIntervention(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        intervention_type=payload.intervention_type,
+        message=payload.message,
+    ))
+
+
+@router.get(
+    "/learners/{learner_id}/interventions",
+    response_model=list[TeacherIntervention],
+)
+def list_teacher_interventions(
+    learner_id: UUID,
+    request: Request,
+) -> list[TeacherIntervention]:
+    return _interventions.list_for_learner(
+        tenant_id=require_uuid_tenant(request),
+        learner_id=learner_id,
     )
 
 
