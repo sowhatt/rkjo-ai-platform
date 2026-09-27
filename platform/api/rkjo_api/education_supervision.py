@@ -110,9 +110,11 @@ def replay_learner_history(
     events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
     if not events:
         raise HTTPException(status_code=404, detail="Learner history not found.")
-    state = None
-    for event in events:
-        state = projection.apply(event)
+    state = projection.replay(
+        events,
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+    )
     assert state is not None
     return state
 
