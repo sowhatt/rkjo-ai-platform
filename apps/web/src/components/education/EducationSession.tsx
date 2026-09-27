@@ -73,6 +73,14 @@ type TutorSource = {
   score: number;
 };
 
+type TeacherIntervention = {
+  intervention_id: string;
+  intervention_type: "request_new_proof" | "assign_consolidation" | "send_message";
+  message: string | null;
+  requested_at: string;
+  status: string;
+};
+
 type TutorAnswer = {
   answer: string;
   level: string;
@@ -148,6 +156,9 @@ export default function EducationSession() {
   const [tutor, setTutor] =
     useState<TutorAnswer | null>(null);
 
+  const [teacherInterventions, setTeacherInterventions] =
+    useState<TeacherIntervention[]>([]);
+
   const [loadingProgress, setLoadingProgress] =
     useState(Boolean(learnerId && courseId));
 
@@ -190,6 +201,34 @@ export default function EducationSession() {
       ) ?? null
     );
   }, [result, currentQuestion]);
+
+  useEffect(() => {
+    if (!learnerId) return;
+
+    let cancelled = false;
+
+    async function loadTeacherInterventions() {
+      try {
+        const response = await fetch(
+          `/api/education/learners/${encodeURIComponent(learnerId)}/interventions`,
+          { cache: "no-store" },
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail ?? "Interventions professeur indisponibles.");
+        if (!cancelled) setTeacherInterventions(payload as TeacherIntervention[]);
+      } catch {
+        if (!cancelled) setTeacherInterventions([]);
+      }
+    }
+
+    void loadTeacherInterventions();
+    const timer = window.setInterval(loadTeacherInterventions, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [learnerId]);
 
   useEffect(() => {
     if (!learnerId || !courseId) {
@@ -728,6 +767,24 @@ export default function EducationSession() {
           <div className="rkjo-session-error">
             {error}
           </div>
+        ) : null}
+
+        {teacherInterventions.length > 0 ? (
+          <section className="rkjo-session-main" aria-live="polite">
+            <span className="rkjo-edu-kicker">MESSAGE DU PROFESSEUR</span>
+            {teacherInterventions.slice(-3).reverse().map((item) => (
+              <div key={item.intervention_id} className="rkjo-tutor-intro">
+                <span>👩‍🏫</span>
+                <p>
+                  {item.intervention_type === "send_message"
+                    ? item.message ?? "Ton professeur t’a envoyé un message."
+                    : item.intervention_type === "request_new_proof"
+                      ? "Ton professeur te demande une nouvelle preuve d’apprentissage."
+                      : "Ton professeur t’a proposé un exercice de consolidation."}
+                </p>
+              </div>
+            ))}
+          </section>
         ) : null}
 
         <section className="rkjo-session-layout">
