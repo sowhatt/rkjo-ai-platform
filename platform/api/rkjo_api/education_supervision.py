@@ -8,11 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import StreamingResponse
 
 from rkjo_api.education import require_uuid_tenant
+from rkjo_api.dependencies import get_database_url
 from rkjo_education.supervision import (
     LearnerSupervisionProjection,
     LearnerSupervisionState,
 )
 from rkjo_education.supervision.alerts import SupervisionAlert, alerts_for_state
+from rkjo_education.supervision.history import PostgresLearningEventHistory
 from rkjo_education.supervision.interventions import (
     TeacherIntervention,
     TeacherInterventionStore,
@@ -85,6 +87,34 @@ def get_learner_detail(
         **state.model_dump(),
         alerts=alerts_for_state(state),
     )
+
+
+@router.get("/learners/{learner_id}/history")
+def get_learner_history(learner_id: UUID, request: Request):
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    return history.list_for_learner(
+        tenant_id=require_uuid_tenant(request), learner_id=learner_id
+    )
+
+
+@router.post("/learners/{learner_id}/replay", response_model=LearnerSupervisionState)
+def replay_learner_history(
+    learner_id: UUID,
+    request: Request,
+    projection: LearnerSupervisionProjection = Depends(get_supervision_projection),
+) -> LearnerSupervisionState:
+    tenant_id = require_uuid_tenant(request)
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+    if not events:
+        raise HTTPException(status_code=404, detail="Learner history not found.")
+    state = None
+    for event in events:
+        state = projection.apply(event)
+    assert state is not None
+    return state
 
 
 @router.post(
