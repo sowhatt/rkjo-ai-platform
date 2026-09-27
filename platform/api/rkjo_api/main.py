@@ -39,6 +39,7 @@ from rkjo_api.security import (
 
 from rkjo_api.dependencies import (
     get_async_dispatcher,
+    get_database_url,
     get_event_bus,
     get_metrics_registry,
     get_workflow_agent_router,
@@ -60,6 +61,7 @@ from rkjo_kernel.workflow.repository.postgres import (
     PostgreSQLWorkflowRepository,
 )
 from rkjo_education.supervision import EducationSupervisionEventConsumer
+from rkjo_education.supervision.history import PostgresLearningEventHistory
 from rkjo_api.education_supervision import get_supervision_projection
 
 
@@ -76,9 +78,15 @@ async def lifespan(app: FastAPI):
 
     if enabled:
         event_bus = get_event_bus()
+        history = PostgresLearningEventHistory(get_database_url())
+        history.initialize_schema()
+        projection = get_supervision_projection()
+        for learner_id in []:
+            pass
         consumer = EducationSupervisionEventConsumer(
             event_bus=event_bus,
-            projection=get_supervision_projection(),
+            projection=projection,
+            history=history,
         )
         task = asyncio.create_task(
             asyncio.to_thread(consumer.consume),
