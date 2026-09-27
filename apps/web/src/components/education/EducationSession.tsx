@@ -241,8 +241,7 @@ export default function EducationSession() {
     };
   }, [learnerId]);
 
-  useEffect(() => {
-    async function acknowledgeTeacherIntervention(interventionId: string) {
+  async function acknowledgeTeacherIntervention(interventionId: string) {
     setError("");
     try {
       const response = await fetch(
@@ -261,7 +260,8 @@ export default function EducationSession() {
     }
   }
 
-  if (!learnerId || !courseId) {
+  useEffect(() => {
+    if (!learnerId || !courseId) {
       return;
     }
 
