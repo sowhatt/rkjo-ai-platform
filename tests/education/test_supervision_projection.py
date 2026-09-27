@@ -166,3 +166,63 @@ def test_assessment_started_marks_learner_active():
 
     assert state.active is True
     assert state.assessment_id == assessment_id
+
+
+
+def test_replay_rebuilds_learner_from_clean_state():
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    projection = LearnerSupervisionProjection()
+    submitted = event(
+        EducationEventType.ANSWER_SUBMITTED,
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+    )
+
+    projection.apply(submitted)
+    projection.apply(event(
+        EducationEventType.HINT_REQUESTED,
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+    ))
+
+    state = projection.replay(
+        [submitted],
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+    )
+
+    assert state is not None
+    assert state.answers_submitted == 1
+    assert state.hints_requested == 0
+
+
+def test_restore_rehydrates_multiple_tenants():
+    learner_id = uuid4()
+    tenant_a = uuid4()
+    tenant_b = uuid4()
+    projection = LearnerSupervisionProjection()
+
+    projection.restore([
+        event(
+            EducationEventType.AUTONOMY_UPDATED,
+            tenant_id=tenant_a,
+            learner_id=learner_id,
+            payload={"autonomy_score": 91},
+        ),
+        event(
+            EducationEventType.AUTONOMY_UPDATED,
+            tenant_id=tenant_b,
+            learner_id=learner_id,
+            payload={"autonomy_score": 34},
+        ),
+    ])
+
+    assert projection.get(
+        tenant_id=tenant_a,
+        learner_id=learner_id,
+    ).autonomy_score == 91
+    assert projection.get(
+        tenant_id=tenant_b,
+        learner_id=learner_id,
+    ).autonomy_score == 34
