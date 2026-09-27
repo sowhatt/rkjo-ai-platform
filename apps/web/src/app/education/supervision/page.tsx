@@ -48,19 +48,21 @@ export default function SupervisionPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [interventionBusy, setInterventionBusy] = useState(false);
   const [history, setHistory] = useState<LearningEvent[]>([]);
+  const [teacherMessage, setTeacherMessage] = useState("");
 
-  async function intervene(interventionType: "request_new_proof" | "assign_consolidation" | "send_message") {
+  async function intervene(interventionType: "request_new_proof" | "assign_consolidation" | "send_message", interventionMessage?: string) {
     if (!selected) return;
     setInterventionBusy(true);
     try {
       const response = await fetch(`/api/education/supervision/learners/${selected.learner_id}/interventions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intervention_type: interventionType }),
+        body: JSON.stringify({ intervention_type: interventionType, message: interventionMessage?.trim() || null }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.detail ?? "Intervention impossible.");
       setMessage("Intervention professeur enregistrée.");
+      if (interventionType === "send_message") setTeacherMessage("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur inconnue.");
     } finally {
@@ -199,7 +201,22 @@ export default function SupervisionPage() {
                 <div className="supervision-intervention-actions">
                   <button disabled={interventionBusy} onClick={() => void intervene("request_new_proof")}>Demander une nouvelle preuve</button>
                   <button disabled={interventionBusy} onClick={() => void intervene("assign_consolidation")}>Exercice de consolidation</button>
-                  <button disabled={interventionBusy} onClick={() => void intervene("send_message")}>Envoyer un message</button>
+                </div>
+                <div className="supervision-intervention-message">
+                  <textarea
+                    value={teacherMessage}
+                    onChange={(event) => setTeacherMessage(event.target.value)}
+                    placeholder="Écrire un message à l’élève…"
+                    rows={3}
+                    maxLength={1000}
+                    disabled={interventionBusy}
+                  />
+                  <button
+                    disabled={interventionBusy || !teacherMessage.trim()}
+                    onClick={() => void intervene("send_message", teacherMessage)}
+                  >
+                    Envoyer le message
+                  </button>
                 </div>
               </div>
               <div className="supervision-alerts">
