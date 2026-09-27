@@ -17,6 +17,8 @@ class TeacherInterventionType(StrEnum):
 
 class TeacherInterventionStatus(StrEnum):
     REQUESTED = "requested"
+    DELIVERED = "delivered"
+    ACKNOWLEDGED = "acknowledged"
 
 
 class TeacherIntervention(BaseModel):
@@ -27,6 +29,8 @@ class TeacherIntervention(BaseModel):
     message: str | None = None
     requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: TeacherInterventionStatus = TeacherInterventionStatus.REQUESTED
+    delivered_at: datetime | None = None
+    acknowledged_at: datetime | None = None
 
 
 class TeacherInterventionStore:
@@ -62,10 +66,14 @@ class PostgresTeacherInterventionStore:
                     message TEXT,
                     requested_at TIMESTAMPTZ NOT NULL,
                     status TEXT NOT NULL,
+                    delivered_at TIMESTAMPTZ,
+                    acknowledged_at TIMESTAMPTZ,
                     intervention_json JSONB NOT NULL
                 )
                 """
             )
+            connection.execute("ALTER TABLE education_teacher_interventions ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ")
+            connection.execute("ALTER TABLE education_teacher_interventions ADD COLUMN IF NOT EXISTS acknowledged_at TIMESTAMPTZ")
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_education_teacher_interventions_learner
@@ -81,9 +89,9 @@ class PostgresTeacherInterventionStore:
                 """
                 INSERT INTO education_teacher_interventions (
                     intervention_id, tenant_id, learner_id, intervention_type,
-                    message, requested_at, status, intervention_json
+                    message, requested_at, status, delivered_at, acknowledged_at, intervention_json
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                 ON CONFLICT (intervention_id) DO NOTHING
                 """,
                 (
@@ -94,6 +102,8 @@ class PostgresTeacherInterventionStore:
                     intervention.message,
                     intervention.requested_at,
                     intervention.status.value,
+                    intervention.delivered_at,
+                    intervention.acknowledged_at,
                     json.dumps(payload),
                 ),
             )
@@ -111,3 +121,59 @@ class PostgresTeacherInterventionStore:
                 (tenant_id, learner_id),
             ).fetchall()
         return [TeacherIntervention.model_validate(row[0]) for row in rows]
+
+
+    def mark_delivered(self, *, tenant_id: UUID, learner_id: UUID) -> list[TeacherIntervention]:
+        now = datetime.now(timezone.utc)
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute(
+                """
+                SELECT intervention_json
+                FROM education_teacher_interventions
+                WHERE tenant_id = %s AND learner_id = %s AND status = %s
+                ORDER BY requested_at ASC, intervention_id ASC
+                """,
+                (tenant_id, learner_id, TeacherInterventionStatus.REQUESTED.value),
+            ).fetchall()
+            for row in rows:
+                item = TeacherIntervention.model_validate(row[0])
+                item.status = TeacherInterventionStatus.DELIVERED
+                item.delivered_at = now
+                payload = item.model_dump(mode="json")
+                connection.execute(
+                    """
+                    UPDATE education_teacher_interventions
+                    SET status = %s, delivered_at = %s, intervention_json = %s::jsonb
+                    WHERE intervention_id = %s AND tenant_id = %s AND learner_id = %s
+                    """,
+                    (item.status.value, now, json.dumps(payload), item.intervention_id, tenant_id, learner_id),
+                )
+        return self.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+
+    def acknowledge(self, *, tenant_id: UUID, learner_id: UUID, intervention_id: UUID) -> TeacherIntervention | None:
+        now = datetime.now(timezone.utc)
+        with psycopg.connect(self.database_url) as connection:
+            row = connection.execute(
+                """
+                SELECT intervention_json
+                FROM education_teacher_interventions
+                WHERE intervention_id = %s AND tenant_id = %s AND learner_id = %s
+                """,
+                (intervention_id, tenant_id, learner_id),
+            ).fetchone()
+            if row is None:
+                return None
+            item = TeacherIntervention.model_validate(row[0])
+            item.status = TeacherInterventionStatus.ACKNOWLEDGED
+            item.delivered_at = item.delivered_at or now
+            item.acknowledged_at = now
+            payload = item.model_dump(mode="json")
+            connection.execute(
+                """
+                UPDATE education_teacher_interventions
+                SET status = %s, delivered_at = %s, acknowledged_at = %s, intervention_json = %s::jsonb
+                WHERE intervention_id = %s AND tenant_id = %s AND learner_id = %s
+                """,
+                (item.status.value, item.delivered_at, now, json.dumps(payload), intervention_id, tenant_id, learner_id),
+            )
+        return item
