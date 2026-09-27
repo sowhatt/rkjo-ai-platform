@@ -164,9 +164,11 @@ class PostgresTeacherInterventionStore:
             if row is None:
                 return None
             item = TeacherIntervention.model_validate(row[0])
+            if item.status == TeacherInterventionStatus.ACKNOWLEDGED:
+                return item
             item.status = TeacherInterventionStatus.ACKNOWLEDGED
             item.delivered_at = item.delivered_at or now
-            item.acknowledged_at = now
+            item.acknowledged_at = item.acknowledged_at or now
             payload = item.model_dump(mode="json")
             connection.execute(
                 """
@@ -174,6 +176,6 @@ class PostgresTeacherInterventionStore:
                 SET status = %s, delivered_at = %s, acknowledged_at = %s, intervention_json = %s::jsonb
                 WHERE intervention_id = %s AND tenant_id = %s AND learner_id = %s
                 """,
-                (item.status.value, item.delivered_at, now, json.dumps(payload), intervention_id, tenant_id, learner_id),
+                (item.status.value, item.delivered_at, item.acknowledged_at, json.dumps(payload), intervention_id, tenant_id, learner_id),
             )
         return item
