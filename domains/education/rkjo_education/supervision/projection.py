@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from uuid import UUID
 
 from rkjo_education.events import EducationEventType, EducationLearningEvent
@@ -66,6 +67,46 @@ class LearnerSupervisionProjection:
         self._states[key] = next_state
         self._processed_event_ids.add(event.event_id)
         return next_state.model_copy(deep=True)
+
+    def replay(
+        self,
+        events: Iterable[EducationLearningEvent],
+        *,
+        tenant_id: UUID,
+        learner_id: UUID,
+    ) -> LearnerSupervisionState | None:
+        """Rebuild one learner from a clean projection state."""
+        key = (tenant_id, learner_id)
+        self._states.pop(key, None)
+
+        ordered_events = sorted(
+            (
+                event
+                for event in events
+                if event.tenant_id == tenant_id and event.learner_id == learner_id
+            ),
+            key=lambda event: (event.occurred_at, str(event.event_id)),
+        )
+        event_ids = {event.event_id for event in ordered_events}
+        self._processed_event_ids.difference_update(event_ids)
+
+        state = None
+        for event in ordered_events:
+            state = self.apply(event)
+        return state
+
+    def restore(self, events: Iterable[EducationLearningEvent]) -> None:
+        """Restore all learner states from durable history."""
+        grouped: dict[tuple[UUID, UUID], list[EducationLearningEvent]] = {}
+        for event in events:
+            grouped.setdefault((event.tenant_id, event.learner_id), []).append(event)
+
+        for (tenant_id, learner_id), learner_events in grouped.items():
+            self.replay(
+                learner_events,
+                tenant_id=tenant_id,
+                learner_id=learner_id,
+            )
 
     def get(self, *, tenant_id: UUID, learner_id: UUID) -> LearnerSupervisionState | None:
         state = self._states.get((tenant_id, learner_id))
