@@ -827,7 +827,9 @@ export default function EducationSession() {
                         ? "Ton professeur te demande une nouvelle preuve d’apprentissage."
                         : "Ton professeur t’a proposé un exercice de consolidation."}
                   </p>
-                  {item.intervention_type === "request_new_proof" && item.message ? (
+                  {item.intervention_type === "request_new_proof" &&
+                  item.message &&
+                  !(proof?.id === item.message && proofResult?.passed) ? (
                     <button
                       type="button"
                       className="rkjo-start"
@@ -835,6 +837,10 @@ export default function EducationSession() {
                     >
                       Commencer la nouvelle preuve
                     </button>
+                  ) : item.intervention_type === "request_new_proof" &&
+                    proof?.id === item.message &&
+                    proofResult?.passed ? (
+                    <small>✓ Preuve réussie en autonomie</small>
                   ) : null}
                   {item.intervention_type === "send_message" ? (
                     item.status !== "acknowledged" ? (
