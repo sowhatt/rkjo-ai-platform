@@ -191,6 +191,20 @@ export default function EducationSession() {
   const currentQuestion =
     assessment?.questions[questionIndex] ?? null;
 
+  const completedProofChallengeIds = useMemo(
+    () =>
+      new Set(
+        teacherInterventions
+          .filter((item) => item.intervention_type === "request_new_proof" && item.message)
+          .filter((item) => {
+            if (proof?.id === item.message && proofResult?.status === "passed") return true;
+            return false;
+          })
+          .map((item) => item.message as string),
+      ),
+    [teacherInterventions, proof, proofResult],
+  );
+
   const currentLearning = useMemo(() => {
     if (!result || !currentQuestion) {
       return null;
@@ -829,7 +843,7 @@ export default function EducationSession() {
                   </p>
                   {item.intervention_type === "request_new_proof" &&
                   item.message &&
-                  !(proof?.id === item.message && proofResult?.passed) ? (
+                  !completedProofChallengeIds.has(item.message) ? (
                     <button
                       type="button"
                       className="rkjo-start"
@@ -838,8 +852,8 @@ export default function EducationSession() {
                       Commencer la nouvelle preuve
                     </button>
                   ) : item.intervention_type === "request_new_proof" &&
-                    proof?.id === item.message &&
-                    proofResult?.passed ? (
+                    item.message &&
+                    completedProofChallengeIds.has(item.message) ? (
                     <small>✓ Preuve réussie en autonomie</small>
                   ) : null}
                   {item.intervention_type === "send_message" ? (
