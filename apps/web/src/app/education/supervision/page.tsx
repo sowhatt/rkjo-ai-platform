@@ -44,6 +44,22 @@ type LearningEvent = {
   payload: Record<string, unknown>;
 };
 
+function proofInterventionResult(
+  intervention: TeacherIntervention,
+  history: LearningEvent[],
+) {
+  if (intervention.intervention_type !== "request_new_proof" || !intervention.message) return null;
+  return history
+    .slice()
+    .reverse()
+    .find(
+      (event) =>
+        (event.event_type === "learner.proof.passed" || event.event_type === "learner.proof.failed") &&
+        (event.payload.challenge_id === intervention.message ||
+          event.payload.proof_challenge_id === intervention.message),
+    ) ?? null;
+}
+
 function alertLabel(code: SupervisionAlert["code"]) {
   if (code === "low_autonomy") return "Autonomie faible";
   if (code === "proof_failed") return "Preuve échouée";
@@ -256,13 +272,16 @@ export default function SupervisionPage() {
                           : "Consolidation"}
                     </strong>
                     <span>
-                      {item.status === "acknowledged"
-                        ? "✓ Pris en compte par l’élève"
-                        : item.status === "delivered"
-                          ? "Remis à l’élève"
-                          : "En attente de remise"}
+                      {(() => {
+                        const proofResult = proofInterventionResult(item, history);
+                        if (proofResult?.event_type === "learner.proof.passed") return "✓ Preuve réussie en autonomie";
+                        if (proofResult?.event_type === "learner.proof.failed") return "✕ Preuve échouée — consolidation nécessaire";
+                        if (item.status === "acknowledged") return "✓ Pris en compte par l’élève";
+                        if (item.status === "delivered") return "Remis à l’élève";
+                        return "En attente de remise";
+                      })()}
                     </span>
-                    {item.message ? <span>{item.message}</span> : null}
+                    {item.intervention_type === "send_message" && item.message ? <span>{item.message}</span> : null}
                     <small>
                       Envoyé {new Date(item.requested_at).toLocaleString("fr-FR")}
                       {item.acknowledged_at
