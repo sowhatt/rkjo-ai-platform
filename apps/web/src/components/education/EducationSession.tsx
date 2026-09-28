@@ -843,6 +843,7 @@ export default function EducationSession() {
                   </p>
                   {item.intervention_type === "request_new_proof" &&
                   item.message &&
+                  item.status !== "acknowledged" &&
                   !completedProofChallengeIds.has(item.message) ? (
                     <button
                       type="button"
@@ -853,7 +854,7 @@ export default function EducationSession() {
                     </button>
                   ) : item.intervention_type === "request_new_proof" &&
                     item.message &&
-                    completedProofChallengeIds.has(item.message) ? (
+                    (item.status === "acknowledged" || completedProofChallengeIds.has(item.message)) ? (
                     <small>✓ Preuve réussie en autonomie</small>
                   ) : null}
                   {item.intervention_type === "send_message" ? (
