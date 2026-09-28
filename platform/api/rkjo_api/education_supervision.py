@@ -226,10 +226,27 @@ def list_teacher_interventions(
 ) -> list[TeacherIntervention]:
     interventions = PostgresTeacherInterventionStore(get_database_url())
     interventions.initialize_schema()
-    return interventions.list_for_learner(
-        tenant_id=require_uuid_tenant(request),
+    tenant_id = require_uuid_tenant(request)
+    items = interventions.list_for_learner(
+        tenant_id=tenant_id,
         learner_id=learner_id,
     )
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+    completed_challenges = {
+        str(event.payload.get("challenge_id") or event.payload.get("proof_challenge_id"))
+        for event in events
+        if event.event_type in {EducationEventType.PROOF_PASSED, EducationEventType.PROOF_FAILED}
+        and (event.payload.get("challenge_id") or event.payload.get("proof_challenge_id"))
+    }
+    return [
+        item.model_copy(update={"status": "acknowledged"})
+        if item.intervention_type == TeacherInterventionType.REQUEST_NEW_PROOF
+        and item.message in completed_challenges
+        else item
+        for item in items
+    ]
 
 
 @router.post(
