@@ -523,6 +523,9 @@ export default function EducationSession() {
     challengeId: string,
   ) {
     setLoadingProof(true);
+    setError("");
+    setProofResult(null);
+    setProofAnswer("");
 
     try {
       const response = await fetch(
@@ -544,6 +547,17 @@ export default function EducationSession() {
       }
 
       setProof(payload as ProofChallenge);
+      window.setTimeout(() => {
+        document
+          .getElementById("rkjo-proof-verification")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Impossible de charger la vérification.",
+      );
     } finally {
       setLoadingProof(false);
     }
@@ -822,17 +836,19 @@ export default function EducationSession() {
                       Commencer la nouvelle preuve
                     </button>
                   ) : null}
-                  {item.status !== "acknowledged" ? (
-                    <button
-                      type="button"
-                      className="rkjo-start"
-                      onClick={() => void acknowledgeTeacherIntervention(item.intervention_id)}
-                    >
-                      J’ai pris en compte
-                    </button>
-                  ) : (
-                    <small>✓ Pris en compte</small>
-                  )}
+                  {item.intervention_type === "send_message" ? (
+                    item.status !== "acknowledged" ? (
+                      <button
+                        type="button"
+                        className="rkjo-start"
+                        onClick={() => void acknowledgeTeacherIntervention(item.intervention_id)}
+                      >
+                        J’ai pris en compte
+                      </button>
+                    ) : (
+                      <small>✓ Pris en compte</small>
+                    )
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -1019,9 +1035,8 @@ export default function EducationSession() {
               )}
             </article>
 
-            {proof &&
-            currentLearning?.proof_required ? (
-              <article className="rkjo-session-main rkjo-proof-card">
+            {proof ? (
+              <article id="rkjo-proof-verification" className="rkjo-session-main rkjo-proof-card">
                 <span className="rkjo-edu-kicker">
                   VÉRIFICATION EN AUTONOMIE
                 </span>
