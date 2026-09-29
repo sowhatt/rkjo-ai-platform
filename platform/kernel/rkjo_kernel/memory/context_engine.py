@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from rkjo_kernel.mission.execution_context import ExecutionContext
 
+from .budget import ContextBudget, ContextBudgetEnforcer
 from .models import MemoryItem, MemoryQuery, MemoryScope
 from .port import MemoryPort
 from .selection import ContextSelectionPolicy, ContextSelector
@@ -41,9 +42,11 @@ class ContextEngine:
         self,
         store: MemoryPort,
         selector: ContextSelector | None = None,
+        budget_enforcer: ContextBudgetEnforcer | None = None,
     ) -> None:
         self._store = store
         self._selector = selector or ContextSelector()
+        self._budget_enforcer = budget_enforcer or ContextBudgetEnforcer()
 
     def build(
         self,
@@ -54,6 +57,7 @@ class ContextEngine:
         entity_limit: int = 20,
         query: str | None = None,
         selection_policy: ContextSelectionPolicy | None = None,
+        budget: ContextBudget | None = None,
     ) -> ContextPackage:
         tenant_id = self._required(context.tenant_id, "tenant_id")
         mission_id = self._required(context.mission_id, "mission_id")
@@ -89,6 +93,9 @@ class ContextEngine:
                 query=query,
                 policy=selection_policy,
             )
+
+        if budget is not None:
+            items = self._budget_enforcer.apply(items, budget=budget)
 
         return ContextPackage(
             tenant_id=tenant_id,
