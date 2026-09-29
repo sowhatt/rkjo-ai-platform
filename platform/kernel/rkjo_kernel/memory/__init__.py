@@ -1,3 +1,4 @@
+from .budget import ContextBudget, ContextBudgetEnforcer
 from .context_engine import ContextEngine, ContextPackage
 from .entity_memory import EntityMemoryService
 from .in_memory import InMemoryMemoryStore
@@ -7,6 +8,8 @@ from .port import MemoryPort
 from .selection import ContextSelectionPolicy, ContextSelector
 
 __all__ = [
+    "ContextBudget",
+    "ContextBudgetEnforcer",
     "ContextEngine",
     "ContextPackage",
     "ContextSelectionPolicy",
