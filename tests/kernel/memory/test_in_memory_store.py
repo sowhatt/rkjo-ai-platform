@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
+
 from rkjo_kernel.memory import (
     InMemoryMemoryStore,
     MemoryItem,
@@ -353,4 +357,69 @@ def test_delete_unknown_memory_returns_false() -> None:
             tenant_id="tenant-a",
         )
         is False
+    )
+
+
+def test_write_can_replace_memory_within_same_tenant() -> None:
+    store = InMemoryMemoryStore()
+
+    original = store.write(
+        mission_memory(
+            content="Original information",
+            tenant_id="tenant-a",
+        )
+    )
+
+    updated = replace(
+        original,
+        content="Updated information",
+    )
+
+    store.write(updated)
+
+    stored = store.get(
+        original.memory_id,
+        tenant_id="tenant-a",
+    )
+
+    assert stored == updated
+    assert stored.content == "Updated information"
+
+
+def test_write_cannot_move_memory_between_tenants() -> None:
+    store = InMemoryMemoryStore()
+
+    original = store.write(
+        mission_memory(
+            content="Tenant A information",
+            tenant_id="tenant-a",
+        )
+    )
+
+    malicious_update = replace(
+        original,
+        tenant_id="tenant-b",
+        content="Tenant B overwrite",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="tenant boundary",
+    ):
+        store.write(malicious_update)
+
+    assert (
+        store.get(
+            original.memory_id,
+            tenant_id="tenant-a",
+        )
+        == original
+    )
+
+    assert (
+        store.get(
+            original.memory_id,
+            tenant_id="tenant-b",
+        )
+        is None
     )

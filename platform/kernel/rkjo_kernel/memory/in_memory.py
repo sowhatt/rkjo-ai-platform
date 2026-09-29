@@ -18,7 +18,18 @@ class InMemoryMemoryStore:
 
     def write(self, item: MemoryItem) -> MemoryItem:
         with self._lock:
+            existing = self._items.get(item.memory_id)
+
+            if (
+                existing is not None
+                and existing.tenant_id != item.tenant_id
+            ):
+                raise ValueError(
+                    "Cannot overwrite memory across tenant boundary"
+                )
+
             self._items[item.memory_id] = item
+
         return item
 
     def get(
