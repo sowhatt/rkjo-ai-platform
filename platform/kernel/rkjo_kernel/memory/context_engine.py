@@ -6,6 +6,7 @@ from rkjo_kernel.mission.execution_context import ExecutionContext
 
 from .models import MemoryItem, MemoryQuery, MemoryScope
 from .port import MemoryPort
+from .selection import ContextSelectionPolicy, ContextSelector
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,8 +37,13 @@ class ContextPackage:
 class ContextEngine:
     """Build a deterministic context package from shared memory."""
 
-    def __init__(self, store: MemoryPort) -> None:
+    def __init__(
+        self,
+        store: MemoryPort,
+        selector: ContextSelector | None = None,
+    ) -> None:
         self._store = store
+        self._selector = selector or ContextSelector()
 
     def build(
         self,
@@ -46,6 +52,8 @@ class ContextEngine:
         entity_id: str | None = None,
         mission_limit: int = 20,
         entity_limit: int = 20,
+        query: str | None = None,
+        selection_policy: ContextSelectionPolicy | None = None,
     ) -> ContextPackage:
         tenant_id = self._required(context.tenant_id, "tenant_id")
         mission_id = self._required(context.mission_id, "mission_id")
@@ -75,6 +83,12 @@ class ContextEngine:
         items = self._deduplicate(
             (*mission_items, *entity_items)
         )
+        if query is not None or selection_policy is not None:
+            items = self._selector.select(
+                items,
+                query=query,
+                policy=selection_policy,
+            )
 
         return ContextPackage(
             tenant_id=tenant_id,
