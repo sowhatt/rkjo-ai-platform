@@ -6,6 +6,7 @@ from .mission_memory import MissionMemoryService
 from .llm_context_adapter import ContextualLLMGateway, LLMContextAdapter, LLMContextLimits
 from .models import MemoryItem, MemoryQuery, MemoryScope, MemoryType
 from .port import MemoryPort
+from .postgres import PostgresMemoryStore
 from .rag_bridge import KnowledgeContextItem, RAGContextBridge, SemanticSearchPort
 from .selection import ContextSelectionPolicy, ContextSelector
 
@@ -24,6 +25,7 @@ __all__ = [
     "LLMContextLimits",
     "MemoryItem",
     "MemoryPort",
+    "PostgresMemoryStore",
     "MemoryQuery",
     "MemoryScope",
     "MemoryType",
