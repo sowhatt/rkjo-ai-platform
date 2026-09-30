@@ -5,6 +5,7 @@ from .in_memory import InMemoryMemoryStore
 from .mission_memory import MissionMemoryService
 from .models import MemoryItem, MemoryQuery, MemoryScope, MemoryType
 from .port import MemoryPort
+from .rag_bridge import KnowledgeContextItem, RAGContextBridge, SemanticSearchPort
 from .selection import ContextSelectionPolicy, ContextSelector
 
 __all__ = [
@@ -16,10 +17,13 @@ __all__ = [
     "ContextSelector",
     "EntityMemoryService",
     "InMemoryMemoryStore",
+    "KnowledgeContextItem",
     "MemoryItem",
     "MemoryPort",
     "MemoryQuery",
     "MemoryScope",
     "MemoryType",
     "MissionMemoryService",
+    "RAGContextBridge",
+    "SemanticSearchPort",
 ]
