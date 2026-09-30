@@ -65,13 +65,24 @@ class LLMContextAdapter:
         )
         remaining = self.limits.max_characters - len(prefix)
 
-        for item in package.items[: self.limits.max_memory_items]:
+        # Validate the entire package, including items beyond display limits.
+        for item in package.items:
             if item.tenant_id != context.tenant_id:
                 raise ValueError("Cross-tenant memory item in ContextPackage")
             if item.scope.value == "mission" and item.mission_id != context.mission_id:
                 raise ValueError("Cross-mission memory item in ContextPackage")
-            if package.entity_id is not None and item.scope.value == "entity" and item.entity_id != package.entity_id:
+            if item.scope.value == "entity" and (
+                package.entity_id is None or item.entity_id != package.entity_id
+            ):
                 raise ValueError("Cross-entity memory item in ContextPackage")
+
+        for item in package.knowledge_items:
+            # Tenant tagging is a defense in depth, not a substitute for
+            # mandatory tenant-filtered retrieval at the search boundary.
+            if item.metadata.get("tenant_id") != context.tenant_id:
+                raise ValueError("Missing or mismatched RAG tenant provenance")
+
+        for item in package.items[: self.limits.max_memory_items]:
             entry = (
                 f"[Memory scope={item.scope.value} type={item.memory_type.value} "
                 f"id={item.memory_id}]\n{item.content}"
@@ -79,10 +90,6 @@ class LLMContextAdapter:
             remaining = self._append(lines, entry, remaining)
 
         for item in package.knowledge_items[: self.limits.max_knowledge_items]:
-            # Retrieval tenancy must be guaranteed upstream with mandatory
-            # tenant-filtered search; missing provenance fails closed here.
-            if item.metadata.get("tenant_id") != context.tenant_id:
-                raise ValueError("Missing or mismatched RAG tenant provenance")
             entry = (
                 f"[Knowledge document_id={item.document_id} "
                 f"chunk_id={item.chunk_id}]\n{item.content}"
