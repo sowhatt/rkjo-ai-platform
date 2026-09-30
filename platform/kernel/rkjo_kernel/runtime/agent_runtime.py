@@ -7,6 +7,7 @@ from rkjo_kernel.logging.logger import get_logger
 from rkjo_kernel.logging.structured import structured_log
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
+from rkjo_kernel.mission.execution_context import ExecutionContext
 from rkjo_kernel.registry.descriptor import AgentStatus
 from rkjo_kernel.runtime.context_runtime import AgentContextRuntime, RuntimeContextRequest
 from rkjo_kernel.runtime.dead_letter_publisher import DeadLetterPublisher
