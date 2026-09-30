@@ -162,6 +162,21 @@ def test_combined_memory_and_knowledge_budget_is_bounded():
     assert "C" * 120 not in enriched.messages[-1].content
 
 
+
+def test_too_small_context_budget_omits_reference_without_truncation():
+    original = request()
+    enriched = LLMContextAdapter(
+        limits=LLMContextLimits(max_characters=80)
+    ).prepare(
+        original,
+        context=context(),
+        package=package(items=(memory(content="A" * 32),)),
+    )
+    assert enriched.messages == original.messages
+    assert enriched.tenant_id == "tenant-a"
+    assert enriched.trace_id == "trace-1"
+
+
 def test_no_reference_content_keeps_original_messages():
     original = request()
     enriched = LLMContextAdapter().prepare(original, context=context(), package=package())
