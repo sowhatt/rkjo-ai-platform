@@ -145,7 +145,7 @@ def test_knowledge_missing_or_wrong_tenant_is_rejected(provenance):
 
 def test_combined_memory_and_knowledge_budget_is_bounded():
     adapter = LLMContextAdapter(limits=LLMContextLimits(
-        max_characters=230, max_memory_items=2, max_knowledge_items=2
+        max_characters=270, max_memory_items=2, max_knowledge_items=2
     ))
     enriched = adapter.prepare(
         request(),
@@ -155,7 +155,8 @@ def test_combined_memory_and_knowledge_budget_is_bounded():
             knowledge_items=(knowledge(content="C" * 120),),
         ),
     )
-    assert len(enriched.messages[-1].content) <= 230
+    assert len(enriched.messages) == 3
+    assert len(enriched.messages[-1].content) <= 270
     assert "A" * 32 in enriched.messages[-1].content
     assert "B" * 120 not in enriched.messages[-1].content
     assert "C" * 120 not in enriched.messages[-1].content
