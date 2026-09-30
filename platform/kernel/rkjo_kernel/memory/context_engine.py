@@ -7,6 +7,7 @@ from rkjo_kernel.mission.execution_context import ExecutionContext
 from .budget import ContextBudget, ContextBudgetEnforcer
 from .models import MemoryItem, MemoryQuery, MemoryScope
 from .port import MemoryPort
+from .rag_bridge import KnowledgeContextItem, RAGContextBridge
 from .selection import ContextSelectionPolicy, ContextSelector
 
 
@@ -19,6 +20,7 @@ class ContextPackage:
     trace_id: str
     items: tuple[MemoryItem, ...]
     entity_id: str | None = None
+    knowledge_items: tuple[KnowledgeContextItem, ...] = ()
 
     @property
     def mission_items(self) -> tuple[MemoryItem, ...]:
@@ -43,10 +45,12 @@ class ContextEngine:
         store: MemoryPort,
         selector: ContextSelector | None = None,
         budget_enforcer: ContextBudgetEnforcer | None = None,
+        rag_bridge: RAGContextBridge | None = None,
     ) -> None:
         self._store = store
         self._selector = selector or ContextSelector()
         self._budget_enforcer = budget_enforcer or ContextBudgetEnforcer()
+        self._rag_bridge = rag_bridge
 
     def build(
         self,
@@ -58,6 +62,8 @@ class ContextEngine:
         query: str | None = None,
         selection_policy: ContextSelectionPolicy | None = None,
         budget: ContextBudget | None = None,
+        knowledge_limit: int = 5,
+        knowledge_filters=None,
     ) -> ContextPackage:
         tenant_id = self._required(context.tenant_id, "tenant_id")
         mission_id = self._required(context.mission_id, "mission_id")
@@ -97,12 +103,21 @@ class ContextEngine:
         if budget is not None:
             items = self._budget_enforcer.apply(items, budget=budget)
 
+        knowledge_items: tuple[KnowledgeContextItem, ...] = ()
+        if self._rag_bridge is not None and query is not None and query.strip():
+            knowledge_items = self._rag_bridge.retrieve(
+                query,
+                limit=knowledge_limit,
+                filters=knowledge_filters,
+            )
+
         return ContextPackage(
             tenant_id=tenant_id,
             mission_id=mission_id,
             trace_id=context.trace_id,
             entity_id=normalized_entity_id,
             items=items,
+            knowledge_items=knowledge_items,
         )
 
     @staticmethod
