@@ -8,6 +8,7 @@ from rkjo_kernel.logging.structured import structured_log
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.registry.descriptor import AgentStatus
+from rkjo_kernel.runtime.context_runtime import AgentContextRuntime, RuntimeContextRequest
 from rkjo_kernel.runtime.dead_letter_publisher import DeadLetterPublisher
 from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
 from rkjo_kernel.runtime.retry_message import build_retry_message
@@ -47,6 +48,7 @@ class AgentRuntime:
         retry_policy: RetryPolicy | None = None,
         dead_letter_publisher: DeadLetterPublisher | None = None,
         metrics: MetricsRegistry | None = None,
+        context_runtime: AgentContextRuntime | None = None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -65,6 +67,7 @@ class AgentRuntime:
         self.retry_policy = retry_policy
         self.dead_letter_publisher = dead_letter_publisher
         self.metrics = metrics
+        self.context_runtime = context_runtime
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -321,6 +324,7 @@ class AgentRuntime:
         )
 
         try:
+            self._prepare_context(message)
             result = self.agent._handle_message(message)
 
             self.total_runtime_messages += 1
@@ -461,6 +465,45 @@ class AgentRuntime:
                     agent_name=self.agent.agent_name,
                     status=AgentStatus.AVAILABLE,
                 )
+
+    def _prepare_context(self, message: AgentMessage) -> None:
+        """Build and attach Memory/RAG context before agent processing."""
+        if self.context_runtime is None:
+            return
+
+        mission_id = message.metadata.get("mission_id")
+        tenant_id = message.metadata.get("tenant_id")
+        trace_id = message.metadata.get("trace_id")
+
+        if not mission_id or not tenant_id:
+            return
+
+        execution_context = ExecutionContext(
+            mission_id=str(mission_id),
+            trace_id=str(trace_id) if trace_id else message.correlation_id,
+            workflow_execution_id=message.metadata.get("workflow_execution_id"),
+            step_id=message.metadata.get("workflow_step_id"),
+            agent_id=self.agent.agent_name,
+            tenant_id=str(tenant_id),
+            user_id=message.metadata.get("user_id"),
+            correlation_id=message.correlation_id,
+            request_id=message.message_id,
+        )
+
+        raw_query = message.payload.get("query")
+        if raw_query is None:
+            raw_query = message.payload.get("question")
+
+        request = RuntimeContextRequest(
+            query=str(raw_query) if raw_query is not None else None,
+            entity_id=message.metadata.get("entity_id"),
+        )
+        package = self.context_runtime.prepare(
+            execution_context=execution_context,
+            request=request,
+        )
+        self.context_runtime.inject(message.metadata, package)
+        self._increment_metric("runtime.context.prepared")
 
     def _increment_metric(
         self,
