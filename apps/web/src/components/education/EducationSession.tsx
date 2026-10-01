@@ -53,6 +53,8 @@ type AttemptResult = Attempt & {
   learning: LearningResult[];
   next_best_action?: "next_activity" | "request_proof" | "consolidation" | "consolidation_and_alert" | null;
   next_best_action_reason?: string | null;
+  next_assessment_id?: string | null;
+  next_proof_challenge_id?: string | null;
 };
 
 type ProofChallenge = {
@@ -569,6 +571,30 @@ export default function EducationSession() {
     }
   }
 
+  function openNextAssessment(assessmentId: string) {
+    const index = assessments.findIndex((item) => item.id === assessmentId);
+    if (index < 0) {
+      setError("La prochaine activité n’est plus disponible.");
+      return;
+    }
+    setAssessmentIndex(index);
+    setQuestionIndex(0);
+    setAttempt(null);
+    setResult(null);
+    setAnswer("");
+    setHintsUsed(0);
+    setAssistanceLevel(0);
+    setAttemptCount(1);
+    setProof(null);
+    setProofResult(null);
+    setError("");
+    window.setTimeout(() => {
+      document
+        .getElementById("rkjo-current-activity")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
   async function loadProof(
     challengeId: string,
   ) {
@@ -1068,6 +1094,27 @@ export default function EducationSession() {
                                   ? "→ Consolider et prévenir le professeur"
                                   : "→ Faire un exercice de consolidation"}
                           </small>
+                          {result.next_best_action === "request_proof" && result.next_proof_challenge_id ? (
+                            <button
+                              type="button"
+                              className="rkjo-start"
+                              onClick={() => void loadProof(result.next_proof_challenge_id!)}
+                            >
+                              Commencer la preuve autonome
+                            </button>
+                          ) : result.next_assessment_id ? (
+                            <button
+                              type="button"
+                              className="rkjo-start"
+                              onClick={() => openNextAssessment(result.next_assessment_id!)}
+                            >
+                              {result.next_best_action === "next_activity"
+                                ? "Continuer"
+                                : "Commencer la consolidation"}
+                            </button>
+                          ) : result.next_best_action === "next_activity" ? (
+                            <small>✓ Parcours actuel terminé</small>
+                          ) : null}
                         </div>
                       ) : null}
 
