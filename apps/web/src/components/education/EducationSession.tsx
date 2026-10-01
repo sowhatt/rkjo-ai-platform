@@ -85,6 +85,9 @@ type TeacherIntervention = {
   message: string | null;
   requested_at: string;
   status: string;
+  result_status?: "passed" | "failed" | null;
+  result_autonomy_score?: number | null;
+  result_mastery?: string | null;
 };
 
 type ProofOutcome = "passed" | "failed";
@@ -932,7 +935,13 @@ export default function EducationSession() {
                         Commencer l’exercice de consolidation
                       </button>
                     ) : (
-                      <small>✓ Exercice de consolidation terminé</small>
+                      <small>
+                        {item.result_status === "passed"
+                          ? "✓ Consolidation réussie"
+                          : item.result_status === "failed"
+                            ? "✕ Consolidation à reprendre"
+                            : "✓ Exercice de consolidation terminé"}
+                      </small>
                     )
                   ) : null}
                   {item.intervention_type === "send_message" ? (
