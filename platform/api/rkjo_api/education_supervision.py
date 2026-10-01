@@ -306,6 +306,7 @@ def list_teacher_interventions(
                         if event.event_type == EducationEventType.AUTONOMY_UPDATED
                         and event.assessment_id == result_event.assessment_id
                         and event.question_id == result_event.question_id
+                        and event.competency_code == result_event.competency_code
                         and event.occurred_at >= result_event.occurred_at
                     ),
                     None,
@@ -317,6 +318,7 @@ def list_teacher_interventions(
                         if event.event_type == EducationEventType.MASTERY_UPDATED
                         and event.assessment_id == result_event.assessment_id
                         and event.question_id == result_event.question_id
+                        and event.competency_code == result_event.competency_code
                         and event.occurred_at >= result_event.occurred_at
                     ),
                     None,
