@@ -87,6 +87,8 @@ type TeacherIntervention = {
   status: string;
 };
 
+type ProofOutcome = "passed" | "failed";
+
 type TutorAnswer = {
   answer: string;
   level: string;
@@ -195,19 +197,16 @@ export default function EducationSession() {
   const currentQuestion =
     assessment?.questions[questionIndex] ?? null;
 
-  const completedProofChallengeIds = useMemo(
-    () =>
-      new Set(
-        teacherInterventions
-          .filter((item) => item.intervention_type === "request_new_proof" && item.message)
-          .filter((item) => {
-            if (proof?.id === item.message && proofResult?.status === "passed") return true;
-            return false;
-          })
-          .map((item) => item.message as string),
-      ),
-    [teacherInterventions, proof, proofResult],
-  );
+  const proofOutcomes = useMemo(() => {
+    const outcomes = new Map<string, ProofOutcome>();
+    if (proof?.id && proofResult) {
+      outcomes.set(
+        proof.id,
+        proofResult.independently_verified ? "passed" : "failed",
+      );
+    }
+    return outcomes;
+  }, [proof, proofResult]);
 
   const currentLearning = useMemo(() => {
     if (!result || !currentQuestion) {
@@ -905,8 +904,7 @@ export default function EducationSession() {
                   </p>
                   {item.intervention_type === "request_new_proof" &&
                   item.message &&
-                  item.status !== "acknowledged" &&
-                  !completedProofChallengeIds.has(item.message) ? (
+                  item.status !== "acknowledged" ? (
                     <button
                       type="button"
                       className="rkjo-start"
@@ -915,9 +913,14 @@ export default function EducationSession() {
                       Commencer la nouvelle preuve
                     </button>
                   ) : item.intervention_type === "request_new_proof" &&
-                    item.message &&
-                    (item.status === "acknowledged" || completedProofChallengeIds.has(item.message)) ? (
-                    <small>✓ Preuve réussie en autonomie</small>
+                    item.message ? (
+                    <small>
+                      {proofOutcomes.get(item.message) === "failed"
+                        ? "✕ Preuve échouée — consolidation nécessaire"
+                        : proofOutcomes.get(item.message) === "passed"
+                          ? "✓ Preuve réussie en autonomie"
+                          : "✓ Preuve terminée — résultat transmis au professeur"}
+                    </small>
                   ) : null}
                   {item.intervention_type === "assign_consolidation" ? (
                     item.status !== "acknowledged" ? (
