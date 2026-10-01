@@ -83,7 +83,8 @@ class ExecutionContext:
 
     def as_metadata(self) -> dict[str, Any]:
         """Serialize non-null context fields for messages and structured logs."""
-        values: dict[str, Any] = {
+        values: dict[str, Any] = dict(self.metadata)
+        values.update({
             "trace_id": self.trace_id,
             "mission_id": self.mission_id,
             "workflow_execution_id": self.workflow_execution_id,
@@ -98,8 +99,7 @@ class ExecutionContext:
             "parent_span_id": self.parent_span_id,
             "policy_context": self.policy_context or None,
             "budget": self.budget or None,
-        }
-        values.update(self.metadata)
+        })
         return {key: value for key, value in values.items() if value is not None}
 
     def inject_into(self, metadata: MutableMapping[str, Any]) -> None:
