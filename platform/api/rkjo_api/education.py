@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from rkjo_api.dependencies import get_education_course_service
+from rkjo_api.dependencies import get_education_course_service, get_database_url
 from rkjo_api.education_dependencies import (
     get_education_assessment_learning_service,
     get_education_event_publisher,
@@ -29,6 +29,7 @@ from rkjo_education.course.service import CourseService
 from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
 from rkjo_education.learning.service import DuplicateEnrollmentError, LearningService
 from rkjo_education.intelligence.next_best_action import NextBestActionService
+from rkjo_education.supervision.history import PostgresLearningEventHistory
 from rkjo_education.intelligence.proof_application import (
     ProofApplicationService,
     ProofChallengeCompletedError,
@@ -695,11 +696,25 @@ def submit_attempt(
     next_proof_challenge_id = None
     if result.learning:
         weakest = min(result.learning, key=lambda item: item.autonomy_score)
-        nba = NextBestActionService().decide(
+        nba_service = NextBestActionService()
+        history = PostgresLearningEventHistory(get_database_url())
+        history.initialize_schema()
+        prior_events = history.list_for_learner(
+            tenant_id=tenant_id,
+            learner_id=attempt.learner_id,
+        )
+        repeated_failures = nba_service.repeated_failures(
+            prior_events,
+            competency_code=weakest.competency_code,
+        )
+        if not weakest.correct:
+            repeated_failures += 1
+        nba = nba_service.decide(
             correct=all(item.correct for item in result.learning),
             autonomy_score=weakest.autonomy_score,
             mastery=weakest.mastery,
             proof_required=any(item.proof_required for item in result.learning),
+            repeated_failures=repeated_failures,
         )
         if nba.action.value == "request_proof":
             next_proof_challenge_id = next(
