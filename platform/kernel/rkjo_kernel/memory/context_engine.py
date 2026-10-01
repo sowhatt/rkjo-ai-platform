@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from rkjo_kernel.mission.execution_context import ExecutionContext
+from rkjo_kernel.rag.retrieval_filters import RetrievalFilters
 
 from .budget import ContextBudget, ContextBudgetEnforcer
 from .models import MemoryItem, MemoryQuery, MemoryScope
@@ -108,7 +109,10 @@ class ContextEngine:
             knowledge_items = self._rag_bridge.retrieve(
                 query,
                 limit=knowledge_limit,
-                filters=knowledge_filters,
+                filters=self._tenant_knowledge_filters(
+                    tenant_id,
+                    knowledge_filters,
+                ),
             )
 
         return ContextPackage(
@@ -119,6 +123,20 @@ class ContextEngine:
             items=items,
             knowledge_items=knowledge_items,
         )
+
+    @staticmethod
+    def _tenant_knowledge_filters(
+        tenant_id: str,
+        filters: RetrievalFilters | None,
+    ) -> RetrievalFilters:
+        metadata = dict(filters.metadata) if filters is not None else {}
+        supplied_tenant = metadata.get("tenant_id")
+        if supplied_tenant is not None and supplied_tenant != tenant_id:
+            raise ValueError(
+                "Knowledge filter tenant_id conflicts with ExecutionContext"
+            )
+        metadata["tenant_id"] = tenant_id
+        return RetrievalFilters(metadata=metadata)
 
     @staticmethod
     def _deduplicate(
