@@ -590,6 +590,7 @@ def submit_attempt(
         get_education_assessment_learning_service
     ),
     learning_service: LearningService = Depends(get_education_learning_service),
+    assessment_service: AssessmentService = Depends(get_education_assessment_service),
     event_publisher: EducationEventPublisher = Depends(get_education_event_publisher),
 ) -> AttemptSubmitResponse:
     tenant_id = require_uuid_tenant(request)
@@ -660,7 +661,7 @@ def submit_attempt(
                 payload={"proof_challenge_id": str(item.proof_challenge_id)},
             ))
 
-    assessment = service._assessment_service.get_assessment(
+    assessment = assessment_service.get_assessment(
         tenant_id=tenant_id,
         assessment_id=attempt.assessment_id,
     )
