@@ -60,6 +60,15 @@ def test_assessment_journey_through_api(client, monkeypatch):
     assert result["percentage"] == 67
     assert result["status"] == "submitted"
 
+    progress = client.get(
+        f"/education/learners/{attempt['learner_id']}/courses/{course_id}/progress",
+        headers=headers,
+    )
+    assert progress.status_code == 200
+    progress_payload = progress.json()
+    assert progress_payload["completion_percent"] == 67
+    assert progress_payload["competency_scores"]["MATH.ADD"] == 100
+
 
 def test_assessment_submit_accepts_learning_evidence(client, monkeypatch):
     tenant_id = uuid4()
