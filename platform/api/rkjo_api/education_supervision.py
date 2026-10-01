@@ -206,6 +206,14 @@ def create_teacher_intervention(
         ))
         message = str(challenge.id)
 
+    if payload.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
+        if state.assessment_id is None:
+            raise HTTPException(
+                status_code=409,
+                detail="No active assessment is available for consolidation.",
+            )
+        message = str(state.assessment_id)
+
     interventions = PostgresTeacherInterventionStore(get_database_url())
     interventions.initialize_schema()
     return interventions.create(TeacherIntervention(
@@ -240,10 +248,23 @@ def list_teacher_interventions(
         if event.event_type in {EducationEventType.PROOF_PASSED, EducationEventType.PROOF_FAILED}
         and (event.payload.get("challenge_id") or event.payload.get("proof_challenge_id"))
     }
+
+    def completed(item: TeacherIntervention) -> bool:
+        if item.intervention_type == TeacherInterventionType.REQUEST_NEW_PROOF:
+            return bool(item.message and item.message in completed_challenges)
+        if item.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
+            return any(
+                event.event_type == EducationEventType.ASSESSMENT_COMPLETED
+                and event.assessment_id is not None
+                and str(event.assessment_id) == item.message
+                and event.occurred_at >= item.requested_at
+                for event in events
+            )
+        return False
+
     return [
         item.model_copy(update={"status": "acknowledged"})
-        if item.intervention_type == TeacherInterventionType.REQUEST_NEW_PROOF
-        and item.message in completed_challenges
+        if completed(item)
         else item
         for item in items
     ]
