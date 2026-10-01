@@ -282,9 +282,12 @@ def list_teacher_interventions(
     enriched: list[TeacherIntervention] = []
     for item in items:
         update: dict[str, object] = {}
-        if completed(item):
-            update["status"] = "acknowledged"
-        if item.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
+        if item.intervention_type == TeacherInterventionType.REQUEST_NEW_PROOF:
+            outcome = completed_challenges.get(item.message or "")
+            if outcome:
+                update["status"] = "acknowledged"
+                update["result_status"] = outcome
+        elif item.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
             result_event = next(
                 (
                     event for event in reversed(events)
@@ -296,6 +299,7 @@ def list_teacher_interventions(
                 None,
             )
             if result_event is not None:
+                update["status"] = "acknowledged"
                 update["result_status"] = (
                     "passed" if result_event.payload.get("correct") is True else "failed"
                 )
