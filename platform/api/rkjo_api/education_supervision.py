@@ -279,12 +279,50 @@ def list_teacher_interventions(
             )
         return False
 
-    return [
-        item.model_copy(update={"status": "acknowledged"})
-        if completed(item)
-        else item
-        for item in items
-    ]
+    enriched: list[TeacherIntervention] = []
+    for item in items:
+        update: dict[str, object] = {}
+        if completed(item):
+            update["status"] = "acknowledged"
+        if item.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
+            result_event = next(
+                (
+                    event for event in reversed(events)
+                    if event.event_type == EducationEventType.ANSWER_SUBMITTED
+                    and event.assessment_id is not None
+                    and str(event.assessment_id) == item.message
+                    and event.occurred_at >= item.requested_at
+                ),
+                None,
+            )
+            if result_event is not None:
+                update["result_status"] = (
+                    "passed" if result_event.payload.get("correct") is True else "failed"
+                )
+                update["result_autonomy_score"] = next(
+                    (
+                        event.payload.get("autonomy_score")
+                        for event in reversed(events)
+                        if event.event_type == EducationEventType.AUTONOMY_UPDATED
+                        and event.assessment_id == result_event.assessment_id
+                        and event.question_id == result_event.question_id
+                        and event.occurred_at >= result_event.occurred_at
+                    ),
+                    None,
+                )
+                update["result_mastery"] = next(
+                    (
+                        event.payload.get("mastery")
+                        for event in reversed(events)
+                        if event.event_type == EducationEventType.MASTERY_UPDATED
+                        and event.assessment_id == result_event.assessment_id
+                        and event.question_id == result_event.question_id
+                        and event.occurred_at >= result_event.occurred_at
+                    ),
+                    None,
+                )
+        enriched.append(item.model_copy(update=update))
+    return enriched
 
 
 @router.post(
