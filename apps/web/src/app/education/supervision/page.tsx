@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import EducationShell from "@/components/education/EducationShell";
 
 type SupervisionAlert = {
-  code: "low_autonomy" | "proof_failed" | "assistance_repeated";
+  code: "low_autonomy" | "proof_failed" | "assistance_repeated" | "repeated_failures";
   severity: "warning" | "critical";
   message: string;
 };
@@ -63,6 +63,7 @@ function proofInterventionResult(
 function alertLabel(code: SupervisionAlert["code"]) {
   if (code === "low_autonomy") return "Autonomie faible";
   if (code === "proof_failed") return "Preuve échouée";
+  if (code === "repeated_failures") return "Échecs répétés";
   return "Assistance répétée";
 }
 
@@ -311,6 +312,25 @@ export default function SupervisionPage() {
                   <div key={alert.code} className={alert.severity === "critical" ? "supervision-alert critical" : "supervision-alert"}>
                     <strong>{alertLabel(alert.code)}</strong>
                     <span>{alert.message}</span>
+                    {alert.code === "repeated_failures" ? (
+                      <button
+                        type="button"
+                        className="supervision-detail-button"
+                        disabled={interventionBusy}
+                        onClick={() => void intervene("assign_consolidation")}
+                      >
+                        Assigner la consolidation maintenant
+                      </button>
+                    ) : alert.code === "proof_failed" ? (
+                      <button
+                        type="button"
+                        className="supervision-detail-button"
+                        disabled={interventionBusy}
+                        onClick={() => void intervene("assign_consolidation")}
+                      >
+                        Lancer une consolidation
+                      </button>
+                    ) : null}
                   </div>
                 ))}
               </div>
