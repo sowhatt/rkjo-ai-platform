@@ -51,6 +51,8 @@ type LearningResult = {
 
 type AttemptResult = Attempt & {
   learning: LearningResult[];
+  next_best_action?: "next_activity" | "request_proof" | "consolidation" | "consolidation_and_alert" | null;
+  next_best_action_reason?: string | null;
 };
 
 type ProofChallenge = {
@@ -1052,6 +1054,22 @@ export default function EducationSession() {
                             : "À retravailler"}
                         </strong>
                       </div>
+
+                      {result.next_best_action ? (
+                        <div className="rkjo-proof-intro">
+                          <strong>Prochaine étape recommandée par RKJO</strong>
+                          <p>{result.next_best_action_reason}</p>
+                          <small>
+                            {result.next_best_action === "next_activity"
+                              ? "→ Continuer vers l’activité suivante"
+                              : result.next_best_action === "request_proof"
+                                ? "→ Vérifier la compétence en autonomie"
+                                : result.next_best_action === "consolidation_and_alert"
+                                  ? "→ Consolider et prévenir le professeur"
+                                  : "→ Faire un exercice de consolidation"}
+                          </small>
+                        </div>
+                      ) : null}
 
                       <div className="rkjo-result-grid">
                         <div>
