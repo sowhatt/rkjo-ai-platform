@@ -28,6 +28,7 @@ from rkjo_education.course.models import Course
 from rkjo_education.course.service import CourseService
 from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
 from rkjo_education.learning.service import DuplicateEnrollmentError, LearningService
+from rkjo_education.intelligence.next_best_action import NextBestActionService
 from rkjo_education.intelligence.proof_application import (
     ProofApplicationService,
     ProofChallengeCompletedError,
@@ -189,6 +190,8 @@ class AttemptSubmitResponse(AttemptResponse):
     learning: list[QuestionLearningResponse] = Field(
         default_factory=list
     )
+    next_best_action: str | None = None
+    next_best_action_reason: str | None = None
 
 
 def require_tenant(request: Request) -> str:
@@ -685,6 +688,16 @@ def submit_attempt(
         payload={"percentage": attempt.percentage},
     ))
 
+    nba = None
+    if result.learning:
+        weakest = min(result.learning, key=lambda item: item.autonomy_score)
+        nba = NextBestActionService().decide(
+            correct=all(item.correct for item in result.learning),
+            autonomy_score=weakest.autonomy_score,
+            mastery=weakest.mastery,
+            proof_required=any(item.proof_required for item in result.learning),
+        )
+
     return AttemptSubmitResponse(
         id=attempt.id,
         assessment_id=attempt.assessment_id,
@@ -706,6 +719,8 @@ def submit_attempt(
             )
             for item in result.learning
         ],
+        next_best_action=nba.action.value if nba else None,
+        next_best_action_reason=nba.reason if nba else None,
     )
 
 
