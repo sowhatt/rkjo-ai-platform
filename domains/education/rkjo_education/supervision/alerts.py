@@ -11,6 +11,7 @@ class SupervisionAlertCode(StrEnum):
     LOW_AUTONOMY = "low_autonomy"
     PROOF_FAILED = "proof_failed"
     ASSISTANCE_REPEATED = "assistance_repeated"
+    REPEATED_FAILURES = "repeated_failures"
 
 
 class SupervisionAlertSeverity(StrEnum):
@@ -24,7 +25,11 @@ class SupervisionAlert(BaseModel):
     message: str
 
 
-def alerts_for_state(state: LearnerSupervisionState) -> list[SupervisionAlert]:
+def alerts_for_state(
+    state: LearnerSupervisionState,
+    *,
+    repeated_failures: int = 0,
+) -> list[SupervisionAlert]:
     """Return deterministic pedagogical alerts for a learner snapshot."""
     alerts: list[SupervisionAlert] = []
 
@@ -40,6 +45,13 @@ def alerts_for_state(state: LearnerSupervisionState) -> list[SupervisionAlert]:
             code=SupervisionAlertCode.PROOF_FAILED,
             severity=SupervisionAlertSeverity.CRITICAL,
             message="Preuve d’apprentissage échouée : compétence à revoir.",
+        ))
+
+    if repeated_failures >= 2:
+        alerts.append(SupervisionAlert(
+            code=SupervisionAlertCode.REPEATED_FAILURES,
+            severity=SupervisionAlertSeverity.CRITICAL,
+            message="Échecs répétés : consolidation et intervention pédagogique recommandées.",
         ))
 
     if state.hints_requested >= 3 or state.tutor_requests >= 3:
