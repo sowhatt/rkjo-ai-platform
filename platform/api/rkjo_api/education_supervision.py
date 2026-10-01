@@ -266,19 +266,6 @@ def list_teacher_interventions(
         and (event.payload.get("challenge_id") or event.payload.get("proof_challenge_id"))
     }
 
-    def completed(item: TeacherIntervention) -> bool:
-        if item.intervention_type == TeacherInterventionType.REQUEST_NEW_PROOF:
-            return bool(item.message and item.message in completed_challenges)
-        if item.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
-            return any(
-                event.event_type == EducationEventType.ASSESSMENT_COMPLETED
-                and event.assessment_id is not None
-                and str(event.assessment_id) == item.message
-                and event.occurred_at >= item.requested_at
-                for event in events
-            )
-        return False
-
     enriched: list[TeacherIntervention] = []
     for item in items:
         update: dict[str, object] = {}
