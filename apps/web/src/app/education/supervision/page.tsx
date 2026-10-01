@@ -35,6 +35,9 @@ type TeacherIntervention = {
   status: "requested" | "delivered" | "acknowledged";
   delivered_at: string | null;
   acknowledged_at: string | null;
+  result_status?: "passed" | "failed" | null;
+  result_autonomy_score?: number | null;
+  result_mastery?: string | null;
 };
 
 type LearningEvent = {
@@ -277,7 +280,12 @@ export default function SupervisionPage() {
                         const proofResult = proofInterventionResult(item, history);
                         if (proofResult?.event_type === "learner.proof.passed") return "✓ Preuve réussie en autonomie";
                         if (proofResult?.event_type === "learner.proof.failed") return "✕ Preuve échouée — consolidation nécessaire";
-                        if (item.intervention_type === "assign_consolidation" && item.status === "acknowledged") return "✓ Exercice de consolidation terminé";
+                        if (item.intervention_type === "assign_consolidation" && item.status === "acknowledged") {
+                          const result = item.result_status === "passed" ? "✓ Consolidation réussie" : item.result_status === "failed" ? "✕ Consolidation à reprendre" : "✓ Exercice de consolidation terminé";
+                          const autonomy = item.result_autonomy_score != null ? ` · autonomie ${item.result_autonomy_score}%` : "";
+                          const mastery = item.result_mastery ? ` · maîtrise ${item.result_mastery.replaceAll("_", " ")}` : "";
+                          return `${result}${autonomy}${mastery}`;
+                        }
                         if (item.status === "acknowledged") return "✓ Pris en compte par l’élève";
                         if (item.status === "delivered") return "Remis à l’élève";
                         return "En attente de remise";
