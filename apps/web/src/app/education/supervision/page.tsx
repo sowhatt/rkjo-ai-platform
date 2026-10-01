@@ -276,6 +276,7 @@ export default function SupervisionPage() {
                         const proofResult = proofInterventionResult(item, history);
                         if (proofResult?.event_type === "learner.proof.passed") return "✓ Preuve réussie en autonomie";
                         if (proofResult?.event_type === "learner.proof.failed") return "✕ Preuve échouée — consolidation nécessaire";
+                        if (item.intervention_type === "assign_consolidation" && item.status === "acknowledged") return "✓ Exercice de consolidation terminé";
                         if (item.status === "acknowledged") return "✓ Pris en compte par l’élève";
                         if (item.status === "delivered") return "Remis à l’élève";
                         return "En attente de remise";
