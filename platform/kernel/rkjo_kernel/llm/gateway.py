@@ -45,6 +45,7 @@ class LLMGateway:
         *,
         context: ExecutionContext,
     ) -> LLMResponse:
+        self._validate_request_identity(request, context)
         policy = self.policy_resolver.resolve(context)
         budget = self.budget_resolver.resolve(context)
 
@@ -53,8 +54,8 @@ class LLMGateway:
 
         governed_request = replace(
             request,
-            tenant_id=request.tenant_id or context.tenant_id,
-            trace_id=request.trace_id or context.trace_id,
+            tenant_id=context.tenant_id,
+            trace_id=context.trace_id,
             metadata=metadata,
         )
 
@@ -65,6 +66,26 @@ class LLMGateway:
 
         self._enforce_usage(response, budget)
         return response
+
+    @staticmethod
+    def _validate_request_identity(
+        request: LLMRequest,
+        context: ExecutionContext,
+    ) -> None:
+        if (
+            request.tenant_id is not None
+            and request.tenant_id != context.tenant_id
+        ):
+            raise ValueError(
+                "LLM request tenant_id conflicts with ExecutionContext"
+            )
+        if (
+            request.trace_id is not None
+            and request.trace_id != context.trace_id
+        ):
+            raise ValueError(
+                "LLM request trace_id conflicts with ExecutionContext"
+            )
 
     @staticmethod
     def _enforce_usage(
