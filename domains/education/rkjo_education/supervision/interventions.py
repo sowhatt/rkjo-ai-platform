@@ -31,6 +31,9 @@ class TeacherIntervention(BaseModel):
     status: TeacherInterventionStatus = TeacherInterventionStatus.REQUESTED
     delivered_at: datetime | None = None
     acknowledged_at: datetime | None = None
+    result_status: str | None = None
+    result_autonomy_score: int | None = None
+    result_mastery: str | None = None
 
 
 class TeacherInterventionStore:
