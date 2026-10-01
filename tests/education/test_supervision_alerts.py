@@ -44,3 +44,15 @@ def test_healthy_state_has_no_alert():
         tutor_requests=0,
     ))
     assert alerts == []
+
+
+def test_repeated_failures_are_critical():
+    alerts = alerts_for_state(
+        state(autonomy_score=70),
+        repeated_failures=2,
+    )
+    repeated = next(
+        item for item in alerts
+        if item.code == SupervisionAlertCode.REPEATED_FAILURES
+    )
+    assert repeated.severity == SupervisionAlertSeverity.CRITICAL
