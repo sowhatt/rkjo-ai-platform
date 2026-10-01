@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from collections.abc import Iterable
+
+from rkjo_education.events import EducationEventType, EducationLearningEvent
 
 
 class NextBestActionType(StrEnum):
@@ -23,6 +26,24 @@ class NextBestActionService:
     The engine uses observable outcome, autonomy, mastery and proof need.
     It deliberately stays provider-neutral and explainable.
     """
+
+    @staticmethod
+    def repeated_failures(
+        events: Iterable[EducationLearningEvent],
+        *,
+        competency_code: str,
+    ) -> int:
+        count = 0
+        for event in reversed(list(events)):
+            if event.competency_code != competency_code:
+                continue
+            if event.event_type != EducationEventType.ANSWER_SUBMITTED:
+                continue
+            if event.payload.get("correct") is True:
+                break
+            if event.payload.get("correct") is False:
+                count += 1
+        return count
 
     def decide(
         self,
