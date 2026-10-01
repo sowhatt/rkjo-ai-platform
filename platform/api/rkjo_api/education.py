@@ -707,7 +707,15 @@ def submit_attempt(
             prior_events,
             competency_code=weakest.competency_code,
         )
-        if not weakest.correct:
+        current_answer_already_persisted = any(
+            event.event_type == EducationEventType.ANSWER_SUBMITTED
+            and event.assessment_id == attempt.assessment_id
+            and event.question_id == weakest.question_id
+            and event.competency_code == weakest.competency_code
+            and event.payload.get("correct") is weakest.correct
+            for event in reversed(prior_events[-8:])
+        )
+        if not weakest.correct and not current_answer_already_persisted:
             repeated_failures += 1
         nba = nba_service.decide(
             correct=all(item.correct for item in result.learning),
