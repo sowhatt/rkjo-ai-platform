@@ -192,6 +192,8 @@ class AttemptSubmitResponse(AttemptResponse):
     )
     next_best_action: str | None = None
     next_best_action_reason: str | None = None
+    next_assessment_id: UUID | None = None
+    next_proof_challenge_id: UUID | None = None
 
 
 def require_tenant(request: Request) -> str:
@@ -689,6 +691,8 @@ def submit_attempt(
     ))
 
     nba = None
+    next_assessment_id = None
+    next_proof_challenge_id = None
     if result.learning:
         weakest = min(result.learning, key=lambda item: item.autonomy_score)
         nba = NextBestActionService().decide(
@@ -697,6 +701,32 @@ def submit_attempt(
             mastery=weakest.mastery,
             proof_required=any(item.proof_required for item in result.learning),
         )
+        if nba.action.value == "request_proof":
+            next_proof_challenge_id = next(
+                (
+                    item.proof_challenge_id
+                    for item in result.learning
+                    if item.proof_challenge_id is not None
+                ),
+                None,
+            )
+        elif nba.action.value in {"consolidation", "consolidation_and_alert"}:
+            next_assessment_id = assessment.id
+        elif nba.action.value == "next_activity":
+            course_assessments = assessment_service.list_assessments(
+                tenant_id=tenant_id,
+                course_id=assessment.course_id,
+            )
+            try:
+                current_index = next(
+                    index
+                    for index, item in enumerate(course_assessments)
+                    if item.id == assessment.id
+                )
+            except StopIteration:
+                current_index = -1
+            if 0 <= current_index < len(course_assessments) - 1:
+                next_assessment_id = course_assessments[current_index + 1].id
 
     return AttemptSubmitResponse(
         id=attempt.id,
@@ -721,6 +751,8 @@ def submit_attempt(
         ],
         next_best_action=nba.action.value if nba else None,
         next_best_action_reason=nba.reason if nba else None,
+        next_assessment_id=next_assessment_id,
+        next_proof_challenge_id=next_proof_challenge_id,
     )
 
 
