@@ -85,9 +85,24 @@ def get_learner_detail(
             status_code=404,
             detail="Learner supervision state not found.",
         )
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    events = history.list_for_learner(
+        tenant_id=state.tenant_id,
+        learner_id=state.learner_id,
+    )
+    repeated_failures = 0
+    for event in reversed(events):
+        if event.event_type != EducationEventType.ANSWER_SUBMITTED:
+            continue
+        if event.payload.get("correct") is True:
+            break
+        if event.payload.get("correct") is False:
+            repeated_failures += 1
+
     return LearnerSupervisionDetail(
         **state.model_dump(),
-        alerts=alerts_for_state(state),
+        alerts=alerts_for_state(state, repeated_failures=repeated_failures),
     )
 
 
