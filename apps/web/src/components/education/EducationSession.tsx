@@ -404,6 +404,31 @@ export default function EducationSession() {
     };
   }, [learnerId, courseId, assessmentId]);
 
+  function startConsolidation(intervention: TeacherIntervention) {
+    if (!intervention.message) return;
+    const index = assessments.findIndex((item) => item.id === intervention.message);
+    if (index < 0) {
+      setError("L’exercice de consolidation n’est plus disponible.");
+      return;
+    }
+    setAssessmentIndex(index);
+    setQuestionIndex(0);
+    setAttempt(null);
+    setResult(null);
+    setAnswer("");
+    setHintsUsed(0);
+    setAssistanceLevel(0);
+    setAttemptCount(1);
+    setProof(null);
+    setProofResult(null);
+    setError("");
+    window.setTimeout(() => {
+      document
+        .getElementById("rkjo-current-activity")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
   async function ensureAttempt() {
     if (attempt) {
       return attempt;
@@ -509,6 +534,15 @@ export default function EducationSession() {
         payload as AttemptResult;
 
       setResult(submitted);
+      setProgress((current) => ({
+        completion_percent: submitted.percentage,
+        competency_scores: {
+          ...(current?.competency_scores ?? {}),
+          ...Object.fromEntries(
+            submitted.learning.map((item) => [item.competency_code, item.autonomy_score]),
+          ),
+        },
+      }));
 
       const learning =
         submitted.learning.find(
@@ -857,6 +891,19 @@ export default function EducationSession() {
                     (item.status === "acknowledged" || completedProofChallengeIds.has(item.message)) ? (
                     <small>✓ Preuve réussie en autonomie</small>
                   ) : null}
+                  {item.intervention_type === "assign_consolidation" ? (
+                    item.status !== "acknowledged" ? (
+                      <button
+                        type="button"
+                        className="rkjo-start"
+                        onClick={() => startConsolidation(item)}
+                      >
+                        Commencer l’exercice de consolidation
+                      </button>
+                    ) : (
+                      <small>✓ Exercice de consolidation terminé</small>
+                    )
+                  ) : null}
                   {item.intervention_type === "send_message" ? (
                     item.status !== "acknowledged" ? (
                       <button
@@ -878,7 +925,7 @@ export default function EducationSession() {
 
         <section className="rkjo-session-layout">
           <div className="rkjo-learning-column">
-            <article className="rkjo-session-main">
+            <article className="rkjo-session-main" id="rkjo-current-activity">
               <span className="rkjo-edu-kicker">
                 TA PROCHAINE ACTIVITÉ
               </span>
