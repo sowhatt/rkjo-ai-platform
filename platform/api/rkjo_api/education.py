@@ -589,6 +589,7 @@ def submit_attempt(
     service=Depends(
         get_education_assessment_learning_service
     ),
+    learning_service: LearningService = Depends(get_education_learning_service),
     event_publisher: EducationEventPublisher = Depends(get_education_event_publisher),
 ) -> AttemptSubmitResponse:
     tenant_id = require_uuid_tenant(request)
@@ -658,6 +659,22 @@ def submit_attempt(
                 competency_code=item.competency_code,
                 payload={"proof_challenge_id": str(item.proof_challenge_id)},
             ))
+
+    assessment = service._assessment_service.get_assessment(
+        tenant_id=tenant_id,
+        assessment_id=attempt.assessment_id,
+    )
+    competency_scores = {
+        item.competency_code: item.autonomy_score
+        for item in result.learning
+    }
+    learning_service.record_progress(
+        tenant_id=tenant_id,
+        learner_id=attempt.learner_id,
+        course_id=assessment.course_id,
+        completion_percent=attempt.percentage,
+        competency_scores=competency_scores,
+    )
 
     event_publisher.publish(EducationLearningEvent(
         event_type=EducationEventType.ASSESSMENT_COMPLETED,
