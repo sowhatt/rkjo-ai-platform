@@ -258,7 +258,9 @@ def list_teacher_interventions(
     history.initialize_schema()
     events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
     completed_challenges = {
-        str(event.payload.get("challenge_id") or event.payload.get("proof_challenge_id"))
+        str(event.payload.get("challenge_id") or event.payload.get("proof_challenge_id")): (
+            "passed" if event.event_type == EducationEventType.PROOF_PASSED else "failed"
+        )
         for event in events
         if event.event_type in {EducationEventType.PROOF_PASSED, EducationEventType.PROOF_FAILED}
         and (event.payload.get("challenge_id") or event.payload.get("proof_challenge_id"))
