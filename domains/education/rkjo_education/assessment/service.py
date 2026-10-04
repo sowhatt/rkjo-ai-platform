@@ -68,6 +68,28 @@ class AssessmentService:
             course_id=course_id,
         )
 
+    def course_completion_percent(
+        self,
+        *,
+        tenant_id: UUID,
+        learner_id: UUID,
+        course_id: UUID,
+    ) -> int:
+        assessments = self.list_assessments(
+            tenant_id=tenant_id,
+            course_id=course_id,
+        )
+        if not assessments:
+            return 0
+        completed = self._repository.list_submitted_assessment_ids(
+            tenant_id=tenant_id,
+            learner_id=learner_id,
+            course_id=course_id,
+        )
+        assessment_ids = {assessment.id for assessment in assessments}
+        completed_count = len(completed & assessment_ids)
+        return round((completed_count / len(assessment_ids)) * 100)
+
     def start_attempt(
         self,
         *,
