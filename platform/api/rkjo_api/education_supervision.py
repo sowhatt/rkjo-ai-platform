@@ -274,24 +274,11 @@ def create_teacher_intervention(
     ))
 
 
-@router.get(
-    "/learners/{learner_id}/interventions",
-    response_model=list[TeacherIntervention],
-)
-def list_teacher_interventions(
-    learner_id: UUID,
-    request: Request,
+def enrich_teacher_interventions(
+    items: list[TeacherIntervention],
+    events: list[EducationLearningEvent],
 ) -> list[TeacherIntervention]:
-    interventions = PostgresTeacherInterventionStore(get_database_url())
-    interventions.initialize_schema()
-    tenant_id = require_uuid_tenant(request)
-    items = interventions.list_for_learner(
-        tenant_id=tenant_id,
-        learner_id=learner_id,
-    )
-    history = PostgresLearningEventHistory(get_database_url())
-    history.initialize_schema()
-    events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+    """Derive durable learner outcomes without confusing unrelated evidence."""
     completed_challenges = {
         str(event.payload.get("challenge_id") or event.payload.get("proof_challenge_id")): (
             "passed" if event.event_type == EducationEventType.PROOF_PASSED else "failed"
@@ -300,7 +287,6 @@ def list_teacher_interventions(
         if event.event_type in {EducationEventType.PROOF_PASSED, EducationEventType.PROOF_FAILED}
         and (event.payload.get("challenge_id") or event.payload.get("proof_challenge_id"))
     }
-
     enriched: list[TeacherIntervention] = []
     for item in items:
         update: dict[str, object] = {}
@@ -358,6 +344,27 @@ def list_teacher_interventions(
                 )
         enriched.append(item.model_copy(update=update))
     return enriched
+
+
+@router.get(
+    "/learners/{learner_id}/interventions",
+    response_model=list[TeacherIntervention],
+)
+def list_teacher_interventions(
+    learner_id: UUID,
+    request: Request,
+) -> list[TeacherIntervention]:
+    interventions = PostgresTeacherInterventionStore(get_database_url())
+    interventions.initialize_schema()
+    tenant_id = require_uuid_tenant(request)
+    items = interventions.list_for_learner(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+    )
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+    return enrich_teacher_interventions(items, events)
 
 
 @router.post(
