@@ -15,19 +15,14 @@ class AssessmentRepository(Protocol):
         tenant_id: UUID,
         course_id: UUID,
     ) -> list[Assessment]: ...
-    def list_assessments(
+
+    def list_submitted_assessment_ids(
         self,
         *,
         tenant_id: UUID,
+        learner_id: UUID,
         course_id: UUID,
-    ) -> list[Assessment]:
-        return [
-            assessment
-            for (item_tenant_id, _), assessment
-            in self._assessments.items()
-            if item_tenant_id == tenant_id
-            and assessment.course_id == course_id
-        ]
+    ) -> set[UUID]: ...
 
     def get_question(
         self,
@@ -50,6 +45,41 @@ class InMemoryAssessmentRepository:
 
     def get_assessment(self, *, tenant_id: UUID, assessment_id: UUID) -> Assessment | None:
         return self._assessments.get((tenant_id, assessment_id))
+
+    def list_assessments(
+        self,
+        *,
+        tenant_id: UUID,
+        course_id: UUID,
+    ) -> list[Assessment]:
+        return [
+            assessment
+            for (item_tenant_id, _), assessment in self._assessments.items()
+            if item_tenant_id == tenant_id and assessment.course_id == course_id
+        ]
+
+    def list_submitted_assessment_ids(
+        self,
+        *,
+        tenant_id: UUID,
+        learner_id: UUID,
+        course_id: UUID,
+    ) -> set[UUID]:
+        course_assessment_ids = {
+            assessment.id
+            for assessment in self.list_assessments(
+                tenant_id=tenant_id,
+                course_id=course_id,
+            )
+        }
+        return {
+            attempt.assessment_id
+            for (item_tenant_id, _), attempt in self._attempts.items()
+            if item_tenant_id == tenant_id
+            and attempt.learner_id == learner_id
+            and attempt.assessment_id in course_assessment_ids
+            and attempt.status.value == "submitted"
+        }
 
     def get_question(
         self,
