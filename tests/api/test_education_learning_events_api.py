@@ -211,3 +211,9 @@ def test_submit_attempt_publishes_learning_chain(monkeypatch):
     assert mastery.payload == {"mastery": "provisional"}
     proof = publisher.events[3]
     assert proof.payload == {"proof_challenge_id": str(PROOF_ID)}
+    body = response.json()
+    assert body["next_best_action"] == "request_proof"
+    assert body["next_best_action_rule_id"]
+    assert body["next_best_action_policy_version"]
+    assert body["next_best_action_signals"]
+    assert isinstance(body["next_best_action_modifiers"], list)
