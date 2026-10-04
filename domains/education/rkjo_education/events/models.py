@@ -21,6 +21,7 @@ class EducationEventType(StrEnum):
     PROOF_PASSED = "learner.proof.passed"
     PROOF_FAILED = "learner.proof.failed"
     SESSION_COMPLETED = "learner.session.completed"
+    NBA_DECIDED = "learner.nba.decided"
 
 
 class EducationLearningEvent(BaseModel):
