@@ -50,7 +50,14 @@ def test_assessment_journey_through_api(client, monkeypatch):
             "answers": {
                 assessment["question_ids"][0]: "4",
                 assessment["question_ids"][1]: "5",
-            }
+            },
+            "evidence": {
+                assessment["question_ids"][0]: {
+                    "assistance_level": 0,
+                    "hints_used": 0,
+                    "attempt_count": 1,
+                }
+            },
         },
     )
     assert submit.status_code == 200
