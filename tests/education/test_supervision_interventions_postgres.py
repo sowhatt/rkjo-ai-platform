@@ -105,3 +105,30 @@ def test_intervention_delivery_and_acknowledgement_lifecycle():
     saved = restarted.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
     current = next(item for item in saved if item.intervention_id == created.intervention_id)
     assert current.status.value == "acknowledged"
+
+
+def test_exact_consolidation_target_survives_restart():
+    store = PostgresTeacherInterventionStore(DATABASE_URL)
+    store.initialize_schema()
+    tenant_id, learner_id = uuid4(), uuid4()
+    assessment_id, question_id = uuid4(), uuid4()
+    created = store.create(TeacherIntervention(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        intervention_type=TeacherInterventionType.ASSIGN_CONSOLIDATION,
+        message=str(assessment_id),
+        target_assessment_id=assessment_id,
+        target_question_id=question_id,
+        competency_code="MATH.ADD",
+    ))
+
+    restarted = PostgresTeacherInterventionStore(DATABASE_URL)
+    saved = restarted.list_for_learner(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+    )[0]
+
+    assert saved == created
+    assert saved.target_assessment_id == assessment_id
+    assert saved.target_question_id == question_id
+    assert saved.competency_code == "MATH.ADD"
