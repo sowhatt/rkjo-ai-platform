@@ -28,7 +28,12 @@ from rkjo_education.course.models import Course
 from rkjo_education.course.service import CourseService
 from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
 from rkjo_education.learning.service import DuplicateEnrollmentError, LearningService
-from rkjo_education.intelligence.next_best_action import NextBestActionService
+from rkjo_education.intelligence.learner_model import LearnerModelProjector
+from rkjo_education.intelligence.next_best_action import (
+    CompetencySignal,
+    NBAContext,
+    NextBestActionService,
+)
 from rkjo_education.supervision.history import PostgresLearningEventHistory
 from rkjo_education.intelligence.proof_application import (
     ProofApplicationService,
@@ -733,13 +738,53 @@ def submit_attempt(
         )
         if not weakest.correct and not current_answer_already_persisted:
             repeated_failures += 1
-        nba = nba_service.decide(
-            correct=all(item.correct for item in result.learning),
-            autonomy_score=weakest.autonomy_score,
-            mastery=weakest.mastery,
-            proof_required=any(item.proof_required for item in result.learning),
-            repeated_failures=repeated_failures,
+        projected_events = list(prior_events)
+        if not current_answer_already_persisted:
+            projected_events.extend([
+                EducationLearningEvent(
+                    event_type=EducationEventType.ANSWER_SUBMITTED,
+                    tenant_id=tenant_id,
+                    learner_id=attempt.learner_id,
+                    assessment_id=attempt.assessment_id,
+                    question_id=weakest.question_id,
+                    competency_code=weakest.competency_code,
+                    payload={"correct": weakest.correct},
+                ),
+                EducationLearningEvent(
+                    event_type=EducationEventType.AUTONOMY_UPDATED,
+                    tenant_id=tenant_id,
+                    learner_id=attempt.learner_id,
+                    assessment_id=attempt.assessment_id,
+                    question_id=weakest.question_id,
+                    competency_code=weakest.competency_code,
+                    payload={"autonomy_score": weakest.autonomy_score},
+                ),
+            ])
+        state = LearnerModelProjector().project(
+            projected_events,
+            competency_code=weakest.competency_code,
         )
+        nba = nba_service.decide_context(NBAContext(
+            competencies=(CompetencySignal(
+                competency_code=weakest.competency_code,
+                mastery=state.mastery,
+                autonomy=state.autonomy,
+                retention=state.retention,
+                latest_correct=state.latest_correct,
+                latest_help=state.latest_help,
+                latest_proof=(
+                    "passed" if state.successful_proof else None
+                ),
+                consecutive_failures=max(
+                    repeated_failures,
+                    state.consecutive_failures,
+                ),
+                consecutive_no_hint_successes=state.consecutive_no_hint_successes,
+                distinct_success_exercises=state.distinct_success_exercises,
+                valid_proof=state.successful_proof,
+            ),),
+            target_competency=weakest.competency_code,
+        ))
         if nba.action.value == "request_proof":
             next_proof_challenge_id = next(
                 (
