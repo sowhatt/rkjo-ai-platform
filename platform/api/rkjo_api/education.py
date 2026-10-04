@@ -767,6 +767,28 @@ def submit_attempt(
             if 0 <= current_index < len(course_assessments) - 1:
                 next_assessment_id = course_assessments[current_index + 1].id
 
+        event_publisher.publish(EducationLearningEvent(
+            event_type=EducationEventType.NBA_DECIDED,
+            tenant_id=tenant_id,
+            learner_id=attempt.learner_id,
+            course_id=assessment.course_id,
+            assessment_id=attempt.assessment_id,
+            competency_code=weakest.competency_code,
+            payload={
+                "action": nba.action.value,
+                "rule_id": nba.rule_id,
+                "modifiers": list(nba.modifiers),
+                "policy_version": nba.policy_version,
+                "signals": nba.signals,
+                "explanation": nba.explanation,
+                "secondary_action": (
+                    nba.secondary_action.value
+                    if nba.secondary_action is not None
+                    else None
+                ),
+            },
+        ))
+
     return AttemptSubmitResponse(
         id=attempt.id,
         assessment_id=attempt.assessment_id,
