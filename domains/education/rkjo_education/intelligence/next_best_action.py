@@ -35,6 +35,7 @@ class CompetencySignal:
     autonomy: float = 1.0
     retention: float = 1.0
     importance: int = 1
+    covered_by_exam: bool = True
     prerequisite_code: str | None = None
     prerequisite_mastery: float | None = None
     latest_correct: bool | None = None
@@ -92,12 +93,14 @@ class NextBestActionService:
 
     def decide_context(self, context: NBAContext) -> NextBestAction:
         scope=tuple(x for x in context.competencies if x.seen and x.eligible)
+        if context.exam_days_remaining is not None and context.exam_days_remaining <= 3:
+            scope=tuple(x for x in scope if x.covered_by_exam)
         target=next((x for x in scope if x.competency_code==context.target_competency), scope[0] if scope else None)
         mods=[]
         if context.exam_days_remaining is not None and context.exam_days_remaining <= 3:
             mods.append("M2")
             if not context.mock_exam_last_24h:
-                return self._d(NextBestActionType.START_MOCK_EXAM,"M2",target,"Examen imminent : commencer par une simulation réaliste.",mods,extra={"exam_days_remaining":context.exam_days_remaining})
+                return self._d(NextBestActionType.START_MOCK_EXAM,"R6",target,"Examen imminent : commencer par une simulation réaliste.",mods,extra={"exam_days_remaining":context.exam_days_remaining,"mock_exam_last_24h":False})
         elif context.exam_days_remaining is not None and context.exam_days_remaining <= 15: mods.append("M1")
         if target is None or (target.latest_correct is None and target.latest_proof is None):
             return self._d(NextBestActionType.POSITIONING_TEST,"R0",target,"Aucune observation exploitable : commencer par un positionnement.",mods)
@@ -116,7 +119,9 @@ class NextBestActionService:
             return self._d(action,"R7",target,"La réussite reste trop assistée : pratiquer à nouveau.",mods)
         if target.consecutive_no_hint_successes>=3 and target.distinct_success_exercises>=3 and not target.valid_proof:
             return self._d(NextBestActionType.REQUEST_PROOF,"R8",target,"Trois réussites autonomes distinctes : vérifier par une preuve sans aide.",mods)
-        if target.latest_proof=="passed" and target.retention>=.60: return self._d(NextBestActionType.ADVANCE,"R9",target,"Preuve autonome réussie et rétention suffisante : avancer.",mods)
+        if target.latest_proof=="passed" and target.retention>=.60:
+            next_target=next((x for x in scope if x.competency_code != target.competency_code and x.eligible), target)
+            return self._d(NextBestActionType.ADVANCE,"R9",next_target,"Preuve autonome réussie et rétention suffisante : avancer.",mods,extra={"completed_competency":target.competency_code})
         action=NextBestActionType.INCREASE_DIFFICULTY if target.latest_correct is True and target.latest_help==0 else NextBestActionType.PRACTICE_SIMILAR
         if action==NextBestActionType.PRACTICE_SIMILAR and "M1" in mods and context.tester_share_last_24h<.40: action=NextBestActionType.PRACTICE_TIMED
         return self._d(action,"R10",target,"Continuer avec l’action adaptée aux derniers signaux.",mods)
