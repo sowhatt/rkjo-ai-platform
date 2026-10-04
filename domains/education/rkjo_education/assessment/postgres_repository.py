@@ -206,6 +206,35 @@ class PostgresAssessmentRepository:
 
         return assessments
 
+    def list_submitted_assessment_ids(
+        self,
+        *,
+        tenant_id: UUID,
+        learner_id: UUID,
+        course_id: UUID,
+    ) -> set[UUID]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT attempt.assessment_id
+                FROM education_assessment_attempts AS attempt
+                JOIN education_assessments AS assessment
+                  ON assessment.tenant_id = attempt.tenant_id
+                 AND assessment.assessment_id = attempt.assessment_id
+                WHERE attempt.tenant_id = %s
+                  AND attempt.learner_id = %s
+                  AND assessment.course_id = %s
+                  AND attempt.status = %s
+                """,
+                (
+                    tenant_id,
+                    learner_id,
+                    course_id,
+                    AttemptStatus.SUBMITTED.value,
+                ),
+            ).fetchall()
+        return {row[0] for row in rows}
+
     def get_question(
         self,
         *,
