@@ -142,9 +142,16 @@ def test_t08_failed_proof_remediates():
     assert (d.action, d.rule_id) == (NextBestActionType.REMEDIATE, "R2")
 
 
-def test_t09_passed_proof_advances():
-    d = decide(sig(mastery=.80, latest_proof="passed", valid_proof=True))
-    assert (d.action, d.rule_id) == (NextBestActionType.ADVANCE, "R9")
+def test_t09_passed_proof_advances_to_next_eligible_competency():
+    d = decide(
+        sig(mastery=.80, latest_proof="passed", valid_proof=True),
+        sig(competency_code="MATH.SUB", latest_correct=None),
+    )
+    assert (d.action, d.rule_id, d.target_competency) == (
+        NextBestActionType.ADVANCE,
+        "R9",
+        "MATH.SUB",
+    )
 
 
 def test_t10_retention_review_beats_advance():
@@ -168,7 +175,19 @@ def test_t12_exam_m1_turns_r7_into_timed_practice():
 def test_t14_exam_m2_starts_mock_before_review():
     d = decide(sig(retention=.50), exam_days_remaining=2, mock_exam_last_24h=False)
     assert d.action == NextBestActionType.START_MOCK_EXAM
+    assert d.rule_id == "R6"
     assert d.modifiers == ("M2",)
+
+
+def test_m2_excludes_unseen_or_out_of_exam_competencies():
+    d = decide(
+        sig(competency_code="MATH.ADD", covered_by_exam=False),
+        sig(competency_code="MATH.SUB", covered_by_exam=True, retention=.50),
+        target="MATH.ADD",
+        exam_days_remaining=2,
+        mock_exam_last_24h=True,
+    )
+    assert d.target_competency == "MATH.SUB"
 
 
 def test_t15_decision_is_explainable_and_versioned():
