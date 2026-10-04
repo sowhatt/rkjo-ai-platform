@@ -9,6 +9,7 @@ from rkjo_api.education_dependencies import (
     get_education_assessment_learning_service,
     get_education_assessment_service,
     get_education_event_publisher,
+    get_education_learning_service,
 )
 from rkjo_api.main import app
 from rkjo_education.assessment.models import (
@@ -58,6 +59,43 @@ class FakeAssessmentService:
             learner_id=learner_id,
             id=ATTEMPT_ID,
         )
+
+    def get_assessment(self, *, tenant_id, assessment_id):
+        assert tenant_id == TENANT_ID
+        assert assessment_id == ASSESSMENT_ID
+        return Assessment(
+            tenant_id=tenant_id,
+            course_id=COURSE_ID,
+            title="Addition",
+            questions=[
+                Question(
+                    id=QUESTION_ID,
+                    prompt="2 + 3 ?",
+                    correct_answer="5",
+                    points=1,
+                    competency_code="MATH.ADD",
+                )
+            ],
+            id=assessment_id,
+        )
+
+    def course_completion_percent(self, *, tenant_id, learner_id, course_id):
+        assert tenant_id == TENANT_ID
+        assert learner_id == LEARNER_ID
+        assert course_id == COURSE_ID
+        return 100
+
+    def list_assessments(self, *, tenant_id, course_id):
+        return [self.get_assessment(tenant_id=tenant_id, assessment_id=ASSESSMENT_ID)]
+
+
+@dataclass
+class FakeLearningService:
+    recorded: list | None = None
+
+    def record_progress(self, **kwargs):
+        if self.recorded is not None:
+            self.recorded.append(kwargs)
 
 
 @dataclass
@@ -135,6 +173,8 @@ def test_submit_attempt_publishes_learning_chain(monkeypatch):
         lambda: FakeAssessmentLearningService()
     )
     app.dependency_overrides[get_education_event_publisher] = lambda: publisher
+    app.dependency_overrides[get_education_assessment_service] = lambda: FakeAssessmentService()
+    app.dependency_overrides[get_education_learning_service] = lambda: FakeLearningService([])
     try:
         client = TestClient(app)
         try:
