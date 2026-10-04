@@ -88,6 +88,9 @@ type TeacherIntervention = {
   result_status?: "passed" | "failed" | null;
   result_autonomy_score?: number | null;
   result_mastery?: string | null;
+  target_assessment_id?: string | null;
+  target_question_id?: string | null;
+  competency_code?: string | null;
 };
 
 type ProofOutcome = "passed" | "failed";
@@ -411,14 +414,26 @@ export default function EducationSession() {
   }, [learnerId, courseId, assessmentId]);
 
   function startConsolidation(intervention: TeacherIntervention) {
-    if (!intervention.message) return;
-    const index = assessments.findIndex((item) => item.id === intervention.message);
+    const targetAssessmentId =
+      intervention.target_assessment_id ?? intervention.message;
+    if (!targetAssessmentId) return;
+    const index = assessments.findIndex((item) => item.id === targetAssessmentId);
     if (index < 0) {
       setError("L’exercice de consolidation n’est plus disponible.");
       return;
     }
+    const targetAssessment = assessments[index];
+    const targetQuestionIndex = intervention.target_question_id
+      ? targetAssessment.questions.findIndex(
+          (question) => question.id === intervention.target_question_id,
+        )
+      : 0;
+    if (intervention.target_question_id && targetQuestionIndex < 0) {
+      setError("La question de consolidation n’est plus disponible.");
+      return;
+    }
     setAssessmentIndex(index);
-    setQuestionIndex(0);
+    setQuestionIndex(Math.max(0, targetQuestionIndex));
     setAttempt(null);
     setResult(null);
     setAnswer("");
@@ -918,11 +933,11 @@ export default function EducationSession() {
                   ) : item.intervention_type === "request_new_proof" &&
                     item.message ? (
                     <small>
-                      {proofOutcomes.get(item.message) === "failed"
+                      {item.result_status === "failed" || proofOutcomes.get(item.message) === "failed"
                         ? "✕ Preuve échouée — consolidation nécessaire"
-                        : proofOutcomes.get(item.message) === "passed"
+                        : item.result_status === "passed" || proofOutcomes.get(item.message) === "passed"
                           ? "✓ Preuve réussie en autonomie"
-                          : "✓ Preuve terminée — résultat transmis au professeur"}
+                          : "✓ Preuve terminée — résultat enregistré"}
                     </small>
                   ) : null}
                   {item.intervention_type === "assign_consolidation" ? (
