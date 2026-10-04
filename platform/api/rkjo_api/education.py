@@ -671,15 +671,26 @@ def submit_attempt(
         tenant_id=tenant_id,
         assessment_id=attempt.assessment_id,
     )
+    competency_observations: dict[str, list[int]] = {}
+    for item in result.learning:
+        competency_observations.setdefault(
+            item.competency_code,
+            [],
+        ).append(item.autonomy_score)
     competency_scores = {
-        item.competency_code: item.autonomy_score
-        for item in result.learning
+        code: round(sum(scores) / len(scores))
+        for code, scores in competency_observations.items()
     }
+    completion_percent = assessment_service.course_completion_percent(
+        tenant_id=tenant_id,
+        learner_id=attempt.learner_id,
+        course_id=assessment.course_id,
+    )
     learning_service.record_progress(
         tenant_id=tenant_id,
         learner_id=attempt.learner_id,
         course_id=assessment.course_id,
-        completion_percent=attempt.percentage,
+        completion_percent=completion_percent,
         competency_scores=competency_scores,
     )
 
