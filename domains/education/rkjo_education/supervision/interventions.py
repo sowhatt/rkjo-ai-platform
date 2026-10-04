@@ -34,6 +34,9 @@ class TeacherIntervention(BaseModel):
     result_status: str | None = None
     result_autonomy_score: int | None = None
     result_mastery: str | None = None
+    target_assessment_id: UUID | None = None
+    target_question_id: UUID | None = None
+    competency_code: str | None = None
 
 
 class TeacherInterventionStore:
