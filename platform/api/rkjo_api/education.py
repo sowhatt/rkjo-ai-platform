@@ -193,6 +193,11 @@ class AttemptSubmitResponse(AttemptResponse):
     )
     next_best_action: str | None = None
     next_best_action_reason: str | None = None
+    next_best_action_rule_id: str | None = None
+    next_best_action_policy_version: str | None = None
+    next_best_action_signals: dict[str, object] = Field(default_factory=dict)
+    next_best_action_modifiers: list[str] = Field(default_factory=list)
+    next_best_action_secondary: str | None = None
     next_assessment_id: UUID | None = None
     next_proof_challenge_id: UUID | None = None
 
@@ -785,6 +790,15 @@ def submit_attempt(
         ],
         next_best_action=nba.action.value if nba else None,
         next_best_action_reason=nba.reason if nba else None,
+        next_best_action_rule_id=nba.rule_id if nba else None,
+        next_best_action_policy_version=nba.policy_version if nba else None,
+        next_best_action_signals=nba.signals if nba else {},
+        next_best_action_modifiers=list(nba.modifiers) if nba else [],
+        next_best_action_secondary=(
+            nba.secondary_action.value
+            if nba and nba.secondary_action is not None
+            else None
+        ),
         next_assessment_id=next_assessment_id,
         next_proof_challenge_id=next_proof_challenge_id,
     )
