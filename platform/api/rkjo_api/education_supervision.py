@@ -221,12 +221,44 @@ def create_teacher_intervention(
         ))
         message = str(challenge.id)
 
+    target_assessment_id = None
+    target_question_id = None
+    target_competency_code = None
     if payload.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
         if state.assessment_id is None:
             raise HTTPException(
                 status_code=409,
                 detail="No active assessment is available for consolidation.",
             )
+        history = PostgresLearningEventHistory(get_database_url())
+        history.initialize_schema()
+        events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+        target_event = next(
+            (
+                event for event in reversed(events)
+                if event.event_type == EducationEventType.ANSWER_SUBMITTED
+                and event.assessment_id == state.assessment_id
+                and event.question_id is not None
+                and event.competency_code
+                and event.payload.get("correct") is False
+            ),
+            None,
+        )
+        if target_event is None:
+            target_event = next(
+                (
+                    event for event in reversed(events)
+                    if event.event_type == EducationEventType.ANSWER_SUBMITTED
+                    and event.assessment_id == state.assessment_id
+                    and event.question_id is not None
+                    and event.competency_code
+                ),
+                None,
+            )
+        target_assessment_id = state.assessment_id
+        if target_event is not None:
+            target_question_id = target_event.question_id
+            target_competency_code = target_event.competency_code
         message = str(state.assessment_id)
 
     interventions = PostgresTeacherInterventionStore(get_database_url())
@@ -236,6 +268,9 @@ def create_teacher_intervention(
         learner_id=learner_id,
         intervention_type=payload.intervention_type,
         message=message,
+        target_assessment_id=target_assessment_id,
+        target_question_id=target_question_id,
+        competency_code=target_competency_code,
     ))
 
 
@@ -275,12 +310,19 @@ def list_teacher_interventions(
                 update["status"] = "acknowledged"
                 update["result_status"] = outcome
         elif item.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
+            target_assessment_id = item.target_assessment_id
+            if target_assessment_id is None and item.message:
+                try:
+                    target_assessment_id = UUID(item.message)
+                except ValueError:
+                    target_assessment_id = None
             result_event = next(
                 (
                     event for event in reversed(events)
                     if event.event_type == EducationEventType.ANSWER_SUBMITTED
-                    and event.assessment_id is not None
-                    and str(event.assessment_id) == item.message
+                    and event.assessment_id == target_assessment_id
+                    and (item.target_question_id is None or event.question_id == item.target_question_id)
+                    and (item.competency_code is None or event.competency_code == item.competency_code)
                     and event.occurred_at >= item.requested_at
                 ),
                 None,
