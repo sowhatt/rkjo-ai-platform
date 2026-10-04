@@ -73,7 +73,8 @@ def test_assessment_journey_through_api(client, monkeypatch):
     )
     assert progress.status_code == 200
     progress_payload = progress.json()
-    assert progress_payload["completion_percent"] == 67
+    # Course completion measures finished learning activities, not quiz score.
+    assert progress_payload["completion_percent"] == 100
     assert progress_payload["competency_scores"]["MATH.ADD"] == 100
 
 
@@ -376,3 +377,67 @@ def test_course_assessments_are_tenant_scoped(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_course_progress_counts_completed_assessments_not_quiz_score(client, monkeypatch):
+    tenant_id = uuid4()
+    monkeypatch.setenv("RKJO_OPERATOR_TENANT_ID", str(tenant_id))
+    headers = {"X-API-Key": "rkjo-operator-key"}
+    course_id = uuid4()
+    learner_id = uuid4()
+
+    assessments = []
+    for title in ("Activité 1", "Activité 2"):
+        created = client.post(
+            "/education/assessments",
+            headers=headers,
+            json={
+                "course_id": str(course_id),
+                "title": title,
+                "questions": [
+                    {
+                        "prompt": "2 + 2 ?",
+                        "correct_answer": "4",
+                        "points": 1,
+                        "competency_code": "MATH.ADD",
+                    }
+                ],
+            },
+        )
+        assert created.status_code == 201
+        assessments.append(created.json())
+
+    first = assessments[0]
+    started = client.post(
+        "/education/attempts",
+        headers=headers,
+        json={
+            "assessment_id": first["id"],
+            "learner_id": str(learner_id),
+        },
+    )
+    assert started.status_code == 201
+
+    submitted = client.post(
+        f"/education/attempts/{started.json()['id']}/submit",
+        headers=headers,
+        json={
+            "answers": {first["question_ids"][0]: "0"},
+            "evidence": {
+                first["question_ids"][0]: {
+                    "assistance_level": 0,
+                    "hints_used": 0,
+                    "attempt_count": 1,
+                }
+            },
+        },
+    )
+    assert submitted.status_code == 200
+    assert submitted.json()["percentage"] == 0
+
+    progress = client.get(
+        f"/education/learners/{learner_id}/courses/{course_id}/progress",
+        headers=headers,
+    )
+    assert progress.status_code == 200
+    assert progress.json()["completion_percent"] == 50
