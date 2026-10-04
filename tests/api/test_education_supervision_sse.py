@@ -84,7 +84,7 @@ def test_sse_emits_again_only_after_state_changes():
             event_type=EducationEventType.AUTONOMY_UPDATED,
             tenant_id=TENANT_A,
             learner_id=learner_id,
-            payload={"score": 91},
+            payload={"autonomy_score": 91},
         ))
         third = await anext(stream)
         fourth = await anext(stream)
