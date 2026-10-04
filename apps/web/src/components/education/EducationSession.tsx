@@ -555,15 +555,21 @@ export default function EducationSession() {
         payload as AttemptResult;
 
       setResult(submitted);
-      setProgress((current) => ({
-        completion_percent: submitted.percentage,
-        competency_scores: {
-          ...(current?.competency_scores ?? {}),
-          ...Object.fromEntries(
-            submitted.learning.map((item) => [item.competency_code, item.autonomy_score]),
-          ),
-        },
-      }));
+      try {
+        const progressResponse = await fetch(
+          `/api/education/learners/${encodeURIComponent(
+            learnerId,
+          )}/courses/${encodeURIComponent(
+            courseId,
+          )}/progress`,
+          { cache: "no-store" },
+        );
+        if (progressResponse.ok) {
+          setProgress((await progressResponse.json()) as Progress);
+        }
+      } catch {
+        // The submitted learning result remains usable even if progress refresh is delayed.
+      }
 
       const learning =
         submitted.learning.find(
