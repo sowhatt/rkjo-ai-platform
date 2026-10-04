@@ -1,5 +1,7 @@
 from rkjo_education.intelligence import (
     AutonomyResult,
+    LearnerModelCalculator,
+    LearnerObservation,
     MasteryCalculator,
     MasteryLevel,
     MasteryObservation,
@@ -172,3 +174,62 @@ def test_multiple_wrong_answers_do_not_create_mastery():
 
     assert result.level == MasteryLevel.NOT_DEMONSTRATED
     assert result.correct_observations == 0
+
+
+
+def test_v23_mastery_is_capped_without_successful_proof():
+    calculator = LearnerModelCalculator()
+    observations = [LearnerObservation(score=1.0, weight=1.0) for _ in range(10)]
+    assert calculator.mastery(observations, successful_proof=False) == 0.75
+    assert calculator.mastery(observations, successful_proof=True) > 0.75
+
+
+def test_v23_autonomy_uses_only_last_five_help_levels():
+    calculator = LearnerModelCalculator()
+    assert calculator.autonomy([1.0, 0.0, 0.25, 0.5, 0.75, 1.0]) == 0.5
+
+
+def test_v23_retention_and_review_threshold():
+    calculator = LearnerModelCalculator()
+    state = calculator.calculate(
+        observations=[LearnerObservation(score=.8, weight=1.0)],
+        help_levels=[0.0],
+        days_since_success=2.0,
+        stability_days=2.0,
+        successful_proof=True,
+    )
+    assert state.retention < 0.60
+    assert state.review_due is True
+
+
+def test_v23_stability_grows_on_spaced_success_and_shrinks_on_failure():
+    calculator = LearnerModelCalculator()
+    assert calculator.next_stability(
+        current_stability_days=2,
+        successful_no_help=True,
+        spaced_at_least_one_day=True,
+    ) == 5
+    assert calculator.next_stability(
+        current_stability_days=5,
+        successful_no_help=False,
+        failed=True,
+    ) == 2.5
+
+
+def test_v23_status_requires_proof_for_acquired():
+    calculator = LearnerModelCalculator()
+    observations = [LearnerObservation(score=1.0, weight=1.0) for _ in range(10)]
+    fragile = calculator.calculate(
+        observations=observations,
+        help_levels=[0.0],
+        days_since_success=0,
+        successful_proof=False,
+    )
+    acquired = calculator.calculate(
+        observations=observations,
+        help_levels=[0.0],
+        days_since_success=0,
+        successful_proof=True,
+    )
+    assert fragile.status == "fragile"
+    assert acquired.status == "acquired"
