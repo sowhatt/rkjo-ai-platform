@@ -74,3 +74,43 @@ def test_submitted_attempt_cannot_be_submitted_twice():
             attempt_id=attempt.id,
             answers={assessment.questions[0].id: "B"},
         )
+
+
+def test_course_completion_counts_finished_assessments_not_scores():
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    course_id = uuid4()
+    service = AssessmentService(InMemoryAssessmentRepository())
+
+    assessments = [
+        service.create_assessment(
+            tenant_id=tenant_id,
+            course_id=course_id,
+            title=f"Activity {index}",
+            questions=[{"prompt": "2 + 2 ?", "correct_answer": "4"}],
+        )
+        for index in (1, 2)
+    ]
+
+    assert service.course_completion_percent(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        course_id=course_id,
+    ) == 0
+
+    attempt = service.start_attempt(
+        tenant_id=tenant_id,
+        assessment_id=assessments[0].id,
+        learner_id=learner_id,
+    )
+    service.submit_attempt(
+        tenant_id=tenant_id,
+        attempt_id=attempt.id,
+        answers={assessments[0].questions[0].id: "wrong"},
+    )
+
+    assert service.course_completion_percent(
+        tenant_id=tenant_id,
+        learner_id=learner_id,
+        course_id=course_id,
+    ) == 50
