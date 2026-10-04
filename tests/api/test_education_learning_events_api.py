@@ -217,3 +217,10 @@ def test_submit_attempt_publishes_learning_chain(monkeypatch):
     assert body["next_best_action_policy_version"]
     assert body["next_best_action_signals"]
     assert isinstance(body["next_best_action_modifiers"], list)
+    nba_event = publisher.events[-1]
+    assert nba_event.event_type == EducationEventType.NBA_DECIDED
+    assert nba_event.payload["action"] == "request_proof"
+    assert nba_event.payload["rule_id"]
+    assert nba_event.payload["policy_version"]
+    assert nba_event.payload["signals"]
+    assert nba_event.payload["explanation"]
