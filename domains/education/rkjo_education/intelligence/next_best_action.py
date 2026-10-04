@@ -8,8 +8,21 @@ from rkjo_education.events import EducationEventType, EducationLearningEvent
 
 
 class NextBestActionType(StrEnum):
-    NEXT_ACTIVITY = "next_activity"
+    POSITIONING_TEST = "positioning_test"
+    EXPLAIN_CONCEPT = "explain_concept"
+    REEXPLAIN_DIFFERENTLY = "reexplain_differently"
+    REMEDIATE = "remediate"
+    PRACTICE_SIMILAR = "practice_similar"
+    PRACTICE_PREREQUISITE = "practice_prerequisite"
+    INCREASE_DIFFICULTY = "increase_difficulty"
+    PRACTICE_TIMED = "practice_timed"
     REQUEST_PROOF = "request_proof"
+    REVIEW = "review"
+    ADVANCE = "advance"
+    START_MOCK_EXAM = "start_mock_exam"
+    MARK_FOR_REVIEW = "mark_for_review"
+    ASK_FOR_HUMAN_HELP = "ask_for_human_help"
+    NEXT_ACTIVITY = "next_activity"
     CONSOLIDATION = "consolidation"
     CONSOLIDATION_AND_ALERT = "consolidation_and_alert"
 
