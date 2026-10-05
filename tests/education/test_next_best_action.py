@@ -5,6 +5,7 @@ from rkjo_education.intelligence.next_best_action import (
     CompetencySignal,
     NBAContext,
     NBA_POLICY_VERSION,
+    NBAPolicyConfig,
     NextBestActionService,
     NextBestActionType,
 )
@@ -197,3 +198,23 @@ def test_t15_decision_is_explainable_and_versioned():
     assert d.policy_version == NBA_POLICY_VERSION
     assert d.explanation
     assert d.timestamp.tzinfo is not None
+
+
+def test_r0_is_explainable_even_without_observations():
+    d = decide()
+    assert d.rule_id == "R0"
+    assert d.signals == {"observation_count": 0}
+    assert d.explanation
+
+
+def test_policy_thresholds_and_version_are_configurable():
+    service = NextBestActionService(NBAPolicyConfig(
+        policy_version="pilot-2026-10",
+        autonomy_low=.80,
+    ))
+    d = service.decide_context(NBAContext(
+        competencies=(sig(autonomy=.75, latest_help=0),),
+        target_competency="MATH.ADD",
+    ))
+    assert (d.action, d.rule_id) == (NextBestActionType.PRACTICE_SIMILAR, "R7")
+    assert d.policy_version == "pilot-2026-10"
