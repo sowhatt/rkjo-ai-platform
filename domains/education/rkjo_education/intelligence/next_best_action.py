@@ -99,13 +99,12 @@ class NextBestActionService:
             if event.payload.get("correct") is False: count += 1
         return count
 
-    @staticmethod
-    def _d(action, rule, target, reason, modifiers=(), secondary=None, extra=None):
+    def _d(self, action, rule, target, reason, modifiers=(), secondary=None, extra=None):
         signals={}
         if target:
             signals={"mastery":target.mastery,"autonomy":target.autonomy,"retention":target.retention,"latest_correct":target.latest_correct,"latest_help":target.latest_help,"latest_proof":target.latest_proof,"consecutive_failures":target.consecutive_failures}
         signals.update(extra or {})
-        return NextBestAction(action, reason, rule, target.competency_code if target else None, tuple(modifiers), NBA_POLICY_VERSION, datetime.now(timezone.utc), signals or {"observation_count": 0}, secondary)
+        return NextBestAction(action, reason, rule, target.competency_code if target else None, tuple(modifiers), self.config.policy_version, datetime.now(timezone.utc), signals or {"observation_count": 0}, secondary)
 
     def decide_context(self, context: NBAContext) -> NextBestAction:
         scope=tuple(x for x in context.competencies if x.seen and x.eligible)
