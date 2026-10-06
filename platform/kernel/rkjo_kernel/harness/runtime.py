@@ -9,6 +9,7 @@ from typing import Any, Callable, Protocol
 from rkjo_kernel.harness.checkpoint import CheckpointService
 from rkjo_kernel.harness.state import HarnessState, HarnessStateStatus, utc_now
 from rkjo_kernel.mission.execution_context import ExecutionContext
+from rkjo_kernel.runtime.retry_policy import RetryPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,15 @@ class HarnessExecutor(Protocol):
     ) -> HarnessIterationResult: ...
 
 
+@dataclass(frozen=True, slots=True)
+class HarnessPolicy:
+    max_iterations: int = 100
+
+    def __post_init__(self) -> None:
+        if self.max_iterations < 1:
+            raise ValueError("Harness max_iterations must be >= 1")
+
+
 class AgentHarness:
     """Run one durable agent iteration and checkpoint every transition."""
 
@@ -42,9 +52,13 @@ class AgentHarness:
         *,
         checkpoints: CheckpointService,
         executor: HarnessExecutor,
+        policy: HarnessPolicy | None = None,
+        retry_policy: RetryPolicy | None = None,
     ) -> None:
         self.checkpoints = checkpoints
         self.executor = executor
+        self.policy = policy or HarnessPolicy()
+        self.retry_policy = retry_policy
 
     def start(
         self,
@@ -83,6 +97,21 @@ class AgentHarness:
         state: HarnessState,
     ) -> HarnessState:
         self._validate_identity(context, state)
+        if state.iteration >= self.policy.max_iterations:
+            limited = self.checkpoints.checkpoint(
+                replace(
+                    state,
+                    status=HarnessStateStatus.FAILED,
+                    metadata={
+                        **deepcopy(state.metadata),
+                        "termination_reason": "max_iterations_reached",
+                    },
+                    updated_at=utc_now(),
+                )
+            )
+            raise RuntimeError(
+                f"Harness iteration limit reached ({limited.iteration})"
+            )
         if state.status in {
             HarnessStateStatus.COMPLETED,
             HarnessStateStatus.CANCELLED,
@@ -102,14 +131,28 @@ class AgentHarness:
         try:
             result = self.executor(state=running, context=context)
         except Exception as exc:
+            metadata = {
+                **deepcopy(running.metadata),
+                "last_error_type": type(exc).__name__,
+                "last_error": str(exc),
+            }
+            if self.retry_policy is not None:
+                attempt = int(metadata.get("retry_attempt", 1))
+                decision = self.retry_policy.decide(
+                    error=exc,
+                    attempt=attempt,
+                )
+                metadata.update({
+                    "retry_attempt": attempt + 1
+                    if decision.should_retry else attempt,
+                    "retry_should_retry": decision.should_retry,
+                    "retry_delay_seconds": decision.delay_seconds,
+                    "retry_reason": decision.reason,
+                })
             failed = replace(
                 running,
                 status=HarnessStateStatus.FAILED,
-                metadata={
-                    **deepcopy(running.metadata),
-                    "last_error_type": type(exc).__name__,
-                    "last_error": str(exc),
-                },
+                metadata=metadata,
                 updated_at=utc_now(),
             )
             self.checkpoints.checkpoint(failed)
