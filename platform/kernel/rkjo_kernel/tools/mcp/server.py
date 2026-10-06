@@ -13,6 +13,7 @@ from rkjo_kernel.registry.capability import AgentCapability
 from rkjo_kernel.tools.context import ToolExecutionContext
 from rkjo_kernel.tools.invoker import ToolInvoker
 from rkjo_kernel.tools.registry import ToolRegistry
+from rkjo_kernel.tools.mcp.security import MCPServerSecurity
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,9 +33,11 @@ class RKJOMCPServer:
         invoker: ToolInvoker,
         capabilities: list[AgentCapability],
         exposed_capabilities: set[str],
+        security: MCPServerSecurity | None = None,
     ) -> None:
         self.registry = registry
         self.invoker = invoker
+        self.security = security
         self._capabilities = {item.name: item for item in capabilities}
         self._exposed = {
             name.strip().lower()
@@ -92,6 +95,36 @@ class RKJOMCPServer:
         if not result.success:
             raise PermissionError(result.error or "RKJO MCP tool execution denied.")
         return result.output
+
+    def handle_authenticated(
+        self,
+        *,
+        credential: str,
+        method: str,
+        capability_name: str,
+        agent_name: str = "external.mcp",
+        params: dict[str, Any] | None = None,
+        mission_id: str | None = None,
+        trace_id: str | None = None,
+        workflow_execution_id: str | None = None,
+        workflow_step_id: str | None = None,
+        correlation_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if self.security is None:
+            raise PermissionError("RKJO MCP inbound security is not configured.")
+        context = self.security.authorize(
+            credential=credential,
+            capability_name=capability_name,
+            agent_name=agent_name,
+            mission_id=mission_id,
+            trace_id=trace_id,
+            workflow_execution_id=workflow_execution_id,
+            workflow_step_id=workflow_step_id,
+            correlation_id=correlation_id,
+            metadata=metadata,
+        )
+        return self.handle(method=method, params=params, context=context)
 
     def handle(
         self,
