@@ -14,6 +14,8 @@ class MCPExecutionAuditRecord:
     tenant_id: str
     agent_name: str
     capability_name: str
+    mission_id: str | None
+    trace_id: str | None
     workflow_execution_id: str | None
     workflow_step_id: str | None
     correlation_id: str | None
