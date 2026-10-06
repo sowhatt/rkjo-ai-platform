@@ -129,6 +129,14 @@ class CapabilityToolExecutionAdapter(AgentExecutionAdapter):
             tenant_id=tenant_id,
             agent_name=discovery_result.agent.name,
             capability_name=discovery_result.capability.name,
+            mission_id=self._optional_metadata_string(
+                context,
+                "mission_id",
+            ),
+            trace_id=self._optional_metadata_string(
+                context,
+                "trace_id",
+            ),
             workflow_execution_id=self._optional_metadata_string(
                 context,
                 "workflow_execution_id",
