@@ -22,6 +22,7 @@ from rkjo_education.supervision.interventions import (
     TeacherIntervention,
     PostgresTeacherInterventionStore,
     TeacherInterventionType,
+    TeacherInterventionStatus,
 )
 from pydantic import BaseModel, Field
 
@@ -293,7 +294,7 @@ def enrich_teacher_interventions(
         if item.intervention_type == TeacherInterventionType.REQUEST_NEW_PROOF:
             outcome = completed_challenges.get(item.message or "")
             if outcome:
-                update["status"] = "acknowledged"
+                update["status"] = TeacherInterventionStatus.ACKNOWLEDGED
                 update["result_status"] = outcome
         elif item.intervention_type == TeacherInterventionType.ASSIGN_CONSOLIDATION:
             target_assessment_id = item.target_assessment_id
@@ -314,7 +315,7 @@ def enrich_teacher_interventions(
                 None,
             )
             if result_event is not None:
-                update["status"] = "acknowledged"
+                update["status"] = TeacherInterventionStatus.ACKNOWLEDGED
                 update["result_status"] = (
                     "passed" if result_event.payload.get("correct") is True else "failed"
                 )
