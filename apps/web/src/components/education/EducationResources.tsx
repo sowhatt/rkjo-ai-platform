@@ -33,12 +33,21 @@ export default function EducationResources() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function chooseFile(file?: File) {
+  async function chooseFile(file?: File) {
     if (!file) return;
     setFilename(file.name);
-    if (file.type.startsWith("text/")) {
-      void file.text().then(setText);
+    setError("");
+    if (file.size > 20 * 1024 * 1024) {
+      setError("Le document dépasse la limite de 20 Mo.");
+      setText("");
+      return;
     }
+    if (file.type.startsWith("text/")) {
+      setText(await file.text());
+      return;
+    }
+    setText("");
+    setError("Le fichier est sélectionné. L’extraction PDF, photo et Word est la prochaine connexion du blueprint ; aucun faux résultat ne sera généré.");
   }
 
   async function analyze(event: FormEvent) {
@@ -93,7 +102,7 @@ export default function EducationResources() {
           <button type="button" className="rkjo-upload-zone" onClick={() => inputRef.current?.click()}>
             <span className="rkjo-upload-icon">↑</span>
             <strong>{filename || "Choisir un fichier"}</strong>
-            <small>{filename ? "Document prêt à être analysé" : "PDF, photo, Word · jusqu’à 20 Mo"}</small>
+            <small>{filename ? (text ? "Document prêt à être analysé" : "Document sélectionné") : "PDF, photo, Word · jusqu’à 20 Mo"}</small>
           </button>
 
           <details className="rkjo-prototype-input">
