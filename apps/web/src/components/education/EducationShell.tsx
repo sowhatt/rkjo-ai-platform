@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 
 type EducationSection =
   | "today"
@@ -52,10 +53,21 @@ export default function EducationShell({
   active,
   children,
 }: EducationShellProps) {
+  const searchParams = useSearchParams();
+  const learnerId = searchParams.get("learnerId");
+  const courseId = searchParams.get("courseId");
+  const contextualHref = (href: string) => {
+    const params = new URLSearchParams();
+    if (learnerId) params.set("learnerId", learnerId);
+    if (courseId) params.set("courseId", courseId);
+    const query = params.toString();
+    return query ? `${href}?${query}` : href;
+  };
+
   return (
     <div className="rkjo-edu-app">
       <aside className="rkjo-edu-side">
-        <Link href="/education" className="rkjo-edu-brand">
+        <Link href={contextualHref("/education")} className="rkjo-edu-brand">
           <span className="rkjo-edu-mark">R</span>
           <span>
             <strong>RKJO</strong>
@@ -70,7 +82,7 @@ export default function EducationShell({
               className={
                 active === item.key ? "active" : ""
               }
-              href={item.href}
+              href={contextualHref(item.href)}
             >
               <span>{item.icon}</span>
               {item.label}
