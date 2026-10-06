@@ -10,6 +10,8 @@ class ToolExecutionContext(BaseModel):
     agent_name: str
     capability_name: str
 
+    mission_id: str | None = None
+    trace_id: str | None = None
     workflow_execution_id: str | None = None
     workflow_step_id: str | None = None
     correlation_id: str | None = None
@@ -22,6 +24,8 @@ class ToolExecutionContext(BaseModel):
         "tenant_id",
         "agent_name",
         "capability_name",
+        "mission_id",
+        "trace_id",
     )
     @classmethod
     def normalize_identifier(
