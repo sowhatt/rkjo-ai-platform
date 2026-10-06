@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from rkjo_kernel.registry.capability import AgentCapability
+from rkjo_kernel.tools.approval import ToolApprovalService
 from rkjo_kernel.tools.context import ToolExecutionContext
 from rkjo_kernel.tools.policy import (
     ToolExecutionDecision,
@@ -24,9 +25,11 @@ class ToolInvoker:
         self,
         registry: ToolRegistry,
         policy: ToolExecutionPolicy | None = None,
+        approval_service: ToolApprovalService | None = None,
     ) -> None:
         self.registry = registry
         self.policy = policy or ToolExecutionPolicy()
+        self.approval_service = approval_service
 
     def invoke(
         self,
@@ -71,13 +74,27 @@ class ToolInvoker:
         )
 
         if decision == ToolExecutionDecision.REQUIRE_APPROVAL:
-            return ToolExecutionResult(
-                success=False,
-                error=(
-                    f"Tool '{normalized_tool_name}' requires approval "
-                    "before execution."
-                ),
+            approval_id = context.metadata.get("approval_id")
+            approved = (
+                isinstance(approval_id, str)
+                and self.approval_service is not None
+                and self.approval_service.authorize(
+                    approval_id=approval_id,
+                    tenant_id=context.tenant_id,
+                    tool_name=normalized_tool_name,
+                    mission_id=context.mission_id,
+                    trace_id=context.trace_id,
+                )
             )
+            if not approved:
+                return ToolExecutionResult(
+                    success=False,
+                    error=(
+                        f"Tool '{normalized_tool_name}' requires durable "
+                        "approval before execution."
+                    ),
+                )
+            decision = ToolExecutionDecision.ALLOW
 
         if decision != ToolExecutionDecision.ALLOW:
             return ToolExecutionResult(
