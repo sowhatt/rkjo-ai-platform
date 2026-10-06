@@ -16,34 +16,35 @@ class ToolExecutionContext(BaseModel):
     workflow_step_id: str | None = None
     correlation_id: str | None = None
 
-    metadata: dict[str, Any] = Field(
-        default_factory=dict
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator(
-        "tenant_id",
-        "agent_name",
-        "capability_name",
-        "mission_id",
-        "trace_id",
-    )
+    @field_validator("tenant_id", "agent_name", "capability_name")
     @classmethod
-    def normalize_identifier(
-        cls,
-        value: str,
-    ) -> str:
+    def normalize_routing_identifier(cls, value: str) -> str:
         normalized_value = value.strip().lower()
-
         if not normalized_value:
-            raise ValueError(
-                "Execution context identifiers "
-                "cannot be empty."
-            )
-
+            raise ValueError("Execution context identifiers cannot be empty.")
         if " " in normalized_value:
             raise ValueError(
-                "Execution context identifiers "
-                "must not contain spaces."
+                "Execution context identifiers must not contain spaces."
             )
+        return normalized_value
 
+    @field_validator(
+        "mission_id",
+        "trace_id",
+        "workflow_execution_id",
+        "workflow_step_id",
+        "correlation_id",
+    )
+    @classmethod
+    def preserve_execution_identity(
+        cls,
+        value: str | None,
+    ) -> str | None:
+        if value is None:
+            return None
+        normalized_value = value.strip()
+        if not normalized_value:
+            raise ValueError("Execution identity cannot be empty.")
         return normalized_value
