@@ -49,3 +49,16 @@ __all__ += [
     "ProofChallengeRepository",
     "StoredProofChallenge",
 ]
+
+
+from .mastery import (
+    LearnerModelCalculator,
+    LearnerModelState,
+    LearnerObservation,
+)
+
+__all__ += [
+    "LearnerModelCalculator",
+    "LearnerModelState",
+    "LearnerObservation",
+]
