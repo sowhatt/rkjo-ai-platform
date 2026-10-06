@@ -34,12 +34,6 @@ class ToolExecutionPolicy:
         if descriptor is not None and bool(
             descriptor.metadata.get("requires_approval", False)
         ):
-            approval = context.metadata.get("tool_approval")
-            if not isinstance(approval, dict):
-                return ToolExecutionDecision.REQUIRE_APPROVAL
-            if approval.get("tool_name") != normalized_tool_name:
-                return ToolExecutionDecision.REQUIRE_APPROVAL
-            if approval.get("approved") is not True:
-                return ToolExecutionDecision.REQUIRE_APPROVAL
+            return ToolExecutionDecision.REQUIRE_APPROVAL
 
         return ToolExecutionDecision.ALLOW
