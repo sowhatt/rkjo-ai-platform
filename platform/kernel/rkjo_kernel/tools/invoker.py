@@ -54,24 +54,43 @@ class ToolInvoker:
         context: ToolExecutionContext,
     ) -> ToolExecutionResult:
         """Invoke a tool only when allowed by the capability policy."""
+        normalized_tool_name = tool_name.strip().lower()
+        registered_tool = self.registry.get_registered_tool(
+            normalized_tool_name
+        )
+        descriptor = (
+            registered_tool.descriptor
+            if registered_tool is not None
+            else None
+        )
         decision = self.policy.evaluate(
             capability=capability,
-            tool_name=tool_name,
+            tool_name=normalized_tool_name,
             context=context,
+            descriptor=descriptor,
         )
+
+        if decision == ToolExecutionDecision.REQUIRE_APPROVAL:
+            return ToolExecutionResult(
+                success=False,
+                error=(
+                    f"Tool '{normalized_tool_name}' requires approval "
+                    "before execution."
+                ),
+            )
 
         if decision != ToolExecutionDecision.ALLOW:
             return ToolExecutionResult(
                 success=False,
                 error=(
-                    f"Tool '{tool_name.strip().lower()}' "
+                    f"Tool '{normalized_tool_name}' "
                     f"is not authorized for capability "
                     f"'{capability.name}'."
                 ),
             )
 
         return self._invoke_registered(
-            tool_name=tool_name.strip().lower(),
+            tool_name=normalized_tool_name,
             payload=payload,
             context=context,
         )
