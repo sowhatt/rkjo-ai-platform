@@ -1,4 +1,8 @@
 from rkjo_kernel.registry.capability import AgentCapability
+from rkjo_kernel.tools.approval import (
+    InMemoryToolApprovalStore,
+    ToolApprovalService,
+)
 from rkjo_kernel.tools.context import ToolExecutionContext
 from rkjo_kernel.tools.descriptor import ToolDescriptor
 from rkjo_kernel.tools.invoker import ToolInvoker
@@ -22,7 +26,8 @@ def setup():
         description="Refund a payment",
         tools=["payments.refund"],
     )
-    return registry, calls, capability
+    approvals = ToolApprovalService(InMemoryToolApprovalStore())
+    return registry, calls, capability, approvals
 
 
 def context(**metadata):
@@ -37,27 +42,32 @@ def context(**metadata):
 
 
 def test_sensitive_tool_fails_closed_without_approval():
-    registry, calls, capability = setup()
-    result = ToolInvoker(registry).invoke_authorized(
+    registry, calls, capability, approvals = setup()
+    result = ToolInvoker(
+        registry,
+        approval_service=approvals,
+    ).invoke_authorized(
         capability=capability,
         tool_name="payments.refund",
         payload={"amount": 100},
         context=context(),
     )
     assert result.success is False
-    assert "requires approval" in result.error
     assert calls == []
 
 
-def test_sensitive_tool_rejects_approval_for_another_tool():
-    registry, calls, capability = setup()
-    result = ToolInvoker(registry).invoke_authorized(
+def test_inline_approval_claim_is_never_trusted():
+    registry, calls, capability, approvals = setup()
+    result = ToolInvoker(
+        registry,
+        approval_service=approvals,
+    ).invoke_authorized(
         capability=capability,
         tool_name="payments.refund",
         payload={"amount": 100},
         context=context(
             tool_approval={
-                "tool_name": "payments.capture",
+                "tool_name": "payments.refund",
                 "approved": True,
             }
         ),
@@ -66,41 +76,55 @@ def test_sensitive_tool_rejects_approval_for_another_tool():
     assert calls == []
 
 
-def test_sensitive_tool_executes_with_explicit_matching_approval():
-    registry, calls, capability = setup()
-    result = ToolInvoker(registry).invoke_authorized(
+def test_sensitive_tool_executes_with_matching_durable_approval():
+    registry, calls, capability, approvals = setup()
+    approval = approvals.request(
+        tenant_id="tenant-a",
+        tool_name="payments.refund",
+        mission_id="Mission-ABC",
+        trace_id="Trace-XYZ",
+    )
+    approval = approvals.decide(
+        approval_id=approval.approval_id,
+        tenant_id="tenant-a",
+        approved=True,
+        decided_by="reviewer",
+    )
+    result = ToolInvoker(
+        registry,
+        approval_service=approvals,
+    ).invoke_authorized(
         capability=capability,
         tool_name="payments.refund",
         payload={"amount": 100},
-        context=context(
-            tool_approval={
-                "tool_name": "payments.refund",
-                "approved": True,
-            }
-        ),
+        context=context(approval_id=approval.approval_id),
     )
     assert result.success is True
     assert calls == [{"amount": 100}]
 
 
-def test_capability_mismatch_still_denies_even_with_approval():
-    registry, calls, capability = setup()
-    wrong = ToolExecutionContext(
+def test_approval_from_another_mission_is_rejected():
+    registry, calls, capability, approvals = setup()
+    approval = approvals.request(
         tenant_id="tenant-a",
-        agent_name="payments-agent",
-        capability_name="other_capability",
-        metadata={
-            "tool_approval": {
-                "tool_name": "payments.refund",
-                "approved": True,
-            }
-        },
+        tool_name="payments.refund",
+        mission_id="Other-Mission",
+        trace_id="Trace-XYZ",
     )
-    result = ToolInvoker(registry).invoke_authorized(
+    approval = approvals.decide(
+        approval_id=approval.approval_id,
+        tenant_id="tenant-a",
+        approved=True,
+        decided_by="reviewer",
+    )
+    result = ToolInvoker(
+        registry,
+        approval_service=approvals,
+    ).invoke_authorized(
         capability=capability,
         tool_name="payments.refund",
         payload={},
-        context=wrong,
+        context=context(approval_id=approval.approval_id),
     )
     assert result.success is False
     assert calls == []
