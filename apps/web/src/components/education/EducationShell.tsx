@@ -8,8 +8,7 @@ type EducationSection =
   | "courses"
   | "tutor"
   | "resources"
-  | "progress"
-  | "supervision";
+  | "progress";
 
 type EducationShellProps = {
   active: EducationSection;
@@ -46,12 +45,6 @@ const navigation = [
     href: "/education/progress",
     icon: "◫",
     label: "Progression",
-  },
-  {
-    key: "supervision" as const,
-    href: "/education/supervision",
-    icon: "◎",
-    label: "Supervision",
   },
 ];
 
