@@ -1,0 +1,103 @@
+"""Learner-first Education ingestion and referential alignment API."""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
+
+from rkjo_api.education import require_uuid_tenant
+from rkjo_education.alignment import ReferentialCompetency
+from rkjo_education.ingestion import DocumentKind, EducationIngestionService, Provenance
+from rkjo_education.ingestion.aligned_copy import CorrectedCopyAlignmentService
+
+
+router = APIRouter(prefix="/education", tags=["education-ingestion"])
+
+
+class ReferentialCompetencyRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=120)
+    label: str = Field(min_length=1, max_length=255)
+    keywords: list[str] = Field(default_factory=list)
+    importance: int = Field(default=1, ge=1, le=3)
+
+
+class AnalyzeDocumentRequest(BaseModel):
+    learner_id: UUID
+    filename: str = Field(min_length=1, max_length=300)
+    media_type: str = Field(min_length=1, max_length=200)
+    extracted_text: str = Field(min_length=1)
+    kind: DocumentKind
+    provenance: Provenance = Provenance.LEARNER_UPLOAD
+    referential: list[ReferentialCompetencyRequest] = Field(default_factory=list)
+
+
+class QuestionAlignmentResponse(BaseModel):
+    question_ref: str
+    competency_code: str | None
+    alignment_confidence: float
+    requires_confirmation: bool
+    earned_points: float | None = None
+    max_points: float | None = None
+
+
+class AnalyzeDocumentResponse(BaseModel):
+    document_id: UUID
+    source_hash: str
+    kind: DocumentKind
+    provenance: Provenance
+    questions: list[QuestionAlignmentResponse]
+
+
+@router.post("/documents/analyze", response_model=AnalyzeDocumentResponse)
+def analyze_document(payload: AnalyzeDocumentRequest, request: Request) -> AnalyzeDocumentResponse:
+    tenant_id = require_uuid_tenant(request)
+    try:
+        document = EducationIngestionService().ingest(
+            tenant_id=tenant_id,
+            learner_id=payload.learner_id,
+            filename=payload.filename,
+            media_type=payload.media_type,
+            extracted_text=payload.extracted_text,
+            kind=payload.kind,
+            provenance=payload.provenance,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    questions: list[QuestionAlignmentResponse] = []
+    if payload.kind == DocumentKind.CORRECTED_COPY:
+        referential = [
+            ReferentialCompetency(
+                code=item.code,
+                label=item.label,
+                keywords=tuple(item.keywords),
+                importance=item.importance,
+            )
+            for item in payload.referential
+        ]
+        rows = CorrectedCopyAlignmentService().process(
+            text=document.extracted_text,
+            referential=referential,
+            source_id=document.id,
+        )
+        questions = [
+            QuestionAlignmentResponse(
+                question_ref=row.question_ref,
+                competency_code=row.competency_code,
+                alignment_confidence=row.alignment_confidence,
+                requires_confirmation=row.requires_confirmation,
+                earned_points=(row.evidence.earned_points if row.evidence else None),
+                max_points=(row.evidence.max_points if row.evidence else None),
+            )
+            for row in rows
+        ]
+
+    return AnalyzeDocumentResponse(
+        document_id=document.id,
+        source_hash=document.source_hash,
+        kind=document.kind,
+        provenance=document.provenance,
+        questions=questions,
+    )
