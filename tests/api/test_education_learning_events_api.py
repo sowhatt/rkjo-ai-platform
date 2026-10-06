@@ -69,6 +69,7 @@ class FakeAssessmentService:
             title="Addition",
             questions=[
                 Question(
+                    tenant_id=tenant_id,
                     id=QUESTION_ID,
                     prompt="2 + 3 ?",
                     correct_answer="5",
@@ -204,6 +205,7 @@ def test_submit_attempt_publishes_learning_chain(monkeypatch):
         EducationEventType.MASTERY_UPDATED,
         EducationEventType.PROOF_REQUESTED,
         EducationEventType.ASSESSMENT_COMPLETED,
+        EducationEventType.NBA_DECIDED,
     ]
     autonomy = publisher.events[1]
     assert autonomy.payload == {"autonomy_score": 100}
