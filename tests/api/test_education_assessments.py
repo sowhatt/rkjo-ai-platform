@@ -251,8 +251,11 @@ def test_assessment_submit_returns_learning_and_proof_challenge(
     assert learning["mastery"] == "developing"
     assert learning["proof_required"] is True
     assert learning["proof_challenge_id"] is not None
-    assert result["next_best_action"] == "request_proof"
-    assert result["next_proof_challenge_id"] == learning["proof_challenge_id"]
+    # CDC v2.3 R7 precedes R8: an assisted success must first
+    # be practised again before an autonomous Proof is requested.
+    assert result["next_best_action"] == "practice_similar"
+    assert result["next_best_action_rule_id"] == "R7"
+    assert result["next_proof_challenge_id"] is None
 
     proof = client.get(
         (
