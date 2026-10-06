@@ -150,6 +150,8 @@ class MCPToolAdapter:
                 tenant_id=context.tenant_id,
                 agent_name=context.agent_name,
                 capability_name=context.capability_name,
+                mission_id=context.mission_id,
+                trace_id=context.trace_id,
                 workflow_execution_id=context.workflow_execution_id,
                 workflow_step_id=context.workflow_step_id,
                 correlation_id=context.correlation_id,
