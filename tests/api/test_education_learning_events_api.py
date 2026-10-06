@@ -214,14 +214,16 @@ def test_submit_attempt_publishes_learning_chain(monkeypatch):
     proof = publisher.events[3]
     assert proof.payload == {"proof_challenge_id": str(PROOF_ID)}
     body = response.json()
-    assert body["next_best_action"] == "request_proof"
+    assert body["next_best_action"] == "increase_difficulty"
+    assert body["next_best_action_rule_id"] == "R10"
     assert body["next_best_action_rule_id"]
     assert body["next_best_action_policy_version"]
     assert body["next_best_action_signals"]
     assert isinstance(body["next_best_action_modifiers"], list)
     nba_event = publisher.events[-1]
     assert nba_event.event_type == EducationEventType.NBA_DECIDED
-    assert nba_event.payload["action"] == "request_proof"
+    assert nba_event.payload["action"] == "increase_difficulty"
+    assert nba_event.payload["rule_id"] == "R10"
     assert nba_event.payload["rule_id"]
     assert nba_event.payload["policy_version"]
     assert nba_event.payload["signals"]
