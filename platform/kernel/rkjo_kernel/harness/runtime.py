@@ -179,6 +179,55 @@ class AgentHarness:
             )
         )
 
+    def suspend(
+        self,
+        *,
+        context: ExecutionContext,
+        state: HarnessState,
+        reason: str | None = None,
+    ) -> HarnessState:
+        self._validate_identity(context, state)
+        if state.status in {
+            HarnessStateStatus.COMPLETED,
+            HarnessStateStatus.CANCELLED,
+        }:
+            raise ValueError("Cannot suspend terminal harness state")
+        metadata = deepcopy(state.metadata)
+        if reason is not None:
+            metadata["suspension_reason"] = reason
+        return self.checkpoints.checkpoint(
+            replace(
+                state,
+                status=HarnessStateStatus.SUSPENDED,
+                metadata=metadata,
+                updated_at=utc_now(),
+            )
+        )
+
+    def cancel(
+        self,
+        *,
+        context: ExecutionContext,
+        state: HarnessState,
+        reason: str | None = None,
+    ) -> HarnessState:
+        self._validate_identity(context, state)
+        if state.status is HarnessStateStatus.COMPLETED:
+            raise ValueError("Cannot cancel completed harness state")
+        if state.status is HarnessStateStatus.CANCELLED:
+            return state
+        metadata = deepcopy(state.metadata)
+        if reason is not None:
+            metadata["cancellation_reason"] = reason
+        return self.checkpoints.checkpoint(
+            replace(
+                state,
+                status=HarnessStateStatus.CANCELLED,
+                metadata=metadata,
+                updated_at=utc_now(),
+            )
+        )
+
     @staticmethod
     def _tenant(context: ExecutionContext) -> str:
         if context.tenant_id is None or not context.tenant_id.strip():
