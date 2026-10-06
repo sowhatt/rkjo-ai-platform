@@ -16,6 +16,7 @@ from rkjo_kernel.tools.mcp.credentials import (
 )
 from rkjo_kernel.tools.mcp.http_transport import HTTPMCPTransport
 from rkjo_kernel.tools.mcp.runtime_client import TransportMCPClient
+from rkjo_kernel.tools.mcp.server import MCPServerTool, RKJOMCPServer
 from rkjo_kernel.tools.mcp.stdio_transport import StdioMCPTransport
 from rkjo_kernel.tools.mcp.transport import (
     MCPTransport,
@@ -33,12 +34,14 @@ __all__ = [
     "MCPCredentialProvider",
     "MCPExecutionAuditRecord",
     "MCPRemoteTool",
+    "MCPServerTool",
     "MCPToolAdapter",
     "MCPToolRegistration",
     "MCPTransport",
     "MCPTransportError",
     "MCPTransportTimeoutError",
     "NullMCPAuditSink",
+    "RKJOMCPServer",
     "StdioMCPTransport",
     "TransportMCPClient",
 ]
