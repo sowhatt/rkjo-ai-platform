@@ -27,6 +27,9 @@ from rkjo_api.education_assistance import (
 from rkjo_api.education_supervision import (
     router as education_supervision_router,
 )
+from rkjo_api.education_ingestion import (
+    router as education_ingestion_router,
+)
 
 from rkjo_api.security import (
     API_KEY_HEADER,
@@ -134,6 +137,9 @@ app.include_router(
 )
 app.include_router(
     education_supervision_router
+)
+app.include_router(
+    education_ingestion_router
 )
 
 
