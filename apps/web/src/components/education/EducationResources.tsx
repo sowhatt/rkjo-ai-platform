@@ -26,6 +26,7 @@ export default function EducationResources() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState("corrected_copy");
   const [filename, setFilename] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [text, setText] = useState("");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [corrections, setCorrections] = useState<Record<string, string>>({});
@@ -36,6 +37,7 @@ export default function EducationResources() {
   async function chooseFile(file?: File) {
     if (!file) return;
     setFilename(file.name);
+    setSelectedFile(file);
     setError("");
     if (file.size > 20 * 1024 * 1024) {
       setError("Le document dépasse la limite de 20 Mo.");
@@ -47,22 +49,34 @@ export default function EducationResources() {
       return;
     }
     setText("");
-    setError("Le fichier est sélectionné. L’extraction PDF, photo et Word est la prochaine connexion du blueprint ; aucun faux résultat ne sera généré.");
+    setError(file.type.startsWith("image/") ? "La photo est sélectionnée. L’OCR/multimodal arrive dans la prochaine tranche." : "Document sélectionné. Clique sur « Analyser avec RKJO ».");
   }
 
   async function analyze(event: FormEvent) {
     event.preventDefault();
-    if (!learnerId || !text.trim()) return;
+    if (!learnerId || (!selectedFile && !text.trim())) return;
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/education/documents/analyze", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          learner_id: learnerId, filename: filename || "support.pdf",
-          media_type: "application/pdf", extracted_text: text, kind,
-          provenance: "learner_upload", referential,
-        }),
-      });
+      let response: Response;
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("learner_id", learnerId);
+        formData.append("kind", kind);
+        formData.append("file", selectedFile);
+        response = await fetch("/api/education/documents/upload", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        response = await fetch("/api/education/documents/analyze", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            learner_id: learnerId, filename: filename || "support.txt",
+            media_type: "text/plain", extracted_text: text, kind,
+            provenance: "learner_upload", referential,
+          }),
+        });
+      }
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? "Analyse impossible.");
       setAnalysis(payload as Analysis); setCorrections({}); setConfirmed({});
@@ -102,7 +116,7 @@ export default function EducationResources() {
           <button type="button" className="rkjo-upload-zone" onClick={() => inputRef.current?.click()}>
             <span className="rkjo-upload-icon">↑</span>
             <strong>{filename || "Choisir un fichier"}</strong>
-            <small>{filename ? (text ? "Document prêt à être analysé" : "Document sélectionné") : "PDF, photo, Word · jusqu’à 20 Mo"}</small>
+            <small>{filename ? "Document prêt à être analysé" : "PDF, photo, Word · jusqu’à 20 Mo"}</small>
           </button>
 
           <details className="rkjo-prototype-input">
@@ -112,7 +126,7 @@ export default function EducationResources() {
 
           <div className="rkjo-supports-action">
             <div><strong>RKJO respecte la source</strong><small>Le document original reste distingué du contenu généré par l’IA.</small></div>
-            <button className="rkjo-action-primary" disabled={loading || !learnerId || !text.trim()}>
+            <button className="rkjo-action-primary" disabled={loading || !learnerId || (!selectedFile && !text.trim())}>
               {loading ? "Analyse en cours…" : "Analyser avec RKJO"}
             </button>
           </div>
