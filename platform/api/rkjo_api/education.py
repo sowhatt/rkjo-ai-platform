@@ -890,6 +890,9 @@ class ProofSubmitResponse(BaseModel):
     competency_code: str
     status: str
     independently_verified: bool
+    next_best_action: str | None = None
+    next_best_action_rule_id: str | None = None
+    next_best_action_explanation: str | None = None
 
 
 @router.get(
@@ -1044,4 +1047,7 @@ def submit_proof_challenge(
         competency_code=result.competency_code,
         status=result.status.value,
         independently_verified=result.independently_verified,
+        next_best_action=nba.action.value,
+        next_best_action_rule_id=nba.rule_id,
+        next_best_action_explanation=nba.explanation,
     )
