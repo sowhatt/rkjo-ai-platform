@@ -234,9 +234,11 @@ class ApplyDocumentLearningRequest(BaseModel):
 
 
 class AppliedEvidenceResponse(BaseModel):
+    question_ref: str
     competency_code: str
     score: float
     weight: float
+    alignment_confidence: float
     source: str = "corrected_copy"
 
 
@@ -280,9 +282,11 @@ def apply_document_learning(
         ):
             evidence.append(
                 AppliedEvidenceResponse(
+                    question_ref=item.question_ref,
                     competency_code=item.competency_code,
                     score=item.earned_points / item.max_points,
                     weight=0.8,
+                    alignment_confidence=item.alignment_confidence,
                 )
             )
 
@@ -302,6 +306,8 @@ def apply_document_learning(
                 competency_code=item.competency_code,
                 payload={
                     "document_id": str(document_id),
+                    "question_ref": item.question_ref,
+                    "alignment_confidence": item.alignment_confidence,
                     "score": item.score,
                     "weight": item.weight,
                     "source": item.source,
@@ -328,6 +334,8 @@ class LearnerTodayRecommendationResponse(BaseModel):
     mastery: float | None = None
     autonomy: float | None = None
     retention: float | None = None
+    challenge_id: UUID | None = None
+    source: str = "computed"
 
 
 @router.get("/learners/{learner_id}/today", response_model=LearnerTodayRecommendationResponse)
@@ -339,6 +347,58 @@ def get_learner_today_recommendation(
     history = PostgresLearningEventHistory(get_database_url())
     history.initialize_schema()
     events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+
+    latest_decision = next(
+        (event for event in reversed(events)
+         if event.event_type == EducationEventType.NBA_DECIDED),
+        None,
+    )
+    latest_observation = next(
+        (event for event in reversed(events)
+         if event.event_type != EducationEventType.NBA_DECIDED),
+        None,
+    )
+    if (
+        latest_decision is not None
+        and latest_observation is not None
+        and latest_decision.occurred_at >= latest_observation.occurred_at
+    ):
+        payload = latest_decision.payload
+        code = latest_decision.competency_code
+        state = (
+            LearnerModelProjector().project(events, competency_code=code)
+            if code else None
+        )
+        proof_request = next(
+            (
+                event for event in reversed(events)
+                if event.event_type == EducationEventType.PROOF_REQUESTED
+                and (code is None or event.competency_code == code)
+            ),
+            None,
+        )
+        raw_challenge_id = (
+            proof_request.payload.get("proof_challenge_id")
+            if proof_request is not None else None
+        )
+        challenge_id = None
+        if raw_challenge_id:
+            try:
+                challenge_id = UUID(str(raw_challenge_id))
+            except ValueError:
+                challenge_id = None
+        return LearnerTodayRecommendationResponse(
+            action=str(payload.get("action") or "practice_similar"),
+            target_competency=code,
+            rule_id=str(payload.get("rule_id") or "R10"),
+            explanation=str(payload.get("explanation") or "Continuer l’apprentissage."),
+            policy_version=str(payload.get("policy_version") or "v2.3-policy-v1"),
+            mastery=state.mastery if state else None,
+            autonomy=state.autonomy if state else None,
+            retention=state.retention if state else None,
+            challenge_id=challenge_id,
+            source="persisted_decision",
+        )
 
     competency_codes = list(dict.fromkeys(
         event.competency_code for event in events if event.competency_code
