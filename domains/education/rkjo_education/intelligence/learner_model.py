@@ -150,11 +150,47 @@ class LearnerModelProjector:
             sum(1.0 - h for h in recent_help) / len(recent_help)
             if recent_help else 0.0
         )
+        # CDC v2.3 retention stability S(c): start at 2 days, grow after
+        # spaced no-help success, shrink after failure.
+        stability_days = 2.0
+        retention_anchor: datetime | None = None
+        for event in sorted(relevant, key=lambda item: item.occurred_at):
+            successful_anchor = False
+            failed_observation = False
+            if event.event_type == EducationEventType.ANSWER_SUBMITTED:
+                correct = event.payload.get("correct") is True
+                help_level = autonomy_by_question.get(event.question_id, 0.0)
+                successful_anchor = correct and help_level == 0
+                failed_observation = not correct
+            elif event.event_type == EducationEventType.CORRECTED_COPY_OBSERVED:
+                score = event.payload.get("score")
+                # The CDC defines successful corrected copies as retention
+                # anchors but gives no partial-score threshold. Only an
+                # unambiguous full success is treated as successful here.
+                successful_anchor = isinstance(score, (int, float)) and float(score) >= 1.0
+                failed_observation = score == 0
+            elif event.event_type == EducationEventType.PROOF_PASSED:
+                successful_anchor = True
+            elif event.event_type == EducationEventType.PROOF_FAILED:
+                failed_observation = True
+
+            if successful_anchor:
+                if (
+                    retention_anchor is not None
+                    and (event.occurred_at - retention_anchor).total_seconds() >= 86400
+                ):
+                    stability_days *= 2.5
+                retention_anchor = event.occurred_at
+            elif failed_observation:
+                stability_days = max(1.0, stability_days * 0.5)
+
+        if retention_anchor is not None:
+            last_success_at = retention_anchor
         days = (
             max(0.0, (now - last_success_at).total_seconds() / 86400)
             if last_success_at else 9999.0
         )
-        retention = exp(-days / 2.0) if last_success_at else 0.0
+        retention = exp(-days / stability_days) if last_success_at else 0.0
 
         failures = 0
         successes = 0
