@@ -173,6 +173,15 @@ def test_t12_exam_m1_turns_r7_into_timed_practice():
     assert (d.action, d.rule_id, d.modifiers) == (NextBestActionType.PRACTICE_TIMED, "R7", ("M1",))
 
 
+def test_t13_failed_corrected_copy_remediates_without_autonomy_signal():
+    d = decide(sig(
+        mastery=.35,
+        autonomy=1.0,
+        latest_correct=None,
+        latest_observation_failed=True,
+    ))
+    assert (d.action, d.rule_id) == (NextBestActionType.REMEDIATE, "R5")
+
 def test_t14_exam_m2_starts_mock_before_review():
     d = decide(sig(retention=.50), exam_days_remaining=2, mock_exam_last_24h=False)
     assert d.action == NextBestActionType.START_MOCK_EXAM
