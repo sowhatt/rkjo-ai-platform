@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from rkjo_api.education import require_uuid_tenant
 from rkjo_education.alignment import ReferentialCompetency
 from rkjo_education.ingestion import DocumentKind, EducationIngestionService, Provenance
+from rkjo_education.ingestion.extractor import DocumentExtractionError, EducationDocumentExtractor
 from rkjo_education.ingestion.aligned_copy import CorrectedCopyAlignmentService
 
 
@@ -80,6 +81,77 @@ def analyze_document(payload: AnalyzeDocumentRequest, request: Request) -> Analy
         rows = CorrectedCopyAlignmentService().process(
             text=document.extracted_text,
             referential=referential,
+            source_id=document.id,
+        )
+        questions = [
+            QuestionAlignmentResponse(
+                question_ref=row.question_ref,
+                competency_code=row.competency_code,
+                alignment_confidence=row.alignment_confidence,
+                requires_confirmation=row.requires_confirmation,
+                earned_points=(row.evidence.earned_points if row.evidence else None),
+                max_points=(row.evidence.max_points if row.evidence else None),
+            )
+            for row in rows
+        ]
+
+    return AnalyzeDocumentResponse(
+        document_id=document.id,
+        source_hash=document.source_hash,
+        kind=document.kind,
+        provenance=document.provenance,
+        questions=questions,
+    )
+
+
+@router.post("/documents/upload", response_model=AnalyzeDocumentResponse)
+async def upload_document(
+    request: Request,
+    learner_id: UUID = Form(...),
+    kind: DocumentKind = Form(...),
+    file: UploadFile = File(...),
+) -> AnalyzeDocumentResponse:
+    tenant_id = require_uuid_tenant(request)
+    content = await file.read()
+    try:
+        extracted_text = EducationDocumentExtractor().extract(
+            filename=file.filename or "document",
+            media_type=file.content_type or "application/octet-stream",
+            content=content,
+        )
+        document = EducationIngestionService().ingest(
+            tenant_id=tenant_id,
+            learner_id=learner_id,
+            filename=file.filename or "document",
+            media_type=file.content_type or "application/octet-stream",
+            extracted_text=extracted_text,
+            kind=kind,
+            provenance=Provenance.LEARNER_UPLOAD,
+        )
+    except (DocumentExtractionError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    questions: list[QuestionAlignmentResponse] = []
+    if kind == DocumentKind.CORRECTED_COPY:
+        # Temporary demo referential. J4 persistence will replace this with
+        # the learner/course referential resolved from the Education domain.
+        demo_referential = [
+            ReferentialCompetency(
+                code="MED.BIO.CELL",
+                label="Biologie cellulaire",
+                keywords=("cellule", "membrane", "mitochondrie"),
+                importance=3,
+            ),
+            ReferentialCompetency(
+                code="MED.BIO.GEN",
+                label="Génétique",
+                keywords=("adn", "gène", "chromosome"),
+                importance=3,
+            ),
+        ]
+        rows = CorrectedCopyAlignmentService().process(
+            text=document.extracted_text,
+            referential=demo_referential,
             source_id=document.id,
         )
         questions = [
