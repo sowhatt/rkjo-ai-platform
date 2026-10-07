@@ -1,5 +1,5 @@
-import EducationHome from "@/components/education/EducationHome";
+import EducationToday from "@/components/education/EducationToday";
 
 export default function EducationPage() {
-  return <EducationHome />;
+  return <EducationToday />;
 }
