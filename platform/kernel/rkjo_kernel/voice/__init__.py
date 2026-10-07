@@ -34,6 +34,10 @@ __all__ = [
     "AudioPlaybackPort",
     "RealtimeTurnResult",
     "RealtimeVoiceOrchestrator",
+    "LiveVoiceEvent",
+    "LiveVoiceEventType",
+    "LiveVoiceSession",
+    "LiveVoiceTransportPort",
 ]
 
 from rkjo_kernel.voice.runtime import VoiceAgentPort, VoiceRuntime, VoiceTurnResult
@@ -45,3 +49,5 @@ from rkjo_kernel.voice.streaming import AudioChunk, VoiceStream, VoiceStreamEven
 from rkjo_kernel.voice.realtime import RealtimeVoiceController, RealtimeVoiceEvent, RealtimeVoiceEventSink, RealtimeVoiceState, VoiceActivity, VoiceActivityDetectorPort, VoiceActivityEvent
 
 from rkjo_kernel.voice.orchestrator import AudioPlaybackPort, RealtimeTurnResult, RealtimeVoiceOrchestrator
+
+from rkjo_kernel.voice.live import LiveVoiceEvent, LiveVoiceEventType, LiveVoiceSession, LiveVoiceTransportPort
