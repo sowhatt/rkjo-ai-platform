@@ -222,3 +222,71 @@ def confirm_document_alignment(
         earned_points=alignment.earned_points,
         max_points=alignment.max_points,
     )
+
+
+class ApplyDocumentLearningRequest(BaseModel):
+    learner_id: UUID
+
+
+class AppliedEvidenceResponse(BaseModel):
+    competency_code: str
+    score: float
+    weight: float
+    source: str = "corrected_copy"
+
+
+class ApplyDocumentLearningResponse(BaseModel):
+    document_id: UUID
+    applied: bool
+    evidence: list[AppliedEvidenceResponse]
+
+
+@router.post("/documents/{document_id}/apply-learning", response_model=ApplyDocumentLearningResponse)
+def apply_document_learning(
+    document_id: UUID,
+    payload: ApplyDocumentLearningRequest,
+    request: Request,
+) -> ApplyDocumentLearningResponse:
+    tenant_id = require_uuid_tenant(request)
+    repository = PostgresEducationDocumentRepository(get_database_url())
+    alignments = repository.get_alignments(
+        tenant_id=tenant_id,
+        learner_id=payload.learner_id,
+        document_id=document_id,
+    )
+    if alignments is None:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+
+    unresolved = [item for item in alignments if item.requires_confirmation]
+    if unresolved:
+        raise HTTPException(
+            status_code=409,
+            detail="Confirme les alignements incertains avant de les utiliser pour ton apprentissage.",
+        )
+
+    evidence = []
+    for item in alignments:
+        if (
+            item.competency_code
+            and item.earned_points is not None
+            and item.max_points is not None
+            and item.max_points > 0
+        ):
+            evidence.append(
+                AppliedEvidenceResponse(
+                    competency_code=item.competency_code,
+                    score=item.earned_points / item.max_points,
+                    weight=0.8,
+                )
+            )
+
+    applied = repository.mark_learning_applied(
+        tenant_id=tenant_id,
+        learner_id=payload.learner_id,
+        document_id=document_id,
+    )
+    return ApplyDocumentLearningResponse(
+        document_id=document_id,
+        applied=applied,
+        evidence=evidence,
+    )
