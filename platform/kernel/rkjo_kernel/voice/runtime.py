@@ -59,6 +59,18 @@ class VoiceRuntime:
         )
         output = self.text_to_speech.synthesize(speech_request)
         self._validate_output_identity(audio, output)
+        # Preserve runtime correlation metadata across the TTS boundary. The
+        # provider owns audio bytes; RKJO owns session/trace correlation.
+        session_id = audio.metadata.get("voice_session_id")
+        if session_id is not None and output.metadata.get("voice_session_id") != session_id:
+            output = AudioOutput(
+                data=output.data,
+                mime_type=output.mime_type,
+                tenant_id=output.tenant_id,
+                mission_id=output.mission_id,
+                trace_id=output.trace_id,
+                metadata={**output.metadata, "voice_session_id": session_id},
+            )
 
         return VoiceTurnResult(
             transcript=transcript,
