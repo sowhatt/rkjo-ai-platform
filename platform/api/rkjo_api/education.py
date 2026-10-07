@@ -1021,6 +1021,7 @@ def submit_proof_challenge(
             autonomy=proof_state.autonomy,
             retention=proof_state.retention,
             latest_correct=proof_state.latest_correct,
+            latest_observation_failed=proof_state.latest_observation_failed,
             has_observation=proof_state.has_observation,
             latest_help=proof_state.latest_help,
             latest_proof=("passed" if result.independently_verified else "failed"),
