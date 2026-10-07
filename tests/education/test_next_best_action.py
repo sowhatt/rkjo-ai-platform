@@ -200,6 +200,18 @@ def test_m2_excludes_unseen_or_out_of_exam_competencies():
     assert d.target_competency == "MATH.SUB"
 
 
+def test_m2_prerequisite_requires_high_prerequisite_importance():
+    d = decide(sig(
+        mastery=.30,
+        latest_correct=False,
+        prerequisite_code="MATH.NUM",
+        prerequisite_mastery=.30,
+        prerequisite_importance=1,
+    ), exam_days_remaining=2, mock_exam_last_24h=True)
+    assert d.rule_id == "R5"
+    assert d.action == NextBestActionType.REMEDIATE
+
+
 def test_t15_decision_is_explainable_and_versioned():
     d = decide(sig(latest_correct=False))
     assert d.rule_id
