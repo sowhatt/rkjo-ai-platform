@@ -69,6 +69,18 @@ class LearnerModelProjector:
                 observations.append(LearnerObservation(score=score, weight=1.0))
                 if correct and help_level == 0:
                     last_success_at = event.occurred_at
+            elif event.event_type == EducationEventType.CORRECTED_COPY_OBSERVED:
+                score = event.payload.get("score")
+                weight = event.payload.get("weight", 0.8)
+                if isinstance(score, (int, float)) and isinstance(weight, (int, float)):
+                    observations.append(
+                        LearnerObservation(
+                            score=max(0.0, min(1.0, float(score))),
+                            weight=max(0.0, float(weight)),
+                        )
+                    )
+                    if float(score) > 0:
+                        last_success_at = event.occurred_at
             elif event.event_type == EducationEventType.PROOF_PASSED:
                 successful_proof = True
                 observations.append(LearnerObservation(score=1.0, weight=1.0))
@@ -93,6 +105,16 @@ class LearnerModelProjector:
                     observations.append(LearnerObservation(score=1.0, weight=1.0))
                 elif event.event_type == EducationEventType.PROOF_FAILED:
                     observations.append(LearnerObservation(score=0.0, weight=1.0))
+                elif event.event_type == EducationEventType.CORRECTED_COPY_OBSERVED:
+                    score = event.payload.get("score")
+                    weight = event.payload.get("weight", 0.8)
+                    if isinstance(score, (int, float)) and isinstance(weight, (int, float)):
+                        observations.append(
+                            LearnerObservation(
+                                score=max(0.0, min(1.0, float(score))),
+                                weight=max(0.0, float(weight)),
+                            )
+                        )
 
         recent = observations[-10:]
         numerator = prior
