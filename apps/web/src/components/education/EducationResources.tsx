@@ -34,6 +34,8 @@ export default function EducationResources() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
 
   async function chooseFile(file?: File) {
     if (!file) return;
@@ -109,6 +111,28 @@ export default function EducationResources() {
       setError(cause instanceof Error ? cause.message : "Confirmation impossible.");
     } finally {
       setConfirming(null);
+    }
+  }
+
+  async function applyLearning() {
+    if (!analysis || !learnerId) return;
+    setApplying(true); setError("");
+    try {
+      const response = await fetch(
+        `/api/education/documents/${analysis.document_id}/apply-learning`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ learner_id: learnerId }),
+        },
+      );
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Application impossible.");
+      setApplied(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Application impossible.");
+    } finally {
+      setApplying(false);
     }
   }
 
@@ -200,7 +224,7 @@ export default function EducationResources() {
           </div>
           <div className="rkjo-next-step">
             <div><span>3</span><strong>Prochaine étape</strong><p>Ces observations alimenteront ton modèle d’apprentissage pour choisir le prochain exercice utile.</p></div>
-            <button type="button" disabled={analysis.questions.some((q) => q.requires_confirmation && !confirmed[q.question_ref])}>Utiliser pour mon apprentissage →</button>
+            <button type="button" disabled={applying || applied || analysis.questions.some((q) => q.requires_confirmation && !confirmed[q.question_ref])} onClick={() => void applyLearning()}>{applied ? "✓ Pris en compte" : applying ? "Mise à jour…" : "Utiliser pour mon apprentissage →"}</button>
           </div>
         </section>
       ) : null}
