@@ -77,3 +77,36 @@ def test_projector_retention_decays_after_success():
         event(EducationEventType.AUTONOMY_UPDATED, autonomy=100, question=q, at=NOW-timedelta(days=2)),
     ], competency_code="MATH.ADD", now=NOW)
     assert state.retention < .60
+
+
+def test_projector_uses_v23_attempt_scores_by_help_level():
+    q1, q2, q3, q4 = uuid4(), uuid4(), uuid4(), uuid4()
+    state = LearnerModelProjector().project([
+        event(EducationEventType.ANSWER_SUBMITTED, correct=True, question=q1),
+        event(EducationEventType.AUTONOMY_UPDATED, autonomy=100, question=q1),
+        event(EducationEventType.ANSWER_SUBMITTED, correct=True, question=q2),
+        event(EducationEventType.AUTONOMY_UPDATED, autonomy=75, question=q2),
+        event(EducationEventType.ANSWER_SUBMITTED, correct=True, question=q3),
+        event(EducationEventType.AUTONOMY_UPDATED, autonomy=50, question=q3),
+        event(EducationEventType.ANSWER_SUBMITTED, correct=True, question=q4),
+        event(EducationEventType.AUTONOMY_UPDATED, autonomy=0, question=q4),
+    ], competency_code="MATH.ADD", now=NOW)
+
+    expected_scores = [0.7, 0.5, 0.3, 0.1]
+    numerator = 0.30
+    denominator = 1.0
+    for rank, score in enumerate(reversed(expected_scores)):
+        decay = 0.85 ** rank
+        numerator += decay * score
+        denominator += decay
+    assert state.mastery == min(numerator / denominator, 0.75)
+    assert state.autonomy == (1.0 + 0.75 + 0.5 + 0.0) / 4
+
+
+def test_projector_reconciles_last_success_after_answer_then_autonomy():
+    q = uuid4()
+    state = LearnerModelProjector().project([
+        event(EducationEventType.ANSWER_SUBMITTED, correct=True, question=q, at=NOW-timedelta(days=1)),
+        event(EducationEventType.AUTONOMY_UPDATED, autonomy=100, question=q, at=NOW-timedelta(days=1)),
+    ], competency_code="MATH.ADD", now=NOW)
+    assert state.retention > 0.60
