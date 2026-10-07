@@ -39,7 +39,7 @@ const navigation = [
     key: "resources" as const,
     href: "/education/resources",
     icon: "□",
-    label: "Ressources",
+    label: "Mes supports",
   },
   {
     key: "progress" as const,
