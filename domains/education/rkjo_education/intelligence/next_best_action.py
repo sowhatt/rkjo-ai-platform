@@ -52,6 +52,7 @@ class CompetencySignal:
     covered_by_exam: bool = True
     prerequisite_code: str | None = None
     prerequisite_mastery: float | None = None
+    prerequisite_importance: int = 1
     latest_correct: bool | None = None
     latest_observation_failed: bool = False
     has_observation: bool = True
@@ -124,7 +125,7 @@ class NextBestActionService:
         if target.remediation_count >= self.config.anti_loop_remediations and target.remediation_mastery_gain < self.config.anti_loop_min_gain:
             return self._d(NextBestActionType.MARK_FOR_REVIEW,"R1",target,"Les remédiations n’améliorent plus suffisamment la maîtrise : marquer pour revue.",mods,NextBestActionType.ASK_FOR_HUMAN_HELP)
         if target.latest_proof=="failed": return self._d(NextBestActionType.REMEDIATE,"R2",target,"La preuve autonome a échoué : consolider avant une nouvelle preuve.",mods)
-        if target.mastery < self.config.mastery_low and target.prerequisite_code and target.prerequisite_mastery is not None and target.prerequisite_mastery < self.config.prerequisite_low and not ("M2" in mods and target.importance < 3):
+        if target.mastery < self.config.mastery_low and target.prerequisite_code and target.prerequisite_mastery is not None and target.prerequisite_mastery < self.config.prerequisite_low and not ("M2" in mods and target.prerequisite_importance < 3):
             p=CompetencySignal(target.prerequisite_code,target.prerequisite_mastery,latest_correct=False)
             return self._d(NextBestActionType.PRACTICE_PREREQUISITE,"R3",p,"Un prérequis fragile bloque la compétence cible.",mods,extra={"blocked_competency":target.competency_code})
         if target.consecutive_failures >= 2: return self._d(NextBestActionType.REEXPLAIN_DIFFERENTLY,"R4",target,"Deux échecs consécutifs : réexpliquer autrement puis réduire la difficulté.",mods,extra={"difficulty_delta":-1})
