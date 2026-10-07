@@ -53,10 +53,13 @@ def test_corrected_copy_observation_is_eligible_for_nba():
             autonomy=state.autonomy,
             retention=state.retention,
             latest_correct=state.latest_correct,
+            latest_observation_failed=state.latest_observation_failed,
             has_observation=state.has_observation,
         ),),
         target_competency=state.competency_code,
     ))
     assert state.has_observation is True
-    assert decision.rule_id != "R0"
+    assert state.latest_observation_failed is True
+    assert decision.rule_id == "R5"
+    assert decision.action.value == "remediate"
     assert decision.target_competency == "MED.BIO.CELL"
