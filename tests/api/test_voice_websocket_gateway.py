@@ -1,3 +1,4 @@
+import asyncio
 import base64
 
 from rkjo_api.voice import VoiceWebSocketGateway
@@ -38,7 +39,7 @@ def message(**overrides):
     return value
 
 
-async def test_gateway_accepts_and_dispatches_authenticated_audio():
+def test_gateway_accepts_and_dispatches_authenticated_audio():
     socket = Socket([message()])
     received = []
     async def on_audio(chunk):
@@ -47,14 +48,14 @@ async def test_gateway_accepts_and_dispatches_authenticated_audio():
         websocket=socket, tenant_id="tenant-a", session_id="session-1",
         mission_id="mission-1", trace_id="trace-1", on_audio=on_audio,
     )
-    await gateway.run()
+    asyncio.run(gateway.run())
     assert socket.accepted is True
     assert len(received) == 1
     assert received[0].data == b"pcm"
     assert socket.closed == [1000]
 
 
-async def test_gateway_fails_closed_on_cross_tenant_audio():
+def test_gateway_fails_closed_on_cross_tenant_audio():
     socket = Socket([message(tenant_id="tenant-b")])
     received = []
     async def on_audio(chunk):
@@ -63,14 +64,14 @@ async def test_gateway_fails_closed_on_cross_tenant_audio():
         websocket=socket, tenant_id="tenant-a", session_id="session-1",
         mission_id="mission-1", trace_id="trace-1", on_audio=on_audio,
     )
-    await gateway.run()
+    asyncio.run(gateway.run())
     assert received == []
     assert socket.sent[-1]["type"] == "error"
     assert "tenant_id" in socket.sent[-1]["error"]
     assert socket.closed == [1008]
 
 
-async def test_gateway_fails_closed_on_trace_conflict():
+def test_gateway_fails_closed_on_trace_conflict():
     socket = Socket([message(trace_id="wrong")])
     async def on_audio(chunk):
         raise AssertionError("must not dispatch")
@@ -78,11 +79,11 @@ async def test_gateway_fails_closed_on_trace_conflict():
         websocket=socket, tenant_id="tenant-a", session_id="session-1",
         mission_id="mission-1", trace_id="trace-1", on_audio=on_audio,
     )
-    await gateway.run()
+    asyncio.run(gateway.run())
     assert socket.closed == [1008]
 
 
-async def test_gateway_rejects_invalid_wire_message():
+def test_gateway_rejects_invalid_wire_message():
     socket = Socket([{"type": "wrong"}])
     async def on_audio(chunk):
         raise AssertionError("must not dispatch")
@@ -90,6 +91,6 @@ async def test_gateway_rejects_invalid_wire_message():
         websocket=socket, tenant_id="tenant-a", session_id="session-1",
         mission_id=None, trace_id=None, on_audio=on_audio,
     )
-    await gateway.run()
+    asyncio.run(gateway.run())
     assert socket.sent[-1]["type"] == "error"
     assert socket.closed == [1008]
