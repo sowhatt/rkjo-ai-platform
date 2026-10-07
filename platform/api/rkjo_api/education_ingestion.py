@@ -4,15 +4,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from rkjo_api.education import require_uuid_tenant
 from rkjo_api.dependencies import get_database_url
+from rkjo_api.education_dependencies import get_education_event_publisher
 from rkjo_education.alignment import ReferentialCompetency
 from rkjo_education.ingestion import DocumentKind, EducationIngestionService, Provenance
 from rkjo_education.ingestion.extractor import DocumentExtractionError, EducationDocumentExtractor
 from rkjo_education.ingestion.postgres_repository import PostgresEducationDocumentRepository, StoredQuestionAlignment
+from rkjo_education.events import EducationEventType, EducationLearningEvent, EducationEventPublisher
 from rkjo_education.ingestion.aligned_copy import CorrectedCopyAlignmentService
 
 
@@ -246,6 +248,7 @@ def apply_document_learning(
     document_id: UUID,
     payload: ApplyDocumentLearningRequest,
     request: Request,
+    event_publisher: EducationEventPublisher = Depends(get_education_event_publisher),
 ) -> ApplyDocumentLearningResponse:
     tenant_id = require_uuid_tenant(request)
     repository = PostgresEducationDocumentRepository(get_database_url())
@@ -285,6 +288,23 @@ def apply_document_learning(
         learner_id=payload.learner_id,
         document_id=document_id,
     )
+    if applied:
+        for item in evidence:
+            event_publisher.publish(
+                EducationLearningEvent(
+                    event_type=EducationEventType.CORRECTED_COPY_OBSERVED,
+                    tenant_id=tenant_id,
+                    learner_id=payload.learner_id,
+                    competency_code=item.competency_code,
+                    payload={
+                        "document_id": str(document_id),
+                        "score": item.score,
+                        "weight": item.weight,
+                        "source": item.source,
+                        "affects_autonomy": False,
+                    },
+                )
+            )
     return ApplyDocumentLearningResponse(
         document_id=document_id,
         applied=applied,
