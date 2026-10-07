@@ -16,6 +16,11 @@ __all__ = [
     "VoiceAgentPort",
     "VoiceRuntime",
     "VoiceTurnResult",
+    "VoiceSession",
+    "VoiceSessionEngine",
+    "VoiceSessionState",
 ]
 
 from rkjo_kernel.voice.runtime import VoiceAgentPort, VoiceRuntime, VoiceTurnResult
+
+from rkjo_kernel.voice.session import VoiceSession, VoiceSessionEngine, VoiceSessionState
