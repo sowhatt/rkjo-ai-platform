@@ -425,6 +425,7 @@ def get_learner_today_recommendation(
             autonomy=state.autonomy,
             retention=state.retention,
             latest_correct=state.latest_correct,
+            latest_observation_failed=state.latest_observation_failed,
             has_observation=state.has_observation,
             latest_help=state.latest_help,
             consecutive_failures=state.consecutive_failures,
