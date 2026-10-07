@@ -17,6 +17,7 @@ class HistoricalCompetencyState:
     retention: float
     successful_proof: bool
     latest_correct: bool | None
+    latest_observation_failed: bool
     has_observation: bool
     latest_help: float
     consecutive_failures: int
@@ -159,6 +160,15 @@ class LearnerModelProjector:
         successes = 0
         distinct: set[object] = set()
         latest_correct = None
+        latest_observation_failed = False
+        latest_significant = next((event for event in reversed(relevant) if event.event_type in {EducationEventType.ANSWER_SUBMITTED, EducationEventType.CORRECTED_COPY_OBSERVED, EducationEventType.PROOF_PASSED, EducationEventType.PROOF_FAILED}), None)
+        if latest_significant is not None:
+            if latest_significant.event_type == EducationEventType.ANSWER_SUBMITTED:
+                latest_observation_failed = latest_significant.payload.get("correct") is False
+            elif latest_significant.event_type == EducationEventType.CORRECTED_COPY_OBSERVED:
+                latest_observation_failed = latest_significant.payload.get("score") == 0
+            elif latest_significant.event_type == EducationEventType.PROOF_FAILED:
+                latest_observation_failed = True
         for event in reversed(answer_events):
             correct = event.payload.get("correct") is True
             if latest_correct is None:
@@ -181,6 +191,7 @@ class LearnerModelProjector:
             retention=max(0.0, min(1.0, retention)),
             successful_proof=successful_proof,
             latest_correct=latest_correct,
+            latest_observation_failed=latest_observation_failed,
             has_observation=bool(observations),
             latest_help=latest_help,
             consecutive_failures=failures,
