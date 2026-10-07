@@ -53,6 +53,7 @@ class CompetencySignal:
     prerequisite_code: str | None = None
     prerequisite_mastery: float | None = None
     latest_correct: bool | None = None
+    latest_observation_failed: bool = False
     has_observation: bool = True
     latest_help: float = 0.0
     latest_proof: str | None = None
@@ -127,7 +128,7 @@ class NextBestActionService:
             p=CompetencySignal(target.prerequisite_code,target.prerequisite_mastery,latest_correct=False)
             return self._d(NextBestActionType.PRACTICE_PREREQUISITE,"R3",p,"Un prérequis fragile bloque la compétence cible.",mods,extra={"blocked_competency":target.competency_code})
         if target.consecutive_failures >= 2: return self._d(NextBestActionType.REEXPLAIN_DIFFERENTLY,"R4",target,"Deux échecs consécutifs : réexpliquer autrement puis réduire la difficulté.",mods,extra={"difficulty_delta":-1})
-        if target.latest_correct is False: return self._d(NextBestActionType.REMEDIATE,"R5",target,"Premier échec : explication ciblée puis exercice similaire.",mods)
+        if target.latest_correct is False or target.latest_observation_failed: return self._d(NextBestActionType.REMEDIATE,"R5",target,"Premier échec : explication ciblée puis exercice similaire.",mods)
         review=min((x for x in scope if x.mastery>=self.config.mastery_low and x.retention<self.config.retention_review),key=lambda x:(x.retention,-x.importance),default=None)
         if review: return self._d(NextBestActionType.REVIEW,"R6",review,"Une compétence déjà travaillée doit être réactivée.",mods)
         if target.latest_help>=.5 or target.autonomy<self.config.autonomy_low:
