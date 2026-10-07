@@ -33,6 +33,18 @@ class LearnerModelProjector:
             value /= 100.0
         return 1.0 - max(0.0, min(1.0, value))
 
+    @staticmethod
+    def _attempt_score(*, correct: bool, help_level: float) -> float:
+        if not correct:
+            return 0.0
+        if help_level <= 0:
+            return 0.7
+        if help_level <= 0.25:
+            return 0.5
+        if help_level < 1.0:
+            return 0.3
+        return 0.1
+
     def project(
         self,
         events: list[EducationLearningEvent],
@@ -63,9 +75,7 @@ class LearnerModelProjector:
                 answer_events.append(event)
                 correct = event.payload.get("correct") is True
                 help_level = autonomy_by_question.get(event.question_id, 0.0)
-                score = 1.0 if correct and help_level == 0 else (
-                    .7 if correct else 0.0
-                )
+                score = self._attempt_score(correct=correct, help_level=help_level)
                 observations.append(LearnerObservation(score=score, weight=1.0))
                 if correct and help_level == 0:
                     last_success_at = event.occurred_at
@@ -93,16 +103,20 @@ class LearnerModelProjector:
         # answer observations with the explicit autonomy event when available.
         if answer_events:
             observations = []
+            last_success_at = None
             for event in answer_events:
                 help_level = autonomy_by_question.get(event.question_id, 0.0)
                 correct = event.payload.get("correct") is True
-                score = 1.0 if correct and help_level == 0 else (
-                    .7 if correct else 0.0
-                )
+                score = self._attempt_score(correct=correct, help_level=help_level)
                 observations.append(LearnerObservation(score=score, weight=1.0))
+                if correct and help_level == 0:
+                    if last_success_at is None or event.occurred_at > last_success_at:
+                        last_success_at = event.occurred_at
             for event in relevant:
                 if event.event_type == EducationEventType.PROOF_PASSED:
                     observations.append(LearnerObservation(score=1.0, weight=1.0))
+                    if last_success_at is None or event.occurred_at > last_success_at:
+                        last_success_at = event.occurred_at
                 elif event.event_type == EducationEventType.PROOF_FAILED:
                     observations.append(LearnerObservation(score=0.0, weight=1.0))
                 elif event.event_type == EducationEventType.CORRECTED_COPY_OBSERVED:
@@ -115,6 +129,8 @@ class LearnerModelProjector:
                                 weight=max(0.0, float(weight)),
                             )
                         )
+                        if float(score) > 0 and (last_success_at is None or event.occurred_at > last_success_at):
+                            last_success_at = event.occurred_at
 
         recent = observations[-10:]
         numerator = prior
