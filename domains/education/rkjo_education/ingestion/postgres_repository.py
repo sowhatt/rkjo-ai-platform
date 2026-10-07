@@ -51,6 +51,10 @@ class PostgresEducationDocumentRepository:
                 )
             """)
             connection.execute("""
+                ALTER TABLE education_learner_documents
+                ADD COLUMN IF NOT EXISTS learning_applied BOOLEAN NOT NULL DEFAULT FALSE
+            """)
+            connection.execute("""
                 CREATE INDEX IF NOT EXISTS idx_education_documents_learner
                 ON education_learner_documents (tenant_id, learner_id)
             """)
