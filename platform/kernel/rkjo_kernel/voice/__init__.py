@@ -13,4 +13,9 @@ __all__ = [
     "SpeechToTextPort",
     "TextToSpeechPort",
     "Transcript",
+    "VoiceAgentPort",
+    "VoiceRuntime",
+    "VoiceTurnResult",
 ]
+
+from rkjo_kernel.voice.runtime import VoiceAgentPort, VoiceRuntime, VoiceTurnResult
