@@ -33,6 +33,7 @@ export default function EducationResources() {
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   async function chooseFile(file?: File) {
     if (!file) return;
@@ -83,6 +84,32 @@ export default function EducationResources() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Analyse impossible.");
     } finally { setLoading(false); }
+  }
+
+  async function confirmAlignment(questionRef: string, competencyCode: string) {
+    if (!analysis || !learnerId || !competencyCode) return;
+    setConfirming(questionRef); setError("");
+    try {
+      const response = await fetch(
+        `/api/education/documents/${analysis.document_id}/alignments/confirm`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            learner_id: learnerId,
+            question_ref: questionRef,
+            competency_code: competencyCode,
+          }),
+        },
+      );
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Confirmation impossible.");
+      setConfirmed((old) => ({ ...old, [questionRef]: true }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Confirmation impossible.");
+    } finally {
+      setConfirming(null);
+    }
   }
 
   return (
@@ -163,7 +190,7 @@ export default function EducationResources() {
                           <option value="">Choisir la bonne compétence</option>
                           {referential.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                         </select>
-                        <button type="button" disabled={!selected} onClick={() => setConfirmed((old) => ({...old,[item.question_ref]:true}))}>Confirmer</button>
+                        <button type="button" disabled={!selected || confirming === item.question_ref} onClick={() => void confirmAlignment(item.question_ref, selected)}>{confirming === item.question_ref ? "Confirmation…" : "Confirmer"}</button>
                       </div>
                     ) : <small className="rkjo-confirmed-label">✓ Compris et vérifié</small>}
                   </div>
