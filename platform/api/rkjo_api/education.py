@@ -980,7 +980,7 @@ def submit_proof_challenge(
             detail=str(exc),
         ) from exc
 
-    event_publisher.publish(EducationLearningEvent(
+    proof_event = EducationLearningEvent(
         event_type=(
             EducationEventType.PROOF_PASSED
             if result.independently_verified
@@ -991,7 +991,11 @@ def submit_proof_challenge(
         course_id=challenge.course_id,
         competency_code=result.competency_code,
         payload={"challenge_id": str(challenge.id)},
-    ))
+    )
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    history.append(proof_event)
+    event_publisher.publish(proof_event)
 
     return ProofSubmitResponse(
         challenge_id=challenge.id,
