@@ -638,8 +638,15 @@ def submit_attempt(
 
     attempt = result.attempt
 
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+
+    def persist_and_publish(event: EducationLearningEvent) -> None:
+        history.append(event)
+        event_publisher.publish(event)
+
     for item in result.learning:
-        event_publisher.publish(EducationLearningEvent(
+        persist_and_publish(EducationLearningEvent(
             event_type=EducationEventType.ANSWER_SUBMITTED,
             tenant_id=tenant_id,
             learner_id=attempt.learner_id,
@@ -648,8 +655,7 @@ def submit_attempt(
             competency_code=item.competency_code,
             payload={"correct": item.correct},
         ))
-        event_publisher.publish(EducationLearningEvent(
-            event_type=EducationEventType.AUTONOMY_UPDATED,
+        persist_and_publish(EducationLearningEvent(\n            event_type=EducationEventType.AUTONOMY_UPDATED,
             tenant_id=tenant_id,
             learner_id=attempt.learner_id,
             assessment_id=attempt.assessment_id,
@@ -657,8 +663,7 @@ def submit_attempt(
             competency_code=item.competency_code,
             payload={"autonomy_score": item.autonomy_score},
         ))
-        event_publisher.publish(EducationLearningEvent(
-            event_type=EducationEventType.MASTERY_UPDATED,
+        persist_and_publish(EducationLearningEvent(\n            event_type=EducationEventType.MASTERY_UPDATED,
             tenant_id=tenant_id,
             learner_id=attempt.learner_id,
             assessment_id=attempt.assessment_id,
@@ -667,8 +672,7 @@ def submit_attempt(
             payload={"mastery": item.mastery},
         ))
         if item.proof_required:
-            event_publisher.publish(EducationLearningEvent(
-                event_type=EducationEventType.PROOF_REQUESTED,
+            persist_and_publish(EducationLearningEvent(\n                event_type=EducationEventType.PROOF_REQUESTED,
                 tenant_id=tenant_id,
                 learner_id=attempt.learner_id,
                 assessment_id=attempt.assessment_id,
@@ -704,8 +708,7 @@ def submit_attempt(
         competency_scores=competency_scores,
     )
 
-    event_publisher.publish(EducationLearningEvent(
-        event_type=EducationEventType.ASSESSMENT_COMPLETED,
+    persist_and_publish(EducationLearningEvent(\n        event_type=EducationEventType.ASSESSMENT_COMPLETED,
         tenant_id=tenant_id,
         learner_id=attempt.learner_id,
         assessment_id=attempt.assessment_id,
@@ -812,8 +815,7 @@ def submit_attempt(
             if 0 <= current_index < len(course_assessments) - 1:
                 next_assessment_id = course_assessments[current_index + 1].id
 
-        event_publisher.publish(EducationLearningEvent(
-            event_type=EducationEventType.NBA_DECIDED,
+        persist_and_publish(EducationLearningEvent(\n            event_type=EducationEventType.NBA_DECIDED,
             tenant_id=tenant_id,
             learner_id=attempt.learner_id,
             course_id=assessment.course_id,
