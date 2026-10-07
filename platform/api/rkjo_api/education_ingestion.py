@@ -292,22 +292,26 @@ def apply_document_learning(
         document_id=document_id,
     )
     if applied:
+        history = PostgresLearningEventHistory(get_database_url())
+        history.initialize_schema()
         for item in evidence:
-            event_publisher.publish(
-                EducationLearningEvent(
-                    event_type=EducationEventType.CORRECTED_COPY_OBSERVED,
-                    tenant_id=tenant_id,
-                    learner_id=payload.learner_id,
-                    competency_code=item.competency_code,
-                    payload={
-                        "document_id": str(document_id),
-                        "score": item.score,
-                        "weight": item.weight,
-                        "source": item.source,
-                        "affects_autonomy": False,
-                    },
-                )
+            event = EducationLearningEvent(
+                event_type=EducationEventType.CORRECTED_COPY_OBSERVED,
+                tenant_id=tenant_id,
+                learner_id=payload.learner_id,
+                competency_code=item.competency_code,
+                payload={
+                    "document_id": str(document_id),
+                    "score": item.score,
+                    "weight": item.weight,
+                    "source": item.source,
+                    "affects_autonomy": False,
+                },
             )
+            # Persist synchronously for immediate learner-model/NBA consistency,
+            # then publish for the distributed consumers.
+            history.append(event)
+            event_publisher.publish(event)
     return ApplyDocumentLearningResponse(
         document_id=document_id,
         applied=applied,
