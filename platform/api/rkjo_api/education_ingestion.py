@@ -234,9 +234,11 @@ class ApplyDocumentLearningRequest(BaseModel):
 
 
 class AppliedEvidenceResponse(BaseModel):
+    question_ref: str
     competency_code: str
     score: float
     weight: float
+    alignment_confidence: float
     source: str = "corrected_copy"
 
 
@@ -280,9 +282,11 @@ def apply_document_learning(
         ):
             evidence.append(
                 AppliedEvidenceResponse(
+                    question_ref=item.question_ref,
                     competency_code=item.competency_code,
                     score=item.earned_points / item.max_points,
                     weight=0.8,
+                    alignment_confidence=item.alignment_confidence,
                 )
             )
 
@@ -302,6 +306,8 @@ def apply_document_learning(
                 competency_code=item.competency_code,
                 payload={
                     "document_id": str(document_id),
+                    "question_ref": item.question_ref,
+                    "alignment_confidence": item.alignment_confidence,
                     "score": item.score,
                     "weight": item.weight,
                     "source": item.source,
