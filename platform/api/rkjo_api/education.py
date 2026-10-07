@@ -892,6 +892,9 @@ class ProofSubmitResponse(BaseModel):
     competency_code: str
     status: str
     independently_verified: bool
+    next_best_action: str | None = None
+    next_best_action_rule_id: str | None = None
+    next_best_action_explanation: str | None = None
 
 
 @router.get(
@@ -982,7 +985,7 @@ def submit_proof_challenge(
             detail=str(exc),
         ) from exc
 
-    event_publisher.publish(EducationLearningEvent(
+    proof_event = EducationLearningEvent(
         event_type=(
             EducationEventType.PROOF_PASSED
             if result.independently_verified
@@ -993,11 +996,60 @@ def submit_proof_challenge(
         course_id=challenge.course_id,
         competency_code=result.competency_code,
         payload={"challenge_id": str(challenge.id)},
+    )
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    history.append(proof_event)
+    event_publisher.publish(proof_event)
+
+    proof_state = LearnerModelProjector().project(
+        history.list_for_learner(
+            tenant_id=tenant_id,
+            learner_id=challenge.learner_id,
+        ),
+        competency_code=result.competency_code,
+    )
+    nba = NextBestActionService().decide_context(NBAContext(
+        competencies=(CompetencySignal(
+            competency_code=result.competency_code,
+            mastery=proof_state.mastery,
+            autonomy=proof_state.autonomy,
+            retention=proof_state.retention,
+            latest_correct=proof_state.latest_correct,
+            has_observation=proof_state.has_observation,
+            latest_help=proof_state.latest_help,
+            latest_proof=("passed" if result.independently_verified else "failed"),
+            consecutive_failures=proof_state.consecutive_failures,
+            consecutive_no_hint_successes=proof_state.consecutive_no_hint_successes,
+            distinct_success_exercises=proof_state.distinct_success_exercises,
+            valid_proof=result.independently_verified,
+        ),),
+        target_competency=result.competency_code,
     ))
+    nba_event = EducationLearningEvent(
+        event_type=EducationEventType.NBA_DECIDED,
+        tenant_id=tenant_id,
+        learner_id=challenge.learner_id,
+        course_id=challenge.course_id,
+        competency_code=result.competency_code,
+        payload={
+            "action": nba.action.value,
+            "rule_id": nba.rule_id,
+            "modifiers": list(nba.modifiers),
+            "policy_version": nba.policy_version,
+            "signals": nba.signals,
+            "explanation": nba.explanation,
+        },
+    )
+    history.append(nba_event)
+    event_publisher.publish(nba_event)
 
     return ProofSubmitResponse(
         challenge_id=challenge.id,
         competency_code=result.competency_code,
         status=result.status.value,
         independently_verified=result.independently_verified,
+        next_best_action=nba.action.value,
+        next_best_action_rule_id=nba.rule_id,
+        next_best_action_explanation=nba.explanation,
     )
