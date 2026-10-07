@@ -53,6 +53,7 @@ class CompetencySignal:
     prerequisite_code: str | None = None
     prerequisite_mastery: float | None = None
     latest_correct: bool | None = None
+    has_observation: bool = True
     latest_help: float = 0.0
     latest_proof: str | None = None
     consecutive_failures: int = 0
@@ -117,7 +118,7 @@ class NextBestActionService:
             if not context.mock_exam_last_24h:
                 return self._d(NextBestActionType.START_MOCK_EXAM,"R6",target,"Examen imminent : commencer par une simulation réaliste.",mods,extra={"exam_days_remaining":context.exam_days_remaining,"mock_exam_last_24h":False})
         elif context.exam_days_remaining is not None and context.exam_days_remaining <= self.config.m1_days: mods.append("M1")
-        if target is None or (target.latest_correct is None and target.latest_proof is None):
+        if target is None or not target.has_observation:
             return self._d(NextBestActionType.POSITIONING_TEST,"R0",target,"Aucune observation exploitable : commencer par un positionnement.",mods)
         if target.remediation_count >= self.config.anti_loop_remediations and target.remediation_mastery_gain < self.config.anti_loop_min_gain:
             return self._d(NextBestActionType.MARK_FOR_REVIEW,"R1",target,"Les remédiations n’améliorent plus suffisamment la maîtrise : marquer pour revue.",mods,NextBestActionType.ASK_FOR_HUMAN_HELP)
