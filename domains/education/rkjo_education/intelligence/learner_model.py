@@ -183,6 +183,8 @@ class LearnerModelProjector:
                 retention_anchor = event.occurred_at
             elif failed_observation:
                 stability_days = max(1.0, stability_days * 0.5)
+                # A failure reduces stability from the last successful anchor;
+                # it does not become a retention success itself.
 
         if retention_anchor is not None:
             last_success_at = retention_anchor
