@@ -38,6 +38,10 @@ __all__ = [
     "LiveVoiceEventType",
     "LiveVoiceSession",
     "LiveVoiceTransportPort",
+    "VoiceWebSocketCodec",
+    "VoiceWebSocketTransport",
+    "WebSocketAudioMessage",
+    "WebSocketPeerPort",
 ]
 
 from rkjo_kernel.voice.runtime import VoiceAgentPort, VoiceRuntime, VoiceTurnResult
@@ -51,3 +55,5 @@ from rkjo_kernel.voice.realtime import RealtimeVoiceController, RealtimeVoiceEve
 from rkjo_kernel.voice.orchestrator import AudioPlaybackPort, RealtimeTurnResult, RealtimeVoiceOrchestrator
 
 from rkjo_kernel.voice.live import LiveVoiceEvent, LiveVoiceEventType, LiveVoiceSession, LiveVoiceTransportPort
+
+from rkjo_kernel.voice.websocket import VoiceWebSocketCodec, VoiceWebSocketTransport, WebSocketAudioMessage, WebSocketPeerPort
