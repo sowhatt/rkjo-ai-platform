@@ -46,6 +46,7 @@ class PostgresEducationDocumentRepository:
                     extracted_text TEXT NOT NULL,
                     source_hash TEXT NOT NULL,
                     question_alignments JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    learning_applied BOOLEAN NOT NULL DEFAULT FALSE,
                     PRIMARY KEY (tenant_id, document_id)
                 )
             """)
@@ -112,3 +113,29 @@ class PostgresEducationDocumentRepository:
                 WHERE tenant_id=%s AND learner_id=%s AND document_id=%s
             """, (Jsonb(items), tenant_id, learner_id, document_id))
         return StoredQuestionAlignment(**selected)
+
+
+    def get_alignments(
+        self, *, tenant_id: UUID, learner_id: UUID, document_id: UUID,
+    ) -> list[StoredQuestionAlignment] | None:
+        with self._connect() as connection:
+            row = connection.execute("""
+                SELECT question_alignments FROM education_learner_documents
+                WHERE tenant_id=%s AND learner_id=%s AND document_id=%s
+            """, (tenant_id, learner_id, document_id)).fetchone()
+        if row is None:
+            return None
+        return [StoredQuestionAlignment(**item) for item in row[0]]
+
+    def mark_learning_applied(
+        self, *, tenant_id: UUID, learner_id: UUID, document_id: UUID,
+    ) -> bool:
+        with self._connect() as connection:
+            row = connection.execute("""
+                UPDATE education_learner_documents
+                SET learning_applied=TRUE
+                WHERE tenant_id=%s AND learner_id=%s AND document_id=%s
+                  AND learning_applied=FALSE
+                RETURNING document_id
+            """, (tenant_id, learner_id, document_id)).fetchone()
+        return row is not None
