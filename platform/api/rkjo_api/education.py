@@ -997,6 +997,48 @@ def submit_proof_challenge(
     history.append(proof_event)
     event_publisher.publish(proof_event)
 
+    proof_state = LearnerModelProjector().project(
+        history.list_for_learner(
+            tenant_id=tenant_id,
+            learner_id=challenge.learner_id,
+        ),
+        competency_code=result.competency_code,
+    )
+    nba = NextBestActionService().decide_context(NBAContext(
+        competencies=(CompetencySignal(
+            competency_code=result.competency_code,
+            mastery=proof_state.mastery,
+            autonomy=proof_state.autonomy,
+            retention=proof_state.retention,
+            latest_correct=proof_state.latest_correct,
+            has_observation=proof_state.has_observation,
+            latest_help=proof_state.latest_help,
+            latest_proof=("passed" if result.independently_verified else "failed"),
+            consecutive_failures=proof_state.consecutive_failures,
+            consecutive_no_hint_successes=proof_state.consecutive_no_hint_successes,
+            distinct_success_exercises=proof_state.distinct_success_exercises,
+            valid_proof=result.independently_verified,
+        ),),
+        target_competency=result.competency_code,
+    ))
+    nba_event = EducationLearningEvent(
+        event_type=EducationEventType.NBA_DECIDED,
+        tenant_id=tenant_id,
+        learner_id=challenge.learner_id,
+        course_id=challenge.course_id,
+        competency_code=result.competency_code,
+        payload={
+            "action": nba.action.value,
+            "rule_id": nba.rule_id,
+            "modifiers": list(nba.modifiers),
+            "policy_version": nba.policy_version,
+            "signals": nba.signals,
+            "explanation": nba.explanation,
+        },
+    )
+    history.append(nba_event)
+    event_publisher.publish(nba_event)
+
     return ProofSubmitResponse(
         challenge_id=challenge.id,
         competency_code=result.competency_code,
