@@ -110,3 +110,78 @@ def test_projector_reconciles_last_success_after_answer_then_autonomy():
         event(EducationEventType.AUTONOMY_UPDATED, autonomy=100, question=q, at=NOW-timedelta(days=1)),
     ], competency_code="MATH.ADD", now=NOW)
     assert state.retention > 0.60
+
+
+def test_retention_stability_grows_after_spaced_no_help_success():
+    from datetime import timedelta
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    competency = "MATH.ADD"
+    now = datetime.now(timezone.utc)
+    q1, q2 = uuid4(), uuid4()
+    events = [
+        EducationLearningEvent(
+            event_type=EducationEventType.ANSWER_SUBMITTED,
+            tenant_id=tenant_id, learner_id=learner_id,
+            competency_code=competency, question_id=q1,
+            occurred_at=now - timedelta(days=4),
+            payload={"correct": True},
+        ),
+        EducationLearningEvent(
+            event_type=EducationEventType.AUTONOMY_UPDATED,
+            tenant_id=tenant_id, learner_id=learner_id,
+            competency_code=competency, question_id=q1,
+            occurred_at=now - timedelta(days=4),
+            payload={"autonomy_score": 100},
+        ),
+        EducationLearningEvent(
+            event_type=EducationEventType.ANSWER_SUBMITTED,
+            tenant_id=tenant_id, learner_id=learner_id,
+            competency_code=competency, question_id=q2,
+            occurred_at=now - timedelta(days=2),
+            payload={"correct": True},
+        ),
+        EducationLearningEvent(
+            event_type=EducationEventType.AUTONOMY_UPDATED,
+            tenant_id=tenant_id, learner_id=learner_id,
+            competency_code=competency, question_id=q2,
+            occurred_at=now - timedelta(days=2),
+            payload={"autonomy_score": 100},
+        ),
+    ]
+    state = LearnerModelProjector().project(events, competency_code=competency, now=now)
+    assert state.retention > 0.60
+
+
+def test_retention_failure_shrinks_stability_floor_to_one_day():
+    from datetime import timedelta
+    tenant_id = uuid4()
+    learner_id = uuid4()
+    competency = "MATH.ADD"
+    now = datetime.now(timezone.utc)
+    q1, q2 = uuid4(), uuid4()
+    events = [
+        EducationLearningEvent(
+            event_type=EducationEventType.ANSWER_SUBMITTED,
+            tenant_id=tenant_id, learner_id=learner_id,
+            competency_code=competency, question_id=q1,
+            occurred_at=now - timedelta(days=2),
+            payload={"correct": True},
+        ),
+        EducationLearningEvent(
+            event_type=EducationEventType.AUTONOMY_UPDATED,
+            tenant_id=tenant_id, learner_id=learner_id,
+            competency_code=competency, question_id=q1,
+            occurred_at=now - timedelta(days=2),
+            payload={"autonomy_score": 100},
+        ),
+        EducationLearningEvent(
+            event_type=EducationEventType.ANSWER_SUBMITTED,
+            tenant_id=tenant_id, learner_id=learner_id,
+            competency_code=competency, question_id=q2,
+            occurred_at=now - timedelta(days=1),
+            payload={"correct": False},
+        ),
+    ]
+    state = LearnerModelProjector().project(events, competency_code=competency, now=now)
+    assert state.retention < 0.20
