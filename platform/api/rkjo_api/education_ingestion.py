@@ -15,6 +15,9 @@ from rkjo_education.ingestion import DocumentKind, EducationIngestionService, Pr
 from rkjo_education.ingestion.extractor import DocumentExtractionError, EducationDocumentExtractor
 from rkjo_education.ingestion.postgres_repository import PostgresEducationDocumentRepository, StoredQuestionAlignment
 from rkjo_education.events import EducationEventType, EducationLearningEvent, EducationEventPublisher
+from rkjo_education.intelligence.learner_model import LearnerModelProjector
+from rkjo_education.intelligence.next_best_action import CompetencySignal, NBAContext, NextBestActionService
+from rkjo_education.supervision.history import PostgresLearningEventHistory
 from rkjo_education.ingestion.aligned_copy import CorrectedCopyAlignmentService
 
 
@@ -309,4 +312,80 @@ def apply_document_learning(
         document_id=document_id,
         applied=applied,
         evidence=evidence,
+    )
+
+
+class LearnerTodayRecommendationResponse(BaseModel):
+    action: str
+    target_competency: str | None
+    rule_id: str
+    explanation: str
+    policy_version: str
+    mastery: float | None = None
+    autonomy: float | None = None
+    retention: float | None = None
+
+
+@router.get("/learners/{learner_id}/today", response_model=LearnerTodayRecommendationResponse)
+def get_learner_today_recommendation(
+    learner_id: UUID,
+    request: Request,
+) -> LearnerTodayRecommendationResponse:
+    tenant_id = require_uuid_tenant(request)
+    history = PostgresLearningEventHistory(get_database_url())
+    history.initialize_schema()
+    events = history.list_for_learner(tenant_id=tenant_id, learner_id=learner_id)
+
+    competency_codes = list(dict.fromkeys(
+        event.competency_code for event in events if event.competency_code
+    ))
+    if not competency_codes:
+        decision = NextBestActionService().decide_context(NBAContext())
+        return LearnerTodayRecommendationResponse(
+            action=decision.action.value,
+            target_competency=decision.target_competency,
+            rule_id=decision.rule_id,
+            explanation=decision.explanation,
+            policy_version=decision.policy_version,
+        )
+
+    projector = LearnerModelProjector()
+    states = [
+        projector.project(events, competency_code=code)
+        for code in competency_codes
+    ]
+    signals = tuple(
+        CompetencySignal(
+            competency_code=state.competency_code,
+            mastery=state.mastery,
+            autonomy=state.autonomy,
+            retention=state.retention,
+            latest_correct=state.latest_correct,
+            latest_help=state.latest_help,
+            consecutive_failures=state.consecutive_failures,
+            consecutive_no_hint_successes=state.consecutive_no_hint_successes,
+            distinct_success_exercises=state.distinct_success_exercises,
+            valid_proof=state.successful_proof,
+            latest_proof=("passed" if state.successful_proof else None),
+        )
+        for state in states
+    )
+    target = min(states, key=lambda state: (state.mastery, state.retention))
+    decision = NextBestActionService().decide_context(NBAContext(
+        competencies=signals,
+        target_competency=target.competency_code,
+    ))
+    target_state = next(
+        (state for state in states if state.competency_code == decision.target_competency),
+        target,
+    )
+    return LearnerTodayRecommendationResponse(
+        action=decision.action.value,
+        target_competency=decision.target_competency,
+        rule_id=decision.rule_id,
+        explanation=decision.explanation,
+        policy_version=decision.policy_version,
+        mastery=target_state.mastery,
+        autonomy=target_state.autonomy,
+        retention=target_state.retention,
     )
