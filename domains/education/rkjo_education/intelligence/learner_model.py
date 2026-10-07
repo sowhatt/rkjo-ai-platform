@@ -17,6 +17,7 @@ class HistoricalCompetencyState:
     retention: float
     successful_proof: bool
     latest_correct: bool | None
+    has_observation: bool
     latest_help: float
     consecutive_failures: int
     consecutive_no_hint_successes: int
@@ -180,6 +181,7 @@ class LearnerModelProjector:
             retention=max(0.0, min(1.0, retention)),
             successful_proof=successful_proof,
             latest_correct=latest_correct,
+            has_observation=bool(observations),
             latest_help=latest_help,
             consecutive_failures=failures,
             consecutive_no_hint_successes=successes,
