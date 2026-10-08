@@ -24,9 +24,13 @@ class OutboxPublisher:
         *,
         event_bus: EventBus,
         uow_factory: WorkflowUnitOfWorkFactory,
+        queue_name: str | None = None,
     ) -> None:
         self.event_bus = event_bus
         self.uow_factory = uow_factory
+        if queue_name is not None and not queue_name.strip():
+            raise ValueError('queue_name cannot be blank.')
+        self.queue_name = queue_name
 
     def publish_pending(
         self,
@@ -54,9 +58,10 @@ class OutboxPublisher:
     def _publish_one(self) -> bool:
         """Publish and acknowledge one pending message."""
         with self.uow_factory() as uow:
-            pending = uow.outbox.pending(
-                limit=1,
-            )
+            if self.queue_name is None:
+                pending = uow.outbox.pending(limit=1)
+            else:
+                pending = uow.outbox.pending(limit=1, queue_name=self.queue_name)
 
             if not pending:
                 return False
