@@ -33,6 +33,7 @@ class OutboxStore(Protocol):
         self,
         *,
         limit: int = 100,
+        queue_name: str | None = None,
     ) -> list[OutboxMessage]:
         """Return unpublished messages."""
         ...
