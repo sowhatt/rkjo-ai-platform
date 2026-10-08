@@ -240,6 +240,7 @@ class PostgreSQLTransactionalOutboxStore:
         self,
         *,
         limit: int = 100,
+        queue_name: str | None = None,
     ) -> list[OutboxMessage]:
         with self._connection.cursor() as cursor:
             cursor.execute(
@@ -251,11 +252,12 @@ class PostgreSQLTransactionalOutboxStore:
                     created_at
                 FROM workflow_outbox
                 WHERE published_at IS NULL
+                  AND (%s::text IS NULL OR queue_name = %s)
                 ORDER BY created_at ASC
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED;
                 """,
-                (limit,),
+                (queue_name, queue_name, limit),
             )
             rows = cursor.fetchall()
 
