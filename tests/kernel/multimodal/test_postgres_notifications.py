@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
+import psycopg
+from psycopg.conninfo import conninfo_to_dict
 
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.multimodal.notifications import NotificationStatus, RetryPolicy
@@ -18,9 +20,15 @@ def store():
     url = os.getenv("RKJO_TEST_DATABASE_URL")
     if not url:
         pytest.skip("Set RKJO_TEST_DATABASE_URL to run PostgreSQL integration tests.")
+    if "test" not in conninfo_to_dict(url).get("dbname", "").lower():
+        pytest.fail("Notification integration tests require a dedicated test database.")
     adapter = PostgreSQLNotificationStore(url, max_attempts=2)
     adapter.initialize_schema()
-    return adapter
+    with psycopg.connect(url) as conn:
+        conn.execute("DELETE FROM multimodal_notifications")
+    yield adapter
+    with psycopg.connect(url) as conn:
+        conn.execute("DELETE FROM multimodal_notifications")
 
 
 def new_message():
