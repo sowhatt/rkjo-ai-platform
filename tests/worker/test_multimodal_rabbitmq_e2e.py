@@ -64,8 +64,9 @@ def test_job_to_notification_with_real_broker(monkeypatch):
         bus = RabbitMQEventBus()
         publisher = OutboxPublisher(
             event_bus=bus, uow_factory=lambda: PostgreSQLWorkflowUnitOfWork(db),
+            queue_name=job_queue,
         )
-        assert publisher.publish_pending(limit=1000) >= 3
+        assert publisher.publish_pending(limit=3) == 3
         consumer = build_job_event_consumer(
             database_url=db, job_queue=job_queue, notification_queue=notify_queue,
         )
@@ -81,7 +82,11 @@ def test_job_to_notification_with_real_broker(monkeypatch):
         assert count == 3
         # Already-processed event is safe on broker redelivery.
         # A second publication cycle delivers the committed notification outbox.
-        assert publisher.publish_pending(limit=1000) >= 3
+        notification_publisher = OutboxPublisher(
+            event_bus=bus, uow_factory=lambda: PostgreSQLWorkflowUnitOfWork(db),
+            queue_name=notify_queue,
+        )
+        assert notification_publisher.publish_pending(limit=3) == 3
         registrar = NotificationRegistrationHandler(notifications)
         terminal_notification_id = f"multimodal:notify:{job.tenant_id}:{job.job_id}:2"
         received = 0
