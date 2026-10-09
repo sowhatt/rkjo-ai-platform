@@ -73,9 +73,9 @@ def test_delivery_receipt_requires_timezone_and_never_implies_new_inbound():
         channel_account_id="business-a", external_message_id="provider-out-1",
         status=DeliveryStatus.READ, occurred_at=NOW, received_at=NOW,
     )
-    assert "last_inbound_at" not in receipt.model_fields
+    assert "last_inbound_at" not in type(receipt).model_fields
     with pytest.raises(ValidationError):
-        receipt.model_copy(update={"occurred_at": NOW.replace(tzinfo=None)}).model_validate(
+        DeliveryStatusEvent.model_validate(
             receipt.model_dump() | {"occurred_at": NOW.replace(tzinfo=None)}
         )
 
