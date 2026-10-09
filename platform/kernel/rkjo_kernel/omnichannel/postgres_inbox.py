@@ -6,6 +6,7 @@ receipt / user-message processors. No processing ACK is implied by insertion.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -76,3 +77,40 @@ class PostgreSQLInboundInbox:
                 if existing is None or existing != (event.kind.value, document):
                     raise ValueError("Webhook event identity collides with different content.")
                 return False
+
+    def accept_batch(self, events: Sequence[VerifiedInbound]) -> list[bool]:
+        """Insert all events in one transaction, rollback on any conflicting replay."""
+        if not events:
+            raise ValueError("Empty webhook batch.")
+        created: list[bool] = []
+        with psycopg.connect(self.database_url) as conn:
+            with conn.cursor() as cur:
+                for event in events:
+                    document = json.loads(json.dumps(dict(event.payload)))
+                    cur.execute("""
+                        INSERT INTO omni_inbound_events (
+                            tenant_id, channel, channel_account_id,
+                            provider_event_id, kind, payload, status
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s)
+                        ON CONFLICT DO NOTHING
+                        RETURNING provider_event_id
+                    """, (
+                        event.tenant_id, event.channel, event.channel_account_id,
+                        event.provider_event_id, event.kind.value, Jsonb(document),
+                        "processed" if event.kind.value == "ignored" else "pending",
+                    ))
+                    is_new = cur.fetchone() is not None
+                    if not is_new:
+                        cur.execute("""
+                            SELECT kind, payload FROM omni_inbound_events
+                            WHERE tenant_id=%s AND channel=%s
+                              AND channel_account_id=%s AND provider_event_id=%s
+                        """, (
+                            event.tenant_id, event.channel,
+                            event.channel_account_id, event.provider_event_id,
+                        ))
+                        existing = cur.fetchone()
+                        if existing is None or existing != (event.kind.value, document):
+                            raise ValueError("Webhook event identity collides with different content.")
+                    created.append(is_new)
+        return created
