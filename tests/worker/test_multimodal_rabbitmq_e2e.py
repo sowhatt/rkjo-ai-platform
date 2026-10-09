@@ -10,7 +10,10 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pika
+import psycopg
 import pytest
+from psycopg import sql
+from psycopg.conninfo import make_conninfo
 
 from rkjo_kernel.config.settings import settings
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
@@ -38,7 +41,15 @@ def test_job_to_notification_with_real_broker(monkeypatch):
     PostgreSQLWorkflowUnitOfWork(db).initialize_schema()
     jobs = PostgreSQLIngestionJobAdapter(db, event_queue=job_queue)
     jobs.initialize_schema()
-    notifications = PostgreSQLNotificationStore(db)
+    # Use a per-run schema for notification delivery: old test notifications
+    # must not be visible to the unscoped production delivery worker.
+    notification_schema = f"rkjo_e2e_notifications_{token}"
+    with psycopg.connect(db) as db_conn:
+        db_conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(notification_schema)))
+    notification_db = make_conninfo(
+        db, options=f"-c search_path={notification_schema},public",
+    )
+    notifications = PostgreSQLNotificationStore(notification_db)
     notifications.initialize_schema()
     monkeypatch.setattr(settings, "rabbitmq_url", rabbit)
     connection = pika.BlockingConnection(pika.URLParameters(rabbit))
@@ -132,3 +143,7 @@ def test_job_to_notification_with_real_broker(monkeypatch):
         for queue in (job_queue, notify_queue):
             connection.channel().queue_delete(queue=queue)
         connection.close()
+        with psycopg.connect(db) as db_conn:
+            db_conn.execute(sql.SQL('DROP SCHEMA {} CASCADE').format(
+                sql.Identifier(notification_schema),
+            ))
