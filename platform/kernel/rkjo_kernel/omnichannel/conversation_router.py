@@ -7,6 +7,8 @@ is called synchronously from the inbox worker.
 from __future__ import annotations
 
 import hashlib
+import json
+from psycopg.types.json import Jsonb
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -98,6 +100,32 @@ class PostgreSQLConversationRouter:
                     PRIMARY KEY(tenant_id, channel, channel_account_id, provider_event_id)
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS omni_route_outbox (
+                    tenant_id TEXT NOT NULL,
+                    channel TEXT NOT NULL,
+                    channel_account_id TEXT NOT NULL,
+                    provider_event_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL,
+                    destination TEXT NOT NULL CHECK (destination IN ('agent','human')),
+                    ownership_version BIGINT NOT NULL,
+                    event_payload JSONB NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending'
+                       CHECK (status IN ('pending','processed','failed')),
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    lease_token TEXT,
+                    lease_until TIMESTAMPTZ,
+                    next_attempt_at TIMESTAMPTZ,
+                    last_error TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY(tenant_id,channel,channel_account_id,provider_event_id)
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_omni_route_outbox_due
+                ON omni_route_outbox(created_at)
+                WHERE status='pending'
+            """)
 
     def route(self, event: VerifiedInbound) -> RoutedInbound:
         conversation_id, occurred = _parse_message(event)
@@ -115,6 +143,8 @@ class PostgreSQLConversationRouter:
                 if previous:
                     if previous[0] != conversation_id:
                         raise ValueError("Conflicting conversation identity.")
+                    # A replay cannot rewrite the earlier routing decision.
+                    self._queue(cur, event, conversation_id, previous[1], previous[2])
                     return RoutedInbound(*key, *previous)
                 cur.execute("""
                     INSERT INTO omni_conversations
@@ -158,7 +188,30 @@ class PostgreSQLConversationRouter:
                     inserted = cur.fetchone()
                     if inserted[0] != conversation_id:
                         raise ValueError("Conflicting conversation identity.")
+                self._queue(cur, event, conversation_id, inserted[1], inserted[2])
                 return RoutedInbound(*key, *inserted)
+
+    @staticmethod
+    def _queue(cur, event: VerifiedInbound, conversation_id: str,
+               destination: str, version: int) -> None:
+        payload = json.loads(json.dumps(dict(event.payload)))
+        key = (event.tenant_id, event.channel, event.channel_account_id, event.provider_event_id)
+        cur.execute("""
+            INSERT INTO omni_route_outbox (
+                tenant_id, channel, channel_account_id, provider_event_id,
+                conversation_id, destination, ownership_version, event_payload
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT DO NOTHING
+        """, (*key, conversation_id, destination, version, Jsonb(payload)))
+        cur.execute("""
+            SELECT conversation_id,destination,ownership_version,event_payload
+            FROM omni_route_outbox
+            WHERE tenant_id=%s AND channel=%s AND channel_account_id=%s
+              AND provider_event_id=%s
+        """, key)
+        row = cur.fetchone()
+        if row != (conversation_id, destination, version, payload):
+            raise ValueError("Conflicting durable route event.")
 
     def ownership(self, *, tenant_id: str, conversation_id: str) -> ConversationOwnership | None:
         with psycopg.connect(self.database_url) as conn:
