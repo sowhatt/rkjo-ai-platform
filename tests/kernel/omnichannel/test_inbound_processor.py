@@ -1,10 +1,11 @@
-"""OMNI-013.1 integration: expired leases, CAS, retries and channel isolation."""
+"""OMNI-013.1 integration in a dedicated temporary PostgreSQL schema."""
 from datetime import datetime, timedelta, timezone
 import os
 from uuid import uuid4
 
+import psycopg
 import pytest
-from psycopg.conninfo import conninfo_to_dict
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from rkjo_kernel.omnichannel.inbound import InboundKind, VerifiedInbound
 from rkjo_kernel.omnichannel.postgres_inbox import PostgreSQLInboundInbox
@@ -21,12 +22,20 @@ def stores():
     if not url:
         pytest.skip("Requires RKJO_TEST_DATABASE_URL.")
     if "test" not in conninfo_to_dict(url).get("dbname", "").lower():
-        pytest.fail("Tests must use an isolated database.")
-    inbox = PostgreSQLInboundInbox(url)
-    inbox.initialize_schema()
-    store = PostgreSQLInboundProcessorStore(url, max_attempts=3)
-    store.initialize_schema()
-    return inbox, store
+        pytest.fail("Tests must use a dedicated test database.")
+    schema = "rkjo_omni_lease_" + uuid4().hex
+    with psycopg.connect(url) as conn:
+        conn.execute('CREATE SCHEMA "' + schema + '"')
+    scoped = make_conninfo(url, options="-c search_path=" + schema)
+    try:
+        inbox = PostgreSQLInboundInbox(scoped)
+        inbox.initialize_schema()
+        store = PostgreSQLInboundProcessorStore(scoped, max_attempts=3)
+        store.initialize_schema()
+        yield inbox, store
+    finally:
+        with psycopg.connect(url) as conn:
+            conn.execute('DROP SCHEMA "' + schema + '" CASCADE')
 
 
 def add(inbox, *, kind=InboundKind.USER_MESSAGE):
@@ -34,8 +43,7 @@ def add(inbox, *, kind=InboundKind.USER_MESSAGE):
     event = VerifiedInbound(
         tenant_id="tenant-" + ident,
         channel="whatsapp", channel_account_id="phone-" + ident,
-        provider_event_id="evt-" + ident, kind=kind,
-        payload={"id": ident},
+        provider_event_id="evt-" + ident, kind=kind, payload={"id": ident},
     )
     assert inbox.accept_once(event)
     return event
@@ -45,15 +53,14 @@ def test_claim_leased_once_and_stale_ack_is_rejected(stores):
     inbox, store = stores
     event = add(inbox)
     first = store.claim_due(now=NOW, lease_seconds=10)
-    assert first is not None
-    # All other rows in the shared test DB are from earlier tests; check
-    # our row using token-CAS rather than expecting an empty global queue.
-    assert first.lease_token
+    assert first.event == event
+    assert store.claim_due(now=NOW) is None
     with pytest.raises(ValueError, match="Stale"):
         store.mark_processed(type(first)(event=first.event, lease_token="wrong", attempt=first.attempt))
     store.mark_processed(first)
     with pytest.raises(ValueError, match="Stale"):
         store.mark_processed(first)
+    assert store.claim_due(now=NOW + timedelta(hours=1)) is None
 
 
 def test_worker_routes_receipt_without_agent_invocation(stores):
@@ -67,71 +74,40 @@ def test_worker_routes_receipt_without_agent_invocation(stores):
     agent = Handler()
     status = Handler()
     worker = InboundProcessingWorker(store=store, user_messages=agent, delivery_receipts=status)
-    # Existing inbox rows may predate this test, so process up to 300 claims.
-    for _ in range(300):
-        if any(e.provider_event_id == receipt.provider_event_id for e in status.received):
-            break
-        if not worker.run_once(now=NOW):
-            break
-    assert any(e.provider_event_id == receipt.provider_event_id for e in status.received)
-    assert all(e.provider_event_id != receipt.provider_event_id for e in agent.received)
+    assert worker.run_once(now=NOW)
+    assert status.received == [receipt]
+    assert agent.received == []
+    assert not worker.run_once(now=NOW)
 
 
 def test_crash_before_ack_retries_then_stale_token_cannot_commit(stores):
     inbox, store = stores
     event = add(inbox)
-    # We must locate this particular event rather than assume no leftover rows.
-    first = None
-    for _ in range(300):
-        claim = store.claim_due(now=NOW, lease_seconds=2)
-        if claim is None:
-            break
-        if claim.event.provider_event_id == event.provider_event_id:
-            first = claim
-            break
-        store.mark_processed(claim)
-    assert first is not None
-    second = None
-    for _ in range(300):
-        claim = store.claim_due(now=NOW + timedelta(seconds=3), lease_seconds=10)
-        if claim is None:
-            break
-        if claim.event.provider_event_id == event.provider_event_id:
-            second = claim
-            break
-        store.mark_processed(claim)
-    assert second is not None
+    first = store.claim_due(now=NOW, lease_seconds=2)
+    second = store.claim_due(now=NOW + timedelta(seconds=3), lease_seconds=10)
+    assert first.event == second.event == event
     assert second.attempt == first.attempt + 1
     with pytest.raises(ValueError, match="Stale"):
         store.mark_processed(first)
     store.mark_processed(second)
+    assert store.claim_due(now=NOW + timedelta(hours=1)) is None
 
 
 def test_retry_limit_blocks_future_claims(stores):
     inbox, store = stores
-    event = add(inbox)
-    claim = None
-    for _ in range(300):
-        candidate = store.claim_due(now=NOW, lease_seconds=2)
-        if candidate is None:
-            break
-        if candidate.event.provider_event_id == event.provider_event_id:
-            claim = candidate
-            break
-        store.mark_processed(candidate)
-    assert claim is not None
+    add(inbox)
     for idx in range(3):
-        store.mark_failed(claim, now=NOW + timedelta(seconds=idx*10),
-                          error="SimulatedProviderFailure", retry_delay_seconds=1)
-        if idx != 2:
-            claim = None
-            for _ in range(300):
-                candidate = store.claim_due(now=NOW + timedelta(seconds=idx*10+2), lease_seconds=2)
-                if candidate is None:
-                    break
-                if candidate.event.provider_event_id == event.provider_event_id:
-                    claim = candidate
-                    break
-                store.mark_processed(candidate)
-            assert claim is not None
-    assert claim.attempt == 3
+        when = NOW + timedelta(seconds=idx*10)
+        claim = store.claim_due(now=when, lease_seconds=2)
+        assert claim is not None and claim.attempt == idx + 1
+        store.mark_failed(claim, now=when, error="ProviderFailure", retry_delay_seconds=1)
+    assert store.claim_due(now=NOW + timedelta(hours=1)) is None
+
+
+def test_invalid_lease_inputs_rejected(stores):
+    inbox, store = stores
+    add(inbox)
+    with pytest.raises(ValueError):
+        store.claim_due(now=NOW.replace(tzinfo=None))
+    with pytest.raises(ValueError):
+        store.claim_due(now=NOW, lease_seconds=0)
