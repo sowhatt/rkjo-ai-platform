@@ -63,7 +63,7 @@ def one_session(queue, handler, *, timeout=3.0, max_delivery_attempts=3):
     processed = []
 
     def callback(msg):
-        handler(msg)
+        handler.handle(msg) if hasattr(handler, 'handle') else handler(msg)
         processed.append(msg.message_id)
         bus.channel.stop_consuming()
 
