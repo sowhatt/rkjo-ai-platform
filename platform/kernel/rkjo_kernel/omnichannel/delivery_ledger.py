@@ -99,6 +99,19 @@ class PostgreSQLDeliveryLedger:
                     WHERE tenant_id=%s AND notification_id=%s FOR UPDATE
                 """, (tenant_id, notification_id))
                 row = cur.fetchone()
+                if row is None:
+                    # ON CONFLICT DO NOTHING also covers the unique provider
+                    # reference. Distinguish that collision from a changed
+                    # notification binding, without relaxing either constraint.
+                    cur.execute("""
+                        SELECT notification_id FROM omni_delivery_messages
+                        WHERE tenant_id=%s AND channel=%s AND channel_account_id=%s
+                          AND provider_message_id=%s
+                    """, (tenant_id, channel, channel_account_id, provider_message_id))
+                    owner = cur.fetchone()
+                    if owner is not None and owner[0] != notification_id:
+                        raise ValueError("Provider message already bound elsewhere.")
+                    raise ValueError("Outbound notification binding conflict.")
                 if row != (channel, channel_account_id, provider_message_id):
                     raise ValueError("Outbound notification binding conflict.")
                 # A provider message must not be linked to another notification.
