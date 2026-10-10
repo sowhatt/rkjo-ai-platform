@@ -47,12 +47,14 @@ class OwnershipFencedChannelAdapter:
     def __init__(
         self, *, database_url: str, downstream: ChannelDeliveryPort,
         policy: ChannelPolicyPort,
+        delivery_ledger=None,
     ):
         if not database_url or not database_url.strip():
             raise ValueError("Database URL required.")
         self.database_url = database_url
         self.downstream = downstream
         self.policy = policy
+        self.delivery_ledger = delivery_ledger
 
     def send(self, *, notification: Notification, message: AgentMessage) -> str:
         raw = message.payload.get("omnichannel_response")
@@ -122,4 +124,12 @@ class OwnershipFencedChannelAdapter:
                 )
                 if not isinstance(provider_ref,str) or not provider_ref.strip():
                     raise ValueError("Provider did not acknowledge an outbound message.")
+                if self.delivery_ledger is not None:
+                    self.delivery_ledger.register_sent(
+                        tenant_id=response.tenant_id,
+                        notification_id=response.notification_id,
+                        channel=response.channel,
+                        channel_account_id=response.channel_account_id,
+                        provider_message_id=provider_ref,
+                    )
                 return provider_ref
