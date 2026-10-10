@@ -138,6 +138,7 @@ def test_operator_retry_after_db_commit_does_not_duplicate(db):
     # Old agent response was queued before takeover; it is no longer eligible.
     claim_old = outbox.claim_due(now=NOW)
     assert claim_old is not None
+    outbox.finish(claim_old, obsolete=True)
     route = router.route(event("m2"))
     assert route.destination == "human"
     claim = outbox.claim_due(now=NOW)
