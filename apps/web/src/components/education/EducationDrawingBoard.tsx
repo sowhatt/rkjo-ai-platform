@@ -5,21 +5,12 @@ import { useRef, useState, type PointerEvent } from "react";
 type Point = { x: number; y: number };
 type Stroke = { points: Point[] };
 
-export default function EducationDrawingBoard({ resetKey }: { resetKey: number }) {
+export default function EducationDrawingBoard() {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [active, setActive] = useState<Stroke | null>(null);
   const [eraser, setEraser] = useState(false);
   const boardRef = useRef<SVGSVGElement>(null);
   const activePointerRef = useRef<number | null>(null);
-  const resetRef = useRef(resetKey);
-
-  if (resetRef.current !== resetKey) {
-    resetRef.current = resetKey;
-    if (strokes.length) setStrokes([]);
-    if (active) setActive(null);
-    activePointerRef.current = null;
-  }
-
   function pointFromEvent(event: PointerEvent<SVGSVGElement>): Point | null {
     const rect = boardRef.current?.getBoundingClientRect();
     if (!rect || !rect.width || !rect.height) return null;
