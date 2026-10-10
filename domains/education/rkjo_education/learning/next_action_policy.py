@@ -36,6 +36,6 @@ def recommend_next_action(signals: LearningSignals) -> ActionDecision:
         return ActionDecision(NextAction.DIAGNOSE, "No observed assessment result")
     if not signals.last_answer_correct:
         return ActionDecision(NextAction.PRACTICE, "An observed answer was incorrect")
-    if signals.autonomous_proof_passed and signals.hints_used == 0:
-        return ActionDecision(NextAction.ADVANCE, "Autonomous proof passed without help")
+    if signals.autonomous_proof_passed:
+        return ActionDecision(NextAction.ADVANCE, "Separate autonomous proof passed; guided hints are not proof assistance")
     return ActionDecision(NextAction.AUTONOMOUS_PROOF, "Guided success still requires independent proof")
