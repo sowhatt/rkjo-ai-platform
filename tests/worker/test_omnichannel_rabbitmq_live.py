@@ -19,7 +19,6 @@ from rkjo_kernel.omnichannel.inbound import InboundKind, VerifiedInbound
 from rkjo_worker.omnichannel_dispatcher import RabbitMQOmnichannelDispatcher
 
 
-@pytest.mark.integration
 def test_postgres_outbox_publishes_persistent_message_to_real_broker(monkeypatch):
     db_url=os.getenv("RKJO_TEST_DATABASE_URL")
     broker_url=os.getenv("RKJO_TEST_RABBITMQ_URL")
