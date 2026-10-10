@@ -165,7 +165,17 @@ class PostgreSQLNotificationStore:
                     # lock and transaction. Concurrent workers cannot bypass it.
                     payload = row[10].get("payload", {})
                     response = payload.get("omnichannel_response") if isinstance(payload, dict) else None
-                    if isinstance(response, dict):
+                    if isinstance(payload, dict) and "omnichannel_response" in payload:
+                        if not isinstance(response, dict):
+                            cur.execute("""
+                                UPDATE multimodal_notifications SET status='failed',
+                                    lease_token=NULL,lease_until=NULL,
+                                    next_attempt_at=NULL,
+                                    last_error='InvalidOmnichannelContract',
+                                    updated_at=CURRENT_TIMESTAMP
+                                WHERE notification_id=%s AND tenant_id=%s
+                            """, (row[0], row[1]))
+                            continue
                         cur.execute("""
                             SELECT provider_message_id,channel,channel_account_id
                             FROM omni_delivery_messages
