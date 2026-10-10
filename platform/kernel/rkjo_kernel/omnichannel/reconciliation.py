@@ -105,3 +105,33 @@ class OmnichannelDeliveryReconciler:
             sent_without_binding=sent_unbound,
             failed=failed,
         )
+
+    def quarantine_uncertain(self, *, tenant_id: str, now: datetime) -> int:
+        """Freeze expired/retry omnichannel sends with no provider proof.
+
+        Must execute before dispatch workers claim more rows. This operation
+        locks matching notifications and never marks a send as unsuccessful
+        with certainty; failed here means 'manual reconciliation required'.
+        """
+        self._validate(tenant_id, now)
+        with psycopg.connect(self.database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE multimodal_notifications n
+                    SET status='failed', lease_token=NULL, lease_until=NULL,
+                        next_attempt_at=NULL,
+                        last_error='UncertainProviderAcceptance',
+                        updated_at=CURRENT_TIMESTAMP
+                    WHERE n.tenant_id=%s
+                      AND n.message_payload -> 'payload' ? 'omnichannel_response'
+                      AND n.attempts > 0
+                      AND (n.status='retry'
+                           OR (n.status='in_flight' AND n.lease_until<=%s))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM omni_delivery_messages d
+                        WHERE d.tenant_id=n.tenant_id
+                          AND d.notification_id=n.notification_id
+                          AND d.channel=n.channel
+                      )
+                """, (tenant_id, now))
+                return cur.rowcount
