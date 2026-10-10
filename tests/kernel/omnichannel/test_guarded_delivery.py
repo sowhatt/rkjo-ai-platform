@@ -206,3 +206,22 @@ def test_human_takeover_waits_until_provider_call_finishes(context):
         assert future_send.result(timeout=5) == "provider-out-1"
         assert future_transfer.result(timeout=5).mode.value == "human"
     assert len(sender.calls) == 1
+
+def test_guarded_send_registers_provider_reference_in_delivery_ledger(context):
+    from rkjo_kernel.omnichannel.delivery_ledger import PostgreSQLDeliveryLedger
+    url, router, route = context
+    ledger = PostgreSQLDeliveryLedger(url)
+    ledger.initialize_schema()
+    sender = Sender()
+    guard = OwnershipFencedChannelAdapter(
+        database_url=url, downstream=sender, policy=Policy(),
+        delivery_ledger=ledger,
+    )
+    notification, message = build(route)
+    assert guard.send(notification=notification, message=message) == "provider-out-1"
+    state = ledger.load(tenant_id="tenant-a", notification_id="notify-1")
+    assert state.provider_message_id == "provider-out-1"
+    assert state.channel_account_id == "phone-a"
+    assert ledger.load(tenant_id="tenant-b", notification_id="notify-1") is None
+    assert guard.send(notification=notification, message=message) == "provider-out-1"
+    assert len(sender.calls) == 2
