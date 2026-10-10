@@ -218,7 +218,7 @@ export default function EducationCe1Classroom() {
             )}
             {phase === "proof" && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Pour cette preuve, la méthode et les indices restent masqués. Essaie seul.</p>}
 
-            <EducationDrawingBoard resetKey={boardVersion} />
+            <EducationDrawingBoard key={boardVersion} />
             <div className="space-y-2">
               <label htmlFor="board-notes" className="block text-sm font-semibold">Mon brouillon</label>
               <textarea id="board-notes" value={boardNotes} onChange={(event) => setBoardNotes(event.target.value)}
