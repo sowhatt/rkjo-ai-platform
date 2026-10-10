@@ -87,16 +87,28 @@ class OwnershipFencedChannelAdapter:
                         or mode != response.origin.value):
                     raise ObsoleteConversationResponse("Conversation ownership is obsolete.")
                 cur.execute("""
-                    SELECT 1 FROM omni_routed_inbound
+                    SELECT event_payload FROM omni_route_outbox
                     WHERE tenant_id=%s AND conversation_id=%s
                       AND channel=%s AND channel_account_id=%s
-                    LIMIT 1
+                    ORDER BY created_at DESC LIMIT 1
                 """, (
                     response.tenant_id,response.conversation_id,
                     response.channel,response.channel_account_id,
                 ))
-                if cur.fetchone() is None:
+                route_row = cur.fetchone()
+                if route_row is None:
                     raise PermissionError("Unbound origin channel account.")
+                provider_event = route_row[0].get("event", {})
+                if response.channel == "whatsapp":
+                    expected_recipient = provider_event.get("from")
+                elif response.channel == "telegram":
+                    chat = route_row[0].get("message", {}).get("chat", {})
+                    expected_recipient = str(chat.get("id")) if chat.get("id") is not None else None
+                else:
+                    raise PermissionError("Unsupported provider channel.")
+                if (not isinstance(expected_recipient, str) or
+                        response.recipient_ref != expected_recipient):
+                    raise PermissionError("Response recipient does not match verified inbound.")
                 if response.origin == ResponseOrigin.HUMAN:
                     sender_operator = message.metadata.get("operator_id")
                     if (not isinstance(sender_operator,str)
