@@ -133,6 +133,7 @@ class ResponseKind(str, Enum):
     BUTTONS = "buttons"
     LIST = "list"
     MEDIA = "media"
+    TEMPLATE = "template"
 
 
 class ChannelResponse(StrictContract):
@@ -152,6 +153,8 @@ class ChannelResponse(StrictContract):
 
     @model_validator(mode="after")
     def validate_response(self):
+        if self.kind == ResponseKind.TEMPLATE and not self.fallback_template_id:
+            raise ValueError("Template response requires an approved template identifier.")
         if self.kind == ResponseKind.MEDIA and not self.media_ref:
             raise ValueError("Media response requires a validated media reference.")
         if self.kind in (ResponseKind.TEXT, ResponseKind.BUTTONS, ResponseKind.LIST) and not (self.text and self.text.strip()):
