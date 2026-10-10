@@ -97,6 +97,17 @@ class NotificationDeliveryWorker:
             if not provider_ref:
                 raise ValueError("Channel adapter returned no provider reference.")
         except Exception as exc:
+            # Terminal omnichannel denials must never consume retry budget.
+            from rkjo_kernel.omnichannel.channel_policy import PermanentDeliveryRejection
+            from rkjo_kernel.omnichannel.guarded_delivery import ObsoleteConversationResponse
+            if isinstance(exc, (PermanentDeliveryRejection, ObsoleteConversationResponse)):
+                self.store.mark_terminal(
+                    notification_id=notification.notification_id,
+                    tenant_id=notification.tenant_id,
+                    lease_token=notification.lease_token or "",
+                    error=type(exc).__name__,
+                )
+                return True
             self.store.mark_failed(
                 notification_id=notification.notification_id, tenant_id=notification.tenant_id,
                 lease_token=notification.lease_token or "", now=now,
