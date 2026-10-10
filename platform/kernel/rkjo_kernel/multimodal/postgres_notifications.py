@@ -148,7 +148,7 @@ class PostgreSQLNotificationStore:
                 """, (now, self.max_attempts))
                 while True:
                     cur.execute(f"""
-                    SELECT {_FIELDS}, message_payload
+                    SELECT {_FIELDS}, message_payload, provider_ref
                     FROM multimodal_notifications
                     WHERE attempts < %s AND (
                         (status IN ('pending','retry') AND
@@ -165,9 +165,7 @@ class PostgreSQLNotificationStore:
                     # lock and transaction. Concurrent workers cannot bypass it.
                     payload = row[10].get("payload", {})
                     response = payload.get("omnichannel_response") if isinstance(payload, dict) else None
-                    if isinstance(response, dict) and (
-                        row[6] > 0 or row[5] != "pending"
-                    ):
+                    if isinstance(response, dict):
                         cur.execute("""
                             SELECT provider_message_id,channel,channel_account_id
                             FROM omni_delivery_messages
@@ -179,7 +177,7 @@ class PostgreSQLNotificationStore:
                             response.get("notification_id") == row[0] and
                             response.get("channel_account_id") == proof[2] and
                             response.get("recipient_ref") == row[4] and
-                            (not row[9] or row[9] == proof[0]))
+                            (not row[11] or row[11] == proof[0]))
                         if safe:
                             cur.execute("""
                                 UPDATE multimodal_notifications
@@ -189,7 +187,7 @@ class PostgreSQLNotificationStore:
                                     updated_at=CURRENT_TIMESTAMP
                                 WHERE notification_id=%s AND tenant_id=%s
                             """, (proof[0], row[0], row[1]))
-                        else:
+                        elif row[6] > 0 or row[5] != "pending" or proof is not None:
                             cur.execute("""
                                 UPDATE multimodal_notifications
                                 SET status='failed', lease_token=NULL,
@@ -198,7 +196,9 @@ class PostgreSQLNotificationStore:
                                     updated_at=CURRENT_TIMESTAMP
                                 WHERE notification_id=%s AND tenant_id=%s
                             """, (row[0],row[1]))
-                        continue
+                            continue
+                        if safe:
+                            continue
                     claimed = _notification(row)
                     token = uuid4().hex
                     cur.execute("""
