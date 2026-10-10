@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import EducationDrawingBoard from "@/components/education/EducationDrawingBoard";
 import { useState } from "react";
 
 type Phase = "welcome" | "practice" | "proof" | "result";
@@ -38,6 +39,9 @@ export default function EducationCe1Classroom() {
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [showBreakdown, setShowBreakdown] = useState(true);
   const [boardNotes, setBoardNotes] = useState("");
+  const [tokensMoved, setTokensMoved] = useState(0);
+  const [explanationCount, setExplanationCount] = useState(0);
+  const [boardVersion, setBoardVersion] = useState(0);
 
   const question = phase === "proof" || phase === "result" ? PROOF : PRACTICE;
   const hints = [
@@ -57,6 +61,7 @@ export default function EducationCe1Classroom() {
   function startPractice() {
     setPhase("practice");
     setShowBreakdown(false);
+    setTokensMoved(0);
     say("À toi ! Calcule 8 + 5. Tu peux me demander jusqu'à trois indices. Je ne donnerai pas la réponse directement.");
   }
 
@@ -90,6 +95,9 @@ export default function EducationCe1Classroom() {
       say("Bravo pour cet entraînement ! Même avec des indices, ce n'est pas encore une preuve autonome. Essayons maintenant un nouveau calcul sans aide.", trimmed);
       setPhase("proof");
       setShowBreakdown(false);
+      setTokensMoved(0);
+      setBoardNotes("");
+      setBoardVersion((v) => v + 1);
       return;
     }
 
@@ -115,6 +123,30 @@ export default function EducationCe1Classroom() {
     setOutcome(null);
     setShowBreakdown(true);
     setBoardNotes("");
+    setBoardVersion((v) => v + 1);
+    setTokensMoved(0);
+    setExplanationCount(0);
+  }
+
+  function explainAgain() {
+    if (phase === "proof" || phase === "result") return;
+    const variants = [
+      "Regarde les jetons : on complète d’abord la rangée de 8 avec 2 jetons jaunes pour former 10.",
+      "Imagine une boîte de 10 cases : 8 cases sont remplies. Il manque 2 cases. Sur les 5 jetons jaunes, après en avoir placé 2, combien reste-t-il ?",
+      "Essaie toi-même : appuie deux fois sur « Déplacer un jeton », puis compte les jetons restants dans le groupe jaune.",
+    ];
+    say(variants[explanationCount % variants.length], "Je n’ai pas compris.");
+    setExplanationCount((v) => v + 1);
+    setShowBreakdown(true);
+    if (phase === "practice") setHintLevel((n) => Math.min(n + 1, hints.length));
+  }
+
+  function moveToken() {
+    if (phase === "proof" || phase === "result" || tokensMoved >= 2) return;
+    const next = tokensMoved + 1;
+    setTokensMoved(next);
+    if (phase === "practice") setHintLevel((n) => Math.min(n + 1, hints.length));
+    if (next === 2) say("Voilà : 8 + 2 = 10 ! Il reste 3 jetons jaunes. Combien font 10 + 3 ?", "J’ai déplacé deux jetons.");
   }
 
   return (
@@ -126,7 +158,7 @@ export default function EducationCe1Classroom() {
         </nav>
 
         <header className="rounded-2xl bg-slate-900 p-6 text-white">
-          <p className="text-xs font-semibold uppercase tracking-widest text-cyan-300">RKJO Education · Classe interactive V1</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-cyan-300">RKJO Education · Classe interactive V2</p>
           <h1 className="mt-2 text-3xl font-bold">Apprendre les additions avec mon professeur</h1>
           <p className="mt-2 text-slate-200">Objectif : comprendre le passage par 10, essayer avec aide, puis démontrer son autonomie.</p>
           <p className="mt-2 text-sm text-amber-200">Séance locale scénarisée : aucune conversation IA, aucun micro, aucune donnée élève enregistrée.</p>
@@ -150,13 +182,23 @@ export default function EducationCe1Classroom() {
               </p>
               <div className="space-y-3" aria-label="Représentation visuelle des deux nombres">
                 <div className="flex flex-wrap gap-2">
-                  {Array.from({ length: question.left }, (_, i) => <span key={"a" + i} className="h-7 w-7 rounded-full bg-cyan-400" aria-hidden="true" />)}
+                  {Array.from({ length: question.left + (phase === "proof" || phase === "result" ? 0 : tokensMoved) }, (_, i) => <span key={"a" + i} className="h-7 w-7 rounded-full bg-cyan-400" aria-hidden="true" />)}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {Array.from({ length: question.right }, (_, i) => <span key={"b" + i} className="h-7 w-7 rounded-full bg-amber-400" aria-hidden="true" />)}
+                  {Array.from({ length: question.right - (phase === "proof" || phase === "result" ? 0 : tokensMoved) }, (_, i) => <span key={"b" + i} className="h-7 w-7 rounded-full bg-amber-400" aria-hidden="true" />)}
                 </div>
               </div>
               <p className="mt-3 text-xs text-slate-300">Bleu : premier nombre · Jaune : second nombre</p>
+              {phase !== "proof" && phase !== "result" && (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={moveToken} disabled={tokensMoved >= 2}
+                    className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">
+                    Déplacer un jeton jaune vers le groupe bleu
+                  </button>
+                  <span role="status" className="text-sm text-cyan-200">Jetons déplacés : {tokensMoved}/2</span>
+                  {tokensMoved === 2 && <p className="w-full text-sm text-white">10 jetons réunis · 3 jetons restants</p>}
+                </div>
+              )}
             </div>
 
             {phase !== "proof" && phase !== "result" && (
@@ -176,6 +218,7 @@ export default function EducationCe1Classroom() {
             )}
             {phase === "proof" && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Pour cette preuve, la méthode et les indices restent masqués. Essaie seul.</p>}
 
+            <EducationDrawingBoard resetKey={boardVersion} />
             <div className="space-y-2">
               <label htmlFor="board-notes" className="block text-sm font-semibold">Mon brouillon</label>
               <textarea id="board-notes" value={boardNotes} onChange={(event) => setBoardNotes(event.target.value)}
@@ -204,6 +247,11 @@ export default function EducationCe1Classroom() {
             </div>
 
             <div className="mt-5 space-y-3 border-t border-slate-100 pt-4">
+              {(phase === "welcome" || phase === "practice") && (
+                <button type="button" onClick={explainAgain} className="w-full rounded-xl border border-blue-700 px-5 py-3 font-semibold text-blue-700">
+                  Je n&apos;ai pas compris, explique autrement
+                </button>
+              )}
               {phase === "welcome" && (
                 <button type="button" onClick={startPractice} className="w-full rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white">
                   J&apos;ai compris, je veux essayer
