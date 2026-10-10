@@ -69,8 +69,9 @@ class OwnershipFencedChannelAdapter:
             raise PermissionError("System messages require a separate authorization policy.")
         # The trusted route must be persisted: never trust an account ID
         # supplied solely by an unverified generated response.
-        with psycopg.connect(self.database_url, options="-c statement_timeout=10000") as conn:
+        with psycopg.connect(self.database_url) as conn:
             with conn.cursor() as cur:
+                cur.execute("SET LOCAL statement_timeout = 10000")
                 cur.execute("""
                     SELECT origin_channel,mode,assigned_operator_id,ownership_version
                     FROM omni_conversations
