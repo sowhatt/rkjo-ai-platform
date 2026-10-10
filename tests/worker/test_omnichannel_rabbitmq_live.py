@@ -57,7 +57,7 @@ def test_postgres_outbox_publishes_persistent_message_to_real_broker(monkeypatch
             channel=connection.channel()
             method,properties,body=channel.basic_get(queue=queue,auto_ack=False)
             assert method is not None
-            assert properties.delivery_mode==pika.DeliveryMode.Persistent
+            assert properties.delivery_mode == pika.DeliveryMode.Persistent.value
             message=AgentMessage.model_validate_json(body)
             assert message.message_type=="omnichannel.inbound.message"
             assert message.metadata["tenant_id"]=="tenant-e2e"
