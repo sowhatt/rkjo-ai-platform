@@ -13,6 +13,7 @@ import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 from rkjo_kernel.omnichannel.conversation_router import PostgreSQLConversationRouter
+from rkjo_kernel.omnichannel.route_consumers import PostgreSQLOperatorInbox
 from rkjo_kernel.omnichannel.inbound import InboundKind, VerifiedInbound
 from rkjo_worker.omnichannel_dispatcher import RabbitMQOmnichannelDispatcher
 
@@ -59,6 +60,7 @@ def stack():
     try:
         router = PostgreSQLConversationRouter(scoped)
         router.initialize_schema()
+        PostgreSQLOperatorInbox(scoped).initialize_schema()
         yield scoped, router
     finally:
         with psycopg.connect(database_url) as conn:
