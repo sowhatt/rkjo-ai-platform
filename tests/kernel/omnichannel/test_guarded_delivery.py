@@ -148,6 +148,24 @@ def test_tenant_account_and_channel_policy_fail_closed(context):
     assert sender.calls == []
 
 
+
+def test_response_cannot_be_sent_to_different_contact(context):
+    url,router,route = context
+    sender = Sender()
+    guard = OwnershipFencedChannelAdapter(database_url=url,downstream=sender,policy=Policy())
+    notification,message = build(route)
+    notification = Notification(
+        notification_id=notification.notification_id,tenant_id=notification.tenant_id,
+        job_id=notification.job_id,channel=notification.channel,
+        recipient_ref="another-contact",status=NotificationStatus.IN_FLIGHT,
+        attempts=1,lease_token="lease",
+    )
+    message.payload["omnichannel_response"]["recipient_ref"] = "another-contact"
+    with pytest.raises(PermissionError,match="recipient"):
+        guard.send(notification=notification,message=message)
+    assert sender.calls == []
+
+
 def test_missing_contract_cannot_bypass_guard(context):
     url,router,route = context
     sender = Sender()
