@@ -180,7 +180,7 @@ export default function EducationCe1Classroom() {
               <label htmlFor="board-notes" className="block text-sm font-semibold">Mon brouillon</label>
               <textarea id="board-notes" value={boardNotes} onChange={(event) => setBoardNotes(event.target.value)}
                 rows={3} placeholder="Tu peux écrire tes calculs ici..." className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
-              <p className="text-xs text-slate-500">Ton brouillon reste dans cette page et n'est pas corrigé automatiquement.</p>
+              <p className="text-xs text-slate-500">Ton brouillon reste dans cette page et n&apos;est pas corrigé automatiquement.</p>
             </div>
           </section>
 
@@ -206,7 +206,7 @@ export default function EducationCe1Classroom() {
             <div className="mt-5 space-y-3 border-t border-slate-100 pt-4">
               {phase === "welcome" && (
                 <button type="button" onClick={startPractice} className="w-full rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white">
-                  J'ai compris, je veux essayer
+                  J&apos;ai compris, je veux essayer
                 </button>
               )}
               {(phase === "practice" || phase === "proof") && (
@@ -231,14 +231,14 @@ export default function EducationCe1Classroom() {
               {phase === "result" && (
                 <div className="space-y-3" role="status">
                   <p className="text-lg font-bold">{outcome === "passed" ? "Preuve autonome réussie" : "Encore un peu d'entraînement"}</p>
-                  <p className="text-sm">Indices à l'entraînement : {hintLevel} · Tentatives guidées : {practiceAttempts} · Tentatives autonomes : {proofAttempts}</p>
+                  <p className="text-sm">Indices à l&apos;entraînement : {hintLevel} · Tentatives guidées : {practiceAttempts} · Tentatives autonomes : {proofAttempts}</p>
                   <p className="text-sm text-slate-600">Action recommandée : {outcome === "passed" ? "continuer avec une nouvelle addition" : "reprendre la méthode, puis refaire une preuve"}.</p>
                   <button type="button" onClick={restart} className="w-full rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white">
                     Recommencer la séance
                   </button>
                 </div>
               )}
-              <p className="text-xs text-slate-500">Le dialogue est régi par des règles locales. La voix, l'IA et la sauvegarde de progression viendront après intégration sécurisée.</p>
+              <p className="text-xs text-slate-500">Le dialogue est régi par des règles locales. La voix, l&apos;IA et la sauvegarde de progression viendront après intégration sécurisée.</p>
             </div>
           </section>
         </div>
