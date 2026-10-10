@@ -9,6 +9,7 @@ import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from psycopg.types.json import Jsonb
 
+from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.multimodal.postgres_notifications import PostgreSQLNotificationStore
 from rkjo_kernel.omnichannel.delivery_ledger import PostgreSQLDeliveryLedger
 
@@ -43,8 +44,13 @@ def insert(url, ident, *, status="retry", attempts=1, tenant="tenant-a",
         "notification_id": ident, "tenant_id": tenant,
         "channel_account_id": account, "recipient_ref": "customer-a",
     }
-    payload = ({"payload":{"omnichannel_response": response}}
-               if omni else {"payload":{"job_id":"job"}})
+    message = AgentMessage(
+        message_id=ident, source="rkjo.agent", target="rkjo.delivery",
+        message_type="omnichannel.response.requested" if omni else "multimodal.notification.requested",
+        payload=({"omnichannel_response": response} if omni else {"job_id":"job"}),
+        metadata={"tenant_id":tenant},
+    )
+    payload = message.model_dump(mode="json")
     lease = "lease" if status == "in_flight" else None
     with psycopg.connect(url) as conn:
         conn.execute("""
@@ -112,17 +118,30 @@ def test_tenant_account_binding_mismatch_is_not_accepted(stack):
 def test_first_attempt_still_claimable_without_prior_proof(stack):
     url,store,_=stack
     insert(url,"new",status="pending",attempts=0)
-    # This fixture uses a minimal payload. The store must not reject the
-    # initial lease before the existing AgentMessage decoder validates it.
-    with pytest.raises(Exception) as err:
-        store.claim_due(now=NOW,lease_seconds=10)
-    assert "omnichannel_response" in str(err.value) or err.value is not None
+    claimed = store.claim_due(now=NOW,lease_seconds=10)
+    assert claimed is not None
+    notification, message = claimed
+    assert notification.notification_id == "new"
+    assert notification.attempts == 1
+    assert message.payload["omnichannel_response"]["notification_id"] == "new"
 
 
 def test_legacy_multimodal_retry_keeps_existing_behavior(stack):
     url,store,_=stack
     insert(url,"legacy",omni=False)
-    # Existing multimodal retry is unaffected by the new routing fence.
-    with pytest.raises(Exception):
-        store.claim_due(now=NOW,lease_seconds=10)
-    assert status(url,"legacy")[2] == 1
+    claimed = store.claim_due(now=NOW,lease_seconds=10)
+    assert claimed is not None
+    notification, message = claimed
+    assert notification.notification_id == "legacy"
+    assert notification.attempts == 2
+    assert message.payload["job_id"] == "job"
+
+
+def test_first_attempt_with_existing_provider_proof_is_not_sent(stack):
+    url,store,ledger=stack
+    insert(url,"early-proof",status="pending",attempts=0)
+    ledger.register_sent(tenant_id="tenant-a",notification_id="early-proof",
+                         channel="whatsapp",channel_account_id="phone-a",
+                         provider_message_id="wamid-early")
+    assert store.claim_due(now=NOW,lease_seconds=10) is None
+    assert status(url,"early-proof")[0] == "sent"
