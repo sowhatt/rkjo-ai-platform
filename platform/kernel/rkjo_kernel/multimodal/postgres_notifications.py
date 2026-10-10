@@ -209,3 +209,21 @@ class PostgreSQLNotificationStore:
                       notification_id, tenant_id, lease_token))
                 if cur.rowcount != 1:
                     raise ValueError("Concurrent notification update.")
+
+    def mark_terminal(self, *, notification_id: str, tenant_id: str,
+                      lease_token: str, error: str) -> None:
+        """Terminal rejection, never retry a stale or policy-denied response."""
+        if not lease_token or not error:
+            raise ValueError("Valid lease token and error required.")
+        with psycopg.connect(self.database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE multimodal_notifications
+                    SET status='failed', lease_token=NULL, lease_until=NULL,
+                        next_attempt_at=NULL, last_error=%s,
+                        updated_at=CURRENT_TIMESTAMP
+                    WHERE notification_id=%s AND tenant_id=%s
+                      AND status='in_flight' AND lease_token=%s
+                """, (error, notification_id, tenant_id, lease_token))
+                if cur.rowcount != 1:
+                    raise ValueError("Stale notification lease or wrong tenant.")
