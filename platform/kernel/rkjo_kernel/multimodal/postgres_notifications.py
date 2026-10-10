@@ -133,8 +133,21 @@ class PostgreSQLNotificationStore:
                         updated_at=CURRENT_TIMESTAMP
                     WHERE status='in_flight' AND lease_until<=%s
                       AND attempts >= %s
+                      AND NOT (message_payload -> 'payload' ? 'omnichannel_response')
                 """, (now, self.max_attempts))
-                cur.execute(f"""
+                # Exhausted omnichannel attempts are uncertain, not proof of failure.
+                cur.execute("""
+                    UPDATE multimodal_notifications SET status='failed',
+                        lease_token=NULL, lease_until=NULL,
+                        next_attempt_at=NULL,
+                        last_error='UncertainProviderAcceptance',
+                        updated_at=CURRENT_TIMESTAMP
+                    WHERE status='in_flight' AND lease_until<=%s
+                      AND attempts >= %s
+                      AND message_payload -> 'payload' ? 'omnichannel_response'
+                """, (now, self.max_attempts))
+                while True:
+                    cur.execute(f"""
                     SELECT {_FIELDS}, message_payload
                     FROM multimodal_notifications
                     WHERE attempts < %s AND (
@@ -145,19 +158,57 @@ class PostgreSQLNotificationStore:
                     ORDER BY created_at, notification_id
                     LIMIT 1 FOR UPDATE SKIP LOCKED
                 """, (self.max_attempts, now, now))
-                row = cur.fetchone()
-                if row is None:
-                    return None
-                claimed = _notification(row)
-                token = uuid4().hex
-                cur.execute("""
+                    row = cur.fetchone()
+                    if row is None:
+                        return None
+                    # This check and the subsequent lease change share the row
+                    # lock and transaction. Concurrent workers cannot bypass it.
+                    payload = row[10].get("payload", {})
+                    response = payload.get("omnichannel_response") if isinstance(payload, dict) else None
+                    if isinstance(response, dict) and (
+                        row[6] > 0 or row[5] != "pending"
+                    ):
+                        cur.execute("""
+                            SELECT provider_message_id,channel,channel_account_id
+                            FROM omni_delivery_messages
+                            WHERE tenant_id=%s AND notification_id=%s
+                        """, (row[1], row[0]))
+                        proof = cur.fetchone()
+                        safe = bool(proof and proof[1] == row[3] and
+                            response.get("tenant_id") == row[1] and
+                            response.get("notification_id") == row[0] and
+                            response.get("channel_account_id") == proof[2] and
+                            response.get("recipient_ref") == row[4] and
+                            (not row[9] or row[9] == proof[0]))
+                        if safe:
+                            cur.execute("""
+                                UPDATE multimodal_notifications
+                                SET status='sent', provider_ref=%s,
+                                    lease_token=NULL, lease_until=NULL,
+                                    next_attempt_at=NULL, last_error=NULL,
+                                    updated_at=CURRENT_TIMESTAMP
+                                WHERE notification_id=%s AND tenant_id=%s
+                            """, (proof[0], row[0], row[1]))
+                        else:
+                            cur.execute("""
+                                UPDATE multimodal_notifications
+                                SET status='failed', lease_token=NULL,
+                                    lease_until=NULL,next_attempt_at=NULL,
+                                    last_error='UncertainProviderAcceptance',
+                                    updated_at=CURRENT_TIMESTAMP
+                                WHERE notification_id=%s AND tenant_id=%s
+                            """, (row[0],row[1]))
+                        continue
+                    claimed = _notification(row)
+                    token = uuid4().hex
+                    cur.execute("""
                     UPDATE multimodal_notifications
                     SET status='in_flight', attempts=attempts+1,
                         lease_token=%s, lease_until=%s, next_attempt_at=NULL,
                         updated_at=CURRENT_TIMESTAMP
                     WHERE notification_id=%s
                 """, (token, now + timedelta(seconds=lease_seconds), claimed.notification_id))
-                return (Notification(
+                    return (Notification(
                     notification_id=claimed.notification_id,
                     tenant_id=claimed.tenant_id, job_id=claimed.job_id,
                     channel=claimed.channel, recipient_ref=claimed.recipient_ref,
