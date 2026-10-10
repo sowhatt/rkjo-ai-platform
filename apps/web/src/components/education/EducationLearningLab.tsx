@@ -144,7 +144,7 @@ export default function EducationLearningLab() {
           {stage === "explain" && (
             <div className="mt-5 space-y-4">
               <p className="rounded-xl bg-sky-50 p-4 leading-7">{lesson.explanation}</p>
-              <button type="button" onClick={() => { setStage("guided"); setFeedback(""); }} className="rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white">Commencer l'exercice</button>
+              <button type="button" onClick={() => { setStage("guided"); setFeedback(""); }} className="rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white">Commencer l&apos;exercice</button>
             </div>
           )}
           {(stage === "guided" || stage === "proof") && (
@@ -165,7 +165,7 @@ export default function EducationLearningLab() {
           {stage === "review" && (
             <div className="mt-5 space-y-4">
               <p className="font-semibold">{proofPassed ? "Objectif démonstration atteint" : "Une nouvelle tentative est recommandée"}</p>
-              <p className="text-sm text-slate-600">Indice utilisé à l'entraînement : {hintUsed ? "oui" : "non"}. Résultat de la preuve autonome : {proofPassed ? "réussi" : "à retravailler"}.</p>
+              <p className="text-sm text-slate-600">Indice utilisé à l&apos;entraînement : {hintUsed ? "oui" : "non"}. Résultat de la preuve autonome : {proofPassed ? "réussi" : "à retravailler"}.</p>
               <p className="text-sm text-slate-600">Prochaine activité suggérée : {proofPassed ? "aborder une nouvelle notion" : "revoir l'explication et refaire un exercice"}.</p>
               <button type="button" onClick={() => reset(discipline)} className="rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white">Recommencer la leçon</button>
             </div>
