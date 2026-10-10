@@ -42,13 +42,15 @@ class PostgreSQLOmnichannelOperations:
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("Timezone-aware clock required.")
         with psycopg.connect(self.database_url) as conn:
-            def health(table: str, waiting: str, expired: str) -> QueueHealth:
+            def health(table: str, waiting: str, expired: str,
+                       *, omni_only: bool = False) -> QueueHealth:
                 # Callers cannot inject SQL identifiers; only fixed internal strings.
                 row = conn.execute(f"""
                     SELECT count(*) FILTER (WHERE {waiting}),
                            count(*) FILTER (WHERE status='failed'),
                            count(*) FILTER (WHERE {expired})
                     FROM {table} WHERE tenant_id=%s
+                      {"AND message_payload -> 'payload' ? 'omnichannel_response'" if omni_only else ""}
                 """, (now, tenant_id)).fetchone()
                 return QueueHealth(*(int(v or 0) for v in row))
 
@@ -60,7 +62,7 @@ class PostgreSQLOmnichannelOperations:
                             "status='pending' AND lease_token IS NOT NULL AND lease_until<=%s")
             outbound = health("multimodal_notifications",
                               "status IN ('pending','retry','in_flight')",
-                              "status='in_flight' AND lease_until<=%s")
+                              "status='in_flight' AND lease_until<=%s", omni_only=True)
             row = conn.execute("""
                 SELECT
                   count(*) FILTER (
