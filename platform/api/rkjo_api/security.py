@@ -222,6 +222,11 @@ def required_role_for_request(
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
 
+    # Students may upload their own PDF for a stateless preview.
+    # The endpoint itself requires an authenticated subject and tenant.
+    if normalized_method == "POST" and path == "/education/study/preview-pdf":
+        return ApiRole.VIEWER
+
     # CE1 pilot learner turns require a verified individual Bearer identity,
     # enforced again inside the endpoint. Teacher commands remain OPERATOR.
     if (
