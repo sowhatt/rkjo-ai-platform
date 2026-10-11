@@ -222,6 +222,15 @@ def required_role_for_request(
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
 
+    # CE1 pilot learner turns require a verified individual Bearer identity,
+    # enforced again inside the endpoint. Teacher commands remain OPERATOR.
+    if (
+        normalized_method == "POST"
+        and path.startswith("/education/ce1-sessions/")
+        and path.endswith("/turns")
+    ):
+        return ApiRole.VIEWER
+
     if path.startswith(
         "/education"
     ):
