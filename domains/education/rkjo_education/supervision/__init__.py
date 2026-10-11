@@ -1,0 +1,1 @@
+"""Teacher supervision domain contracts."""
