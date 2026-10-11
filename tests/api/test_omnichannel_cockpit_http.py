@@ -35,6 +35,12 @@ def mock_backend(monkeypatch):
         def acknowledge(self, *, tenant_id, code, operator_id):
             return SimpleNamespace(code=code,status="acknowledged",
                                    acknowledged_by=operator_id)
+    class Heartbeats:
+        def __init__(self,url):
+            pass
+        def list(self, *, tenant_id, now):
+            return []
+    monkeypatch.setattr(omnichannel,"PostgreSQLOmnichannelWorkerHeartbeats",Heartbeats)
     monkeypatch.setattr(omnichannel,"PostgreSQLOmnichannelOperations",Operations)
     monkeypatch.setattr(omnichannel,"PostgreSQLOmnichannelMonitor",Monitor)
     monkeypatch.setattr(omnichannel,"PostgreSQLOmnichannelIncidents",Incidents)
