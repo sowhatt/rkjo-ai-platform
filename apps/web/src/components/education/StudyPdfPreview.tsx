@@ -12,9 +12,25 @@ type Preview = {
   revision_outline: Outline[];
 };
 
+const suggestedUnits: Record<string, string[]> = {
+  "medicine-year-1": [
+    "Anatomie", "Physiologie", "Biologie cellulaire", "Histologie",
+    "Biochimie", "Biophysique", "Embryologie", "Santé publique",
+  ],
+  "pharmacy-year-1": [
+    "Chimie générale", "Chimie organique", "Biochimie", "Biologie cellulaire",
+    "Physiologie", "Botanique", "Pharmacologie", "Microbiologie",
+  ],
+  "nursing-year-1": [
+    "Sciences biologiques et médicales", "Anatomie et physiologie",
+    "Hygiène et infectiologie", "Soins infirmiers", "Pharmacologie",
+    "Santé publique", "Psychologie", "Raisonnement clinique",
+  ],
+};
+
 export default function StudyPdfPreview() {
   const [programme, setProgramme] = useState("medicine-year-1");
-  const [ue, setUe] = useState("anatomie");
+  const [ue, setUe] = useState("");
   const [kind, setKind] = useState("cm");
   const [token, setToken] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -76,7 +92,10 @@ export default function StudyPdfPreview() {
       <form onSubmit={onSubmit} className="mt-6 grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
           Formation
-          <select value={programme} onChange={(event) => setProgramme(event.target.value)}
+          <select value={programme} onChange={(event) => {
+            setProgramme(event.target.value);
+            setUe("");
+          }}
             className="mt-2 w-full rounded-lg border border-slate-300 bg-white p-3">
             <option value="medicine-year-1">Médecine</option>
             <option value="pharmacy-year-1">Pharmacie</option>
@@ -85,8 +104,18 @@ export default function StudyPdfPreview() {
         </label>
         <label className="block text-sm font-semibold">
           Unité d&apos;enseignement
-          <input required maxLength={120} value={ue} onChange={(event) => setUe(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-slate-300 p-3" placeholder="Ex. Anatomie" />
+          <input required maxLength={120} list="suggested-health-ues"
+            value={ue} onChange={(event) => setUe(event.target.value)}
+            className="mt-2 w-full rounded-lg border border-slate-300 p-3"
+            placeholder="Choisir une UE ou saisir la tienne" />
+          <datalist id="suggested-health-ues">
+            {suggestedUnits[programme].map((unit) => (
+              <option value={unit} key={unit} />
+            ))}
+          </datalist>
+          <span className="mt-1 block text-xs font-normal text-slate-500">
+            Suggestions indicatives : saisis le nom exact de ton UE selon ton établissement.
+          </span>
         </label>
         <label className="block text-sm font-semibold">
           Support
