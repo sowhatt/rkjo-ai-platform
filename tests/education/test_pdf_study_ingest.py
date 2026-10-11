@@ -60,3 +60,36 @@ def test_rejects_byte_limit():
 def test_invalid_pdf_structure():
     with pytest.raises(StudyPdfError):
         ingest(b"%PDF-not-a-valid-document")
+
+
+def test_extracts_real_pdf_text_with_page_citation():
+    """A valid in-memory PDF must actually yield a traceable course segment."""
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+    from rkjo_education.curriculum.health_study_generator import make_revision_outline
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=595, height=842)
+    font = DictionaryObject({
+        NameObject("/Type"): NameObject("/Font"),
+        NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica"),
+    })
+    font_ref = writer._add_object(font)
+    page[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_ref})
+    })
+    content = DecodedStreamObject()
+    content.set_data(b"BT /F1 12 Tf 50 700 Td (Anatomie du coeur) Tj ET")
+    page[NameObject("/Contents")] = writer._add_object(content)
+    output = BytesIO()
+    writer.write(output)
+
+    source = ingest(output.getvalue())
+    assert source.document_id == "cm-1"
+    assert source.document_type is StudyDocumentType.CM
+    assert len(source.segments) == 1
+    assert source.segments[0].page == 1
+    assert "Anatomie du coeur" in source.segments[0].text
+    outline = make_revision_outline(source)
+    assert outline.items[0].segment_ids == (source.segments[0].segment_id,)
+    outline.validate_sources(source)
