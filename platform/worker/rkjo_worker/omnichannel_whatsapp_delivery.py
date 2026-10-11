@@ -29,6 +29,8 @@ from rkjo_kernel.omnichannel.whatsapp_runtime import (
 )
 
 
+from rkjo_worker.omnichannel_heartbeat import configured_publisher
+
 logger = get_logger(__name__)
 
 
@@ -107,6 +109,7 @@ class SupervisedWhatsAppDelivery:
         self, *, worker, poll_seconds: float = 1.0,
         batch_size: int = 50, sleep_fn: Callable[[float], None] = time.sleep,
         now_fn: Callable[[], datetime] | None = None,
+        heartbeat=None,
     ):
         if not 0.1 <= poll_seconds <= 60 or not 1 <= batch_size <= 1000:
             raise ValueError("Invalid WhatsApp polling configuration.")
@@ -116,6 +119,7 @@ class SupervisedWhatsAppDelivery:
         self.sleep_fn = sleep_fn
         self.now_fn = now_fn or (lambda: datetime.now(timezone.utc))
         self.running = True
+        self.heartbeat = heartbeat
 
     def stop(self):
         self.running = False
@@ -132,10 +136,17 @@ class SupervisedWhatsAppDelivery:
         while self.running:
             try:
                 completed = self.run_cycle()
+                if self.heartbeat is not None:
+                    self.heartbeat.record('ready')
             except Exception:
                 # Do not dump exception detail: credentials may be present in
                 # lower-level transport errors or provider responses.
                 logger.error("WhatsApp delivery worker cycle interrupted (details suppressed).")
+                if self.heartbeat is not None:
+                    try:
+                        self.heartbeat.record('degraded')
+                    except Exception:
+                        logger.error("WhatsApp heartbeat unavailable (details suppressed).")
                 completed = 0
             if self.running and completed < self.batch_size:
                 self.sleep_fn(self.poll_seconds)
@@ -154,6 +165,9 @@ def main() -> None:
         worker=worker,
         poll_seconds=float(os.getenv("RKJO_OMNI_DELIVERY_POLL_SECONDS", "1")),
         batch_size=int(os.getenv("RKJO_OMNI_DELIVERY_BATCH_SIZE", "50")),
+        heartbeat=configured_publisher(
+            database_url=database_url, worker_name='whatsapp-delivery',
+        ),
     )
 
     def stop(_signum, _frame):
