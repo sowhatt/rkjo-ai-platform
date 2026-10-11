@@ -14,6 +14,7 @@ from rkjo_api.rag import (
 from rkjo_api.education import (
     router as education_router,
 )
+from rkjo_api.education_session_api import router as education_session_pilot_router
 from rkjo_api.education_tutor import (
     router as education_tutor_router,
 )
@@ -65,6 +66,7 @@ app.include_router(
 app.include_router(
     education_tutor_router
 )
+app.include_router(education_session_pilot_router)
 
 
 
