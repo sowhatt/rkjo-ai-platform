@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type QueueHealth = { pending: number; failed: number; expired_leases: number };
@@ -18,6 +18,7 @@ type Dashboard = {
     sent_without_binding: number; delivery_receipts: number;
   };
   alerts: Alert[]; incidents: Incident[];
+  workers: { name: string; status: string; stale: boolean; last_seen_at: string }[];
 };
 
 const labels: Record<string, string> = {
@@ -50,6 +51,9 @@ export default function OmnichannelPage() {
   const [loading, setLoading] = useState(false);
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   const load = useCallback(async (bearer: string) => {
     if (!bearer.trim()) {
@@ -70,7 +74,7 @@ export default function OmnichannelPage() {
           "Cockpit indisponible (HTTP " + response.status + ").");
       }
       const data = (await response.json()) as Dashboard;
-      if (!data || typeof data.tenant_id !== "string" || !data.queues ||
+      if (!data || typeof data.tenant_id !== "string" || !Array.isArray(data.workers) || !data.queues ||
           !data.delivery || !Array.isArray(data.alerts) || !Array.isArray(data.incidents)) {
         throw new Error("Réponse de supervision invalide.");
       }
@@ -82,6 +86,16 @@ export default function OmnichannelPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!autoRefresh || !token) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible" && tokenRef.current) {
+        void load(tokenRef.current);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, token, load]);
 
   const acknowledge = async (code: string) => {
     if (!token.trim() || busyCode) return;
@@ -160,11 +174,16 @@ export default function OmnichannelPage() {
             >
               {loading ? "Chargement…" : "Actualiser"}
             </button>
-            <button type="button" onClick={() => { setToken(""); setDashboard(null); setError(""); }}
+            <button type="button" onClick={() => { setAutoRefresh(false); setToken(""); setDashboard(null); setError(""); }}
               className="rounded-xl border border-slate-300 px-4 py-3 text-sm">
               Déconnecter
             </button>
           </div>
+          <label className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={autoRefresh}
+              onChange={(event) => setAutoRefresh(event.target.checked)} />
+            Actualiser toutes les 30 secondes (onglet visible uniquement)
+          </label>
         </section>
 
         {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
@@ -205,6 +224,23 @@ export default function OmnichannelPage() {
                     </div>)}
                 </div>
               </article>)}
+          </section>
+
+          <section className="rounded-2xl border bg-white p-5 shadow-sm" aria-label="Workers supervisés">
+            <h2 className="text-xl font-bold">Workers supervisés</h2>
+            <p className="mt-1 text-xs text-slate-500">Heartbeats déclarés pour ce tenant. Absence de heartbeat ≠ disponibilité confirmée.</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {dashboard.workers.length === 0 && <p className="text-sm text-slate-500">Aucun worker déclaré pour ce tenant.</p>}
+              {dashboard.workers.map((worker) => <article key={worker.name} className="flex items-center justify-between rounded-xl border p-4">
+                <div><p className="font-semibold">{worker.name}</p>
+                  <p className="text-xs text-slate-500">Dernier heartbeat : {formatDate(worker.last_seen_at)}</p></div>
+                <span className={worker.stale || worker.status !== "ready" ?
+                  "rounded-full bg-amber-100 px-3 py-1 text-xs text-amber-800" :
+                  "rounded-full bg-emerald-100 px-3 py-1 text-xs text-emerald-800"}>
+                  {worker.stale ? "Périmé" : worker.status === "ready" ? "Disponible" : worker.status}
+                </span>
+              </article>)}
+            </div>
           </section>
 
           <section className="grid gap-5 lg:grid-cols-5">
@@ -256,8 +292,8 @@ export default function OmnichannelPage() {
           </section>
 
           <p className="text-xs text-slate-500">
-            Les files et alertes sont réelles, limitées au tenant authentifié. Le statut de chaque worker
-            et les métriques internes de RabbitMQ ne sont pas encore exposés par cette API.
+            Les files et alertes sont réelles, limitées au tenant authentifié. Les métriques RabbitMQ globales (consommateurs, profondeur des queues et DLQ)
+            ne sont pas encore exposées : un heartbeat ne mesure pas la santé complète du broker.
           </p>
         </>}
       </div>
