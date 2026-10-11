@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Role = "teacher" | "learner";
 type SessionStatus = "active" | "paused" | "ended";
@@ -34,12 +34,9 @@ export default function EducationCe1PairedPilot({ role }: { role: Role }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [polling, setPolling] = useState(false);
-  const tokenRef = useRef(token);
-  tokenRef.current = token;
-
   const refresh = useCallback(async () => {
     const session = sessionInput.trim();
-    const bearer = tokenRef.current.trim();
+    const bearer = token.trim();
     if (!/^[0-9a-fA-F-]{36}$/.test(session) || !bearer) return;
     try {
       const next = await pilotRequest(`${session}/${role === "teacher" ? "teacher-state" : "state"}`, bearer);
@@ -49,7 +46,7 @@ export default function EducationCe1PairedPilot({ role }: { role: Role }) {
       setState(null); // Fail closed: never treat an unavailable session as active.
       setError(err instanceof Error ? err.message : "Impossible de synchroniser la séance.");
     }
-  }, [role, sessionInput]);
+  }, [role, sessionInput, token]);
 
   useEffect(() => {
     if (!polling) return;
@@ -123,7 +120,7 @@ export default function EducationCe1PairedPilot({ role }: { role: Role }) {
             placeholder="Jeton de test local" className="w-full rounded-lg border p-3" />
           {role === "teacher" && (
             <>
-              <label className="block text-sm font-semibold" htmlFor="learner-id">Identifiant UUID de l'élève fictif</label>
+              <label className="block text-sm font-semibold" htmlFor="learner-id">Identifiant UUID de l&apos;élève fictif</label>
               <input id="learner-id" value={learnerId} onChange={(e) => setLearnerId(e.target.value)}
                 className="w-full rounded-lg border p-3" />
               <button type="button" disabled={busy || !token.trim() || !learnerId.trim()} onClick={create}
