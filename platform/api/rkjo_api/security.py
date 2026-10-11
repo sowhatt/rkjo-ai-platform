@@ -31,6 +31,7 @@ PROTECTED_PATH_PREFIXES = (
     "/rag",
     "/education",
     "/omnichannel",
+    "/internal/omnichannel",
 )
 
 
