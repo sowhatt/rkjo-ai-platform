@@ -23,6 +23,8 @@ from rkjo_kernel.omnichannel.route_consumers import (
 from rkjo_kernel.omnichannel.route_outbox import PostgreSQLRouteOutbox, RoutingDispatchWorker
 
 
+from rkjo_worker.omnichannel_heartbeat import configured_publisher
+
 logger = get_logger(__name__)
 
 
@@ -92,6 +94,9 @@ def main() -> None:
     interval = float(os.getenv("RKJO_OMNI_DISPATCH_POLL_SECONDS", "1"))
     if interval <= 0:
         raise ValueError("Poll interval must be positive.")
+    heartbeat = configured_publisher(
+        database_url=dispatcher.database_url, worker_name='rabbitmq-route-dispatcher',
+    )
     running = True
 
     def stop(_signum, _frame):
@@ -103,8 +108,15 @@ def main() -> None:
     while running:
         try:
             dispatcher.dispatch_batch(now=datetime.now(timezone.utc))
+            if heartbeat is not None:
+                heartbeat.record('ready')
         except Exception:
-            logger.exception("Omnichannel dispatch batch interrupted.")
+            logger.error("Omnichannel dispatch batch interrupted (details suppressed).")
+            if heartbeat is not None:
+                try:
+                    heartbeat.record("degraded")
+                except Exception:
+                    logger.error("Omnichannel dispatcher heartbeat unavailable (details suppressed).")
         if running:
             time.sleep(interval)
 
