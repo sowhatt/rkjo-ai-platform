@@ -16,6 +16,7 @@ from rkjo_api.identity import get_authenticated_identity
 from rkjo_kernel.omnichannel.incidents import PostgreSQLOmnichannelIncidents
 from rkjo_kernel.omnichannel.monitoring import PostgreSQLOmnichannelMonitor
 from rkjo_kernel.omnichannel.operations import PostgreSQLOmnichannelOperations
+from rkjo_kernel.omnichannel.worker_heartbeats import PostgreSQLOmnichannelWorkerHeartbeats
 
 
 router = APIRouter(prefix="/omnichannel", tags=["omnichannel"])
@@ -51,6 +52,9 @@ def dashboard(request: Request):
         incidents = PostgreSQLOmnichannelIncidents(url).list(
             tenant_id=tenant_id, limit=50,
         )
+        workers = PostgreSQLOmnichannelWorkerHeartbeats(url).list(
+            tenant_id=tenant_id, now=now,
+        )
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Omnichannel dashboard unavailable.") from exc
     return {
@@ -67,7 +71,11 @@ def dashboard(request: Request):
             "sent_without_binding": snapshot.sent_without_binding,
             "delivery_receipts": snapshot.delivery_receipts,
         },
-        "healthy": monitoring.healthy,
+        "healthy": monitoring.healthy and all(not w.stale and w.status == "ready" for w in workers),
+        "workers": [
+            {"name": w.worker_name, "status": w.status, "stale": w.stale,
+             "last_seen_at": w.last_seen_at.isoformat()} for w in workers
+        ],
         "alerts": [
             {"code": a.code, "severity": a.severity.value, "count": a.count}
             for a in monitoring.alerts
