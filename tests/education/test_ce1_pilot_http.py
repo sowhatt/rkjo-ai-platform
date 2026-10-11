@@ -108,3 +108,26 @@ def test_disabled_pilot_rejects_authenticated_call(client, monkeypatch):
     monkeypatch.delenv("RKJO_EDU_CE1_PILOT_ENABLED")
     assert http.post("/education/ce1-sessions", headers=auth("teacher"),
                      json={"learner_id": str(learner)}).status_code == 503
+
+
+def test_teacher_can_read_state_but_learner_cannot(client):
+    http, _ = client
+    session = open_session(client)
+    route = f"/education/ce1-sessions/{session}/teacher-state"
+    correct = http.get(route, headers=auth("teacher"))
+    assert correct.status_code == 200
+    assert correct.json()["version"] == 0
+    assert http.get(route, headers=auth("learner")).status_code == 403
+    assert http.get(route, headers=auth("intruder")).status_code == 403
+
+
+def test_teacher_state_reflects_pause(client):
+    http, _ = client
+    session = open_session(client)
+    base = f"/education/ce1-sessions/{session}"
+    assert http.post(base + "/commands", headers=auth("teacher"),
+                     json={"command": "pause", "expected_version": 0}).status_code == 200
+    state = http.get(base + "/teacher-state", headers=auth("teacher"))
+    assert state.status_code == 200
+    assert state.json()["status"] == "paused"
+    assert state.json()["version"] == 1
