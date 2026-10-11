@@ -194,3 +194,20 @@ def learner_turn(session_id: UUID, payload: LearnerTurnBody, request: Request) -
         )
         db.execute("COMMIT")
     return PilotState(session_id=session_id, status="active", version=version + 1)
+
+
+@router.get("/{session_id}/teacher-state", response_model=PilotState)
+def teacher_state(session_id: UUID, request: Request) -> PilotState:
+    """Teacher-only current state for optimistic command version selection."""
+    tenant, actor, role = _actor(request)
+    path, grants = _config()
+    if role not in (ApiRole.OPERATOR, ApiRole.ADMIN):
+        raise HTTPException(403, "Teacher role required")
+    with _connection(path) as db:
+        st, teacher, learner = _membership(db, session_id)
+    if tenant != st or actor != teacher:
+        raise HTTPException(403, "Teacher not assigned to session")
+    _grant(grants, tenant, teacher, learner)
+    store = SqliteSessionStateStore(path)
+    state = store.read(session_id=session_id, tenant_id=tenant, teacher_id=actor)
+    return PilotState(session_id=session_id, status=state.status.value, version=state.version)
