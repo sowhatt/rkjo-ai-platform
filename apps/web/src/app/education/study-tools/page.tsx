@@ -1,6 +1,7 @@
 import Link from "next/link";
 import StudyPdfPreview from "@/components/education/StudyPdfPreview";
 import StudyMediaRoadmap from "@/components/education/StudyMediaRoadmap";
+import AudioEstimate from "@/components/education/AudioEstimate";
 
 const tools = [
   {id:"fiches",icon:"📑",title:"Fiches de révision",description:"Résumés et notes de cours avec définitions, tableaux et notions à mémoriser.",example:"À partir d’un CM : notions clés, définitions et références aux pages du support."},
@@ -27,6 +28,7 @@ export default function EducationStudyToolsPage() {
         </div>
         <StudyPdfPreview />
         <StudyMediaRoadmap />
+        <AudioEstimate />
         <div className="mt-8 grid gap-5 sm:grid-cols-2">
           {tools.map((tool) => (
             <section id={tool.id} key={tool.id} className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
