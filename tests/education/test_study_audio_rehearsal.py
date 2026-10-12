@@ -83,10 +83,6 @@ def test_durable_rehearsal_is_idempotent_isolated_and_never_published():
             assert outbox_rows == [(REHEARSAL_QUEUE, None)]
     finally:
         with psycopg.connect(TEST_URL) as conn:
-            conn.execute(
-                "DELETE FROM workflow_outbox WHERE outbox_id LIKE %s",
-                ("edu-audio-synthetic-%",),
-            ) if False else None
             # Delete only identifiers produced in this run, never other rows.
             if "first" in locals():
                 conn.execute("DELETE FROM workflow_outbox WHERE outbox_id=%s", (first.outbox_id,))
