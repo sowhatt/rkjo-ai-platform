@@ -17,6 +17,7 @@ from rkjo_api.education import (
 from rkjo_api.education_session_api import router as education_session_pilot_router
 from rkjo_api.education_study_documents import router as education_study_documents_router
 from rkjo_api.education_study_audio import router as education_study_audio_router
+from rkjo_api.education_study_audio_staging import router as education_study_audio_staging_router
 from rkjo_api.education_tutor import (
     router as education_tutor_router,
 )
@@ -71,6 +72,7 @@ app.include_router(
 app.include_router(education_session_pilot_router)
 app.include_router(education_study_documents_router)
 app.include_router(education_study_audio_router)
+app.include_router(education_study_audio_staging_router)
 
 
 
