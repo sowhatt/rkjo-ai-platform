@@ -10,6 +10,7 @@ from uuid import uuid4
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from rkjo_education.curriculum.health_study_generator import make_revision_outline
+from rkjo_education.curriculum.study_learning_views import build_study_views
 from rkjo_education.curriculum.pdf_study_ingest import StudyPdfError, extract_study_pdf
 from rkjo_education.curriculum.study_sources import StudyDocumentType
 
@@ -48,6 +49,7 @@ async def preview_course_pdf(
             document_type=document_type,
         )
         outline = make_revision_outline(source)
+        views = build_study_views(source)
     except StudyPdfError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     finally:
@@ -58,6 +60,7 @@ async def preview_course_pdf(
         "document_type": source.document_type.value,
         "pages_with_text": len(source.segments),
         "preview_only": True,
+        **views,
         "revision_outline": [
             {
                 "title": item.title,
