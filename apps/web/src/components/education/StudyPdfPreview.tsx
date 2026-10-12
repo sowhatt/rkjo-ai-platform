@@ -3,7 +3,14 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Outline = { title: string; body: string; pages: number[] };
+type Citation = { page: number; segment_id: string };
+type RevisionNote = { title: string; excerpts: string[]; citation: Citation; source_only: boolean };
+type MindMapBranch = { id: string; label: string; page: number; children: { label: string; text: string; citation: Citation }[] };
 type Preview = {
+  revision_notes: RevisionNote[];
+  mind_map: { root: string; branches: MindMapBranch[]; representation: string };
+  generation_mode: string;
+  disclaimer: string;
   document_id: string;
   ue_id: string;
   document_type: string;
@@ -39,6 +46,7 @@ export default function StudyPdfPreview() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [studyTab, setStudyTab] = useState<"notes" | "map" | "sources">("notes");
 
   useEffect(() => {
     let mounted = true;
@@ -110,7 +118,12 @@ export default function StudyPdfPreview() {
           !Array.isArray(data.revision_outline)) {
         throw new Error("La réponse du serveur est invalide.");
       }
-      setPreview(data as Preview);
+      const result = data as Preview;
+      if (!Array.isArray(result.revision_notes) || !Array.isArray(result.mind_map?.branches)) {
+        throw new Error("Vues pédagogiques absentes de la réponse API.");
+      }
+      setStudyTab("notes");
+      setPreview(result);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Erreur pendant la lecture du PDF.");
     } finally {
@@ -211,6 +224,51 @@ export default function StudyPdfPreview() {
             <p className="text-sm text-emerald-900">{preview.pages_with_text} page(s) contenant du texte · UE : {preview.ue_id}</p>
             <p className="mt-1 text-xs text-emerald-900">Prévisualisation temporaire · aucune sauvegarde · non validée scientifiquement</p>
           </div>
+          <div className="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Supports de révision">
+            {([
+              ["notes", "Fiches de révision"],
+              ["map", "Carte des notions"],
+              ["sources", "Extraits du PDF"],
+            ] as const).map(([id, title]) => (
+              <button key={id} type="button" role="tab" aria-selected={studyTab === id}
+                onClick={() => setStudyTab(id)}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold ${studyTab === id ? "bg-blue-700 text-white" : "border border-slate-300 bg-white text-slate-800"}`}>
+                {title}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-sm text-amber-900">{preview.disclaimer}</p>
+          {studyTab === "notes" && (
+            <section aria-label="Fiches de révision" className="mt-4 grid gap-3">
+              {preview.revision_notes.map((note) => (
+                <article key={note.citation.segment_id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <h3 className="font-semibold">{note.title}</h3>
+                  <ul className="mt-2 list-disc space-y-2 pl-5 text-sm">
+                    {note.excerpts.map((excerpt, i) => <li key={i}>{excerpt}</li>)}
+                  </ul>
+                  <p className="mt-2 text-xs text-blue-800">Extraits du cours · page {note.citation.page}</p>
+                </article>
+              ))}
+            </section>
+          )}
+          {studyTab === "map" && (
+            <section aria-label="Carte des notions" className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="text-lg font-bold">{preview.mind_map.root}</h3>
+              <p className="mt-1 text-xs text-slate-600">Plan navigable extrait des pages ; relations conceptuelles IA à venir.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {preview.mind_map.branches.map((branch) => (
+                  <details key={branch.id} className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <summary className="cursor-pointer font-semibold">{branch.label} · p. {branch.page}</summary>
+                    <ul className="mt-2 list-disc space-y-2 pl-4 text-sm">
+                      {branch.children.map((child, i) => <li key={i}>{child.text}</li>)}
+                    </ul>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
+          {studyTab === "sources" && (
+          <>
           <h3 className="mt-6 text-xl font-bold">Extraits avec références au cours</h3>
           <div className="mt-3 grid gap-4">
             {preview.revision_outline.map((item, index) => (
@@ -221,6 +279,8 @@ export default function StudyPdfPreview() {
               </article>
             ))}
           </div>
+          </>
+          )}
         </div>
       )}
     </section>
