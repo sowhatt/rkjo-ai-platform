@@ -65,6 +65,12 @@ class PostgresStudyAudioStaging:
         expires_at = datetime.now(timezone.utc) + timedelta(hours=RETENTION_HOURS)
         with psycopg.connect(self.database_url) as conn:
             with conn.cursor() as cursor:
+                # Permit restaging after the 24h expiry without retaining stale bytes.
+                cursor.execute("""
+                    DELETE FROM education_staged_audio
+                    WHERE tenant_id=%s AND learner_id=%s AND programme_id=%s
+                      AND ue_id=%s AND sha256=%s AND expires_at <= now()
+                """, (tenant_id, learner_id, programme_id, ue_id, probe.sha256))
                 cursor.execute("""
                     INSERT INTO education_staged_audio (
                         source_id, tenant_id, learner_id, programme_id, ue_id,
