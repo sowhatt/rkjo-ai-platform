@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from rkjo_api.identity import get_authenticated_identity
 from rkjo_api.security import ApiRole
+from rkjo_kernel.omnichannel.rabbitmq_alerts import (BrokerThresholds, evaluate_broker_alerts)
 from rkjo_kernel.omnichannel.rabbitmq_telemetry import (
     RabbitMQQueueProbe, sanitized_snapshot,
 )
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/internal/omnichannel", tags=["omnichannel-internal"]
 def rabbitmq_metrics(request: Request):
     identity = get_authenticated_identity(request)
     # Defense-in-depth, on top of authentication middleware.
-    if identity.role != ApiRole.ADMIN:
+    if identity.role != ApiRole.ADMIN or identity.tenant_id is not None:
         raise HTTPException(status_code=403, detail="Administrator role required.")
     try:
         allowlist = [
@@ -32,7 +33,16 @@ def rabbitmq_metrics(request: Request):
             vhost=os.getenv("RKJO_OMNI_RABBITMQ_VHOST", "/"),
             queue_names=allowlist,
         )
-        result = sanitized_snapshot(probe.snapshot())
+        queues = probe.snapshot()
+        thresholds = BrokerThresholds(
+            ready_warning=int(os.getenv("RKJO_OMNI_RABBITMQ_READY_WARNING", "100")),
+            ready_critical=int(os.getenv("RKJO_OMNI_RABBITMQ_READY_CRITICAL", "1000")),
+            unacked_warning=int(os.getenv("RKJO_OMNI_RABBITMQ_UNACKED_WARNING", "100")),
+            dlq_warning=int(os.getenv("RKJO_OMNI_RABBITMQ_DLQ_WARNING", "1")),
+        )
+        result = sanitized_snapshot(queues)
+        result["alerts"] = evaluate_broker_alerts(queues, thresholds)
+        result["healthy"] = not result["alerts"]
     except Exception:
         # Fail closed. Never leak management URLs, credentials or queue config.
         raise HTTPException(status_code=503, detail="Broker monitoring unavailable.") from None
