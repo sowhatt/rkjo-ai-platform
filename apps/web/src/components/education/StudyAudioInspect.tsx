@@ -4,6 +4,9 @@ import { FormEvent, useState } from "react";
 
 type InspectedAudio = {
   filename: string;
+  source_id?: string;
+  state?: string;
+  expires_at?: string;
   duration_ms: number;
   size_bytes: number;
   sample_rate: number;
@@ -21,6 +24,7 @@ export default function StudyAudioInspect() {
   const [recordingAuthorized, setRecordingAuthorized] = useState(false);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [stageMode, setStageMode] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<InspectedAudio | null>(null);
 
@@ -45,7 +49,7 @@ export default function StudyAudioInspect() {
     payload.append("processing_rights_confirmed", "true");
     setLoading(true);
     try {
-      const response = await fetch("/api/education/study/inspect-audio", {
+      const response = await fetch(stageMode ? "/api/education/study/stage-audio" : "/api/education/study/inspect-audio", {
         method: "POST", body: payload, cache: "no-store",
       });
       const data: unknown = await response.json();
@@ -65,8 +69,7 @@ export default function StudyAudioInspect() {
       <p className="text-xs font-semibold uppercase tracking-widest text-blue-700">Stream D + E + F/S · Premier import réel</p>
       <h2 className="mt-2 text-xl font-bold">Vérifier un cours magistral audio</h2>
       <p className="mt-2 text-sm text-slate-600">
-        Première version : inspection WAV uniquement. Le fichier est lu en mémoire,
-        sans stockage, transcription, résumé ni paiement.
+        Inspection WAV disponible ; stockage PostgreSQL temporaire possible uniquement en pilote local activé.\n        Aucune transcription, résumé ou paiement ne démarre.
       </p>
       <form onSubmit={inspect} className="mt-5 grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-semibold">
@@ -99,23 +102,23 @@ export default function StudyAudioInspect() {
             onChange={event=>setRightsConfirmed(event.target.checked)} />
           Je suis autorisé à transmettre cet audio pour analyse et il ne contient pas de données patient.
         </label>
-        <button type="submit" disabled={loading}
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">\n          <input type="checkbox" checked={stageMode} onChange={event => { setStageMode(event.target.checked); setResult(null); }} />\n          Conserver temporairement cet audio dans la base PostgreSQL du pilote (24 h, sans chiffrement applicatif).\n        </label>\n        <button type="submit" disabled={loading}
           className="rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">
-          {loading ? "Vérification en cours…" : "Vérifier mon audio"}
+          {loading ? "Vérification en cours…" : stageMode ? "Enregistrer mon audio (pilote local)" : "Vérifier mon audio"}
         </button>
       </form>
       {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">{error}</p>}
       {result && (
         <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4" role="status">
-          <p className="font-bold text-emerald-900">Fichier WAV validé — inspection uniquement</p>
+          <p className="font-bold text-emerald-900">{result.source_id ? "Audio enregistré dans le pilote" : "Fichier WAV validé — inspection uniquement"}</p>
           <p className="mt-2 text-sm text-emerald-900">
             Durée : {(result.duration_ms / 60000).toFixed(2)} min ·
             Taille : {(result.size_bytes / 1024 / 1024).toFixed(2)} Mo ·
             {result.sample_rate} Hz · {result.channels} canal/canaux
           </p>
-          <p className="mt-2 break-all text-xs text-emerald-900">Empreinte SHA-256 : {result.sha256}</p>
+          <p className="mt-2 break-all text-xs text-emerald-900">Empreinte SHA-256 : {result.sha256}</p>\n          {result.source_id && <p className="mt-2 text-xs text-emerald-900">Référence : {result.source_id} · expiration : {result.expires_at}</p>}
           <p className="mt-2 text-sm font-medium text-emerald-900">
-            Aucun fichier sauvegardé ; aucun résumé, paiement ou job de transcription lancé.
+            {result.source_id ? "Audio sauvegardé temporairement ; aucune transcription ni paiement lancé." : "Aucun fichier sauvegardé ; aucun résumé, paiement ou job de transcription lancé."}
           </p>
         </div>
       )}
