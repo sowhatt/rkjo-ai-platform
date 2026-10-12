@@ -181,3 +181,24 @@ Premier pilote : CM autorisé de **30 à 120 minutes**, avec PDF et notes facult
 **Pas encore livré** : import audio réel, ASR, suivi de job durable audio, lecture horodatée, résumé audio IA, QCM audio, fusion Audio/PDF/notes, tarif progressif actif, paiement, traduction d'ebook. Ce CDC **ne prétend pas** valider ces fonctions.
 
 **Version suivante proposée : 1.2** après réalisation et recette du premier parcours audio P0, sans présumer de sa date.
+
+## Addendum d'implémentation — P0.1 WAV (12/10/2026)
+Sans changer la version fonctionnelle V1.1, première livraison de code **découpée par streams** sur la branche isolée `feat/edu-health-study-pipeline-v1` :
+- **E Multimodal** : `study_audio_probe.py` contrôle le contenu RIFF/WAVE PCM, la durée réelle, l'échantillonnage, les canaux, la taille et SHA-256. Pilot WAV seulement, autres codecs non disponibles.
+- **D/F/S** : `education_study_audio.py` offre `POST /education/study/inspect-audio`, impose Bearer individuel lié à un tenant, vérifie l'accord d'enregistrement et de traitement, ne persiste aucun fichier. Maximum 50 MiB.
+- **B/F** : `/api/education/study/inspect-audio` côté Next.js réutilise la session locale signée HttpOnly, relaie au backend via JWT côté serveur et expose le formulaire d'inspection.
+- **Tests** : `tests/education/test_study_audio_probe.py` valide la lecture et les principaux rejets.
+
+**Statut strict :** première admission/inspection implémentée, **pas de job persistant, pas de worker, pas d'ASR, pas de stockage, pas de résumé, pas de paiement**. Toute validation du build, tests API et test navigateur nécessite exécution locale. Pour tester :
+
+```bash
+cd /Users/rkjo/Projects/rkjo-ai-platform-education-health
+git pull --ff-only
+PYTHONPATH=domains/education:platform/kernel:platform/api /Users/rkjo/Projects/rkjo-ai-platform/.venv/bin/python -m pytest -q tests/education/test_study_audio_probe.py tests/education/test_study_media_intake.py
+npm --prefix apps/web run lint
+npm --prefix apps/web run build
+```
+
+Redémarrer FastAPI et Next.js avec leurs variables de pilote communes ; utiliser un fichier WAV autorisé de petite taille. Les secrets pilote affichés dans une conversation doivent être renouvelés localement et les deux processus redémarrés, sans communiquer leur valeur.
+
+**Prochain incrément P0.2** : stockage temporaire protégé, durées réelles pour formats audio supplémentaires via décodeur sandboxé, orchestration via les jobs durables du kernel existant, tests d'idempotence/reprise/DLQ et conservation de la preuve de droits.
