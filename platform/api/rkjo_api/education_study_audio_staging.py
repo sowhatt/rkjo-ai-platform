@@ -12,7 +12,6 @@ from uuid import UUID
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from psycopg import Error as PostgresError
 
-from rkjo_api.dependencies import get_database_url
 from rkjo_education.curriculum.study_audio_probe import StudyAudioError, probe_study_wav
 from rkjo_education.curriculum.study_audio_postgres import (
     PostgresStudyAudioStaging, StagedAudioNotFound,
@@ -40,7 +39,10 @@ def _identity_and_gate(request: Request) -> tuple[str, str]:
 
 
 def _store() -> PostgresStudyAudioStaging:
-    return PostgresStudyAudioStaging(get_database_url())
+    database_url = os.getenv("RKJO_EDUCATION_AUDIO_DATABASE_URL", "").strip()
+    if not database_url:
+        raise HTTPException(status_code=503, detail="Dedicated audio staging database not configured")
+    return PostgresStudyAudioStaging(database_url)
 
 
 @router.post("/stage-audio", status_code=201)
