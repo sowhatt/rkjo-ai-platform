@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type Outline = { title: string; body: string; pages: number[] };
 type Preview = {
@@ -32,11 +32,50 @@ export default function StudyPdfPreview() {
   const [programme, setProgramme] = useState("medicine-year-1");
   const [ue, setUe] = useState("");
   const [kind, setKind] = useState("cm");
-  const [token, setToken] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    fetch("/api/education/study/session", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data: { connected?: boolean } = await response.json();
+        if (mounted) setConnected(Boolean(data.connected));
+      })
+      .catch(() => undefined);
+    return () => { mounted = false; };
+  }, []);
+
+  async function login(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/education/study/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password }),
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Connexion impossible : vérifie le code pilote local.");
+      setConnected(true);
+      setPassword("");
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Connexion impossible.");
+    } finally { setAuthBusy(false); }
+  }
+
+  async function logout() {
+    await fetch("/api/education/study/session", { method: "DELETE", cache: "no-store" });
+    setConnected(false);
+    setPreview(null);
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,8 +85,8 @@ export default function StudyPdfPreview() {
       setError("Choisis un PDF de 15 Mo maximum.");
       return;
     }
-    if (!token.trim()) {
-      setError("Un jeton étudiant temporaire est nécessaire pour ce pilote.");
+    if (!connected) {
+      setError("Connecte-toi au pilote avant d’analyser un cours.");
       return;
     }
     const form = new FormData();
@@ -59,7 +98,6 @@ export default function StudyPdfPreview() {
     try {
       const response = await fetch("/api/education/study/preview-pdf", {
         method: "POST",
-        headers: { authorization: `Bearer ${token.trim()}` },
         body: form,
         cache: "no-store",
       });
@@ -76,7 +114,6 @@ export default function StudyPdfPreview() {
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Erreur pendant la lecture du PDF.");
     } finally {
-      setToken("");
       setLoading(false);
     }
   }
@@ -89,6 +126,31 @@ export default function StudyPdfPreview() {
         Prévisualise le texte extrait de ton CM, TD ou TP et retrouve les pages du document.
         Il s&apos;agit d&apos;extraits, pas encore d&apos;une fiche rédigée par IA.
       </p>
+      <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        {connected ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-emerald-800">Connecté au pilote étudiant local</p>
+            <button type="button" onClick={logout} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">
+              Se déconnecter
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={login} className="flex flex-wrap items-end gap-3">
+            <label className="min-w-48 flex-1 text-sm font-semibold">
+              Code de connexion du pilote
+              <input required type="password" autoComplete="off" maxLength={256}
+                value={password} onChange={(event) => setPassword(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white p-3"
+                placeholder="Code fourni par le responsable du pilote" />
+            </label>
+            <button disabled={authBusy} type="submit"
+              className="rounded-lg bg-blue-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">
+              {authBusy ? "Connexion…" : "Se connecter"}
+            </button>
+          </form>
+        )}
+        <p className="mt-2 text-xs text-slate-500">Accès de démonstration local uniquement, sans compte étudiant permanent.</p>
+      </div>
       <form onSubmit={onSubmit} className="mt-6 grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
           Formation
@@ -132,18 +194,11 @@ export default function StudyPdfPreview() {
             onChange={(event) => setFile(event.currentTarget.files?.[0] ?? null)}
             className="mt-2 w-full rounded-lg border border-slate-300 p-3 text-sm" />
         </label>
-        <label className="block text-sm font-semibold sm:col-span-2">
-          Jeton Bearer étudiant temporaire (pilote local uniquement)
-          <input type="password" autoComplete="off" value={token}
-            onChange={(event) => setToken(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-slate-300 p-3"
-            placeholder="Jeton de test signé, avec tenant et sujet" />
-        </label>
         <p className="text-xs text-slate-500 sm:col-span-2">
-          N&apos;utilise pas de documents contenant des données patient. Le jeton n&apos;est ni enregistré
-          dans le navigateur ni conservé après la requête. L&apos;API ne stocke pas le PDF.
+          N&apos;utilise pas de documents contenant des données patient. La session est gérée par
+          un cookie HttpOnly ; l&apos;API ne stocke pas le PDF.
         </p>
-        <button disabled={loading} type="submit"
+        <button disabled={loading || !connected} type="submit"
           className="rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">
           {loading ? "Analyse du cours…" : "Analyser mon PDF"}
         </button>
