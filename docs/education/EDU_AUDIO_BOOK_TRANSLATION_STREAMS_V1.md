@@ -13,6 +13,32 @@ Le cas d'usage cible est un **ebook personnel acquis légalement par l'étudiant
 - distinguer droit d'étude personnel, licence de traduction, redistribution et accès par modèle tiers ; ne pas présumer que l'achat autorise chacun de ces usages ;
 - si ouvrage bloqué par DRM : expliquer la limitation et proposer des passages que l'étudiant peut utiliser légitimement, plutôt que contourner la protection.
 
+## Décision commerciale — traduction et résumé de livres à la demande (2026-10-12)
+
+**Modèle retenu :** ni la traduction ni le résumé d'un livre ne sont inclus automatiquement dans l'abonnement Education. Chaque traitement est une **commande distincte, payée à la demande**, avec devis présenté et accepté **avant** tout lancement coûteux. L'abonnement peut inclure la bibliothèque et les fonctionnalités courantes de révision selon un quota indépendant.
+
+### Produits facturables
+- `BOOK_SUMMARY` : résumé d'un chapitre, de chapitres choisis ou d'un livre autorisé.
+- `BOOK_TRANSLATION_FR` : traduction vers le français des extraits ou chapitres autorisés d'un ebook anglais acheté par l'étudiant ; intégralité uniquement si la licence l'autorise.
+- `BOOK_TRANSLATION_AND_SUMMARY` : commande groupée avec réutilisation de l'extraction déjà facturée.
+
+### Parcours de facturation à implémenter
+1. L'étudiant importe un ebook qu'il a acheté ; RKJO vérifie le type, la taille (maximum 50 MiB), les droits déclarés et la protection éventuelle, sans contourner de DRM.
+2. Extraction légère puis **estimation sans génération** : pages effectivement exploitables, volume estimé de tokens entrée/sortie, OCR éventuel, langue, périmètre et modèle/qualité.
+3. Affichage d'un devis `quote_id`, `currency`, `amount`, `included_chapters`, `page_count`, `valid_until`, `estimated_delivery` et des limites. L'estimation ne doit pas déclencher la traduction ou le résumé.
+4. L'étudiant confirme et paie ; l'API vérifie côté serveur le prix, le droit d'accès et l'état de paiement. **Pas de job payant tant que le paiement n'est pas confirmé par le prestataire**.
+5. Job asynchrone idempotent avec `order_id`, `payment_id`, `job_id`, réessais bornés et déduplication : ne jamais débiter deux fois la même commande.
+6. Livrable individuel relié aux pages/chapitres d'origine, facturation unique de la commande ; statut et historique accessibles à l'étudiant.
+7. Erreurs avant traitement : pas de débit, ou annulation automatique ; échecs partiels/après paiement : règles explicites de reprise gratuite, remboursement ou avoir, non-débit supplémentaire.
+8. Le système garde des **mesures réelles** de coût par opération (tokens, modèle, OCR, stockage et frais fournisseur) pour réviser les tarifs et protéger la marge.
+
+### Contrats pour le moteur Billing
+`BookProcessingQuote` : `tenant_id`, `learner_id`, `source_id`, `source_version`, `operation`, `chapter_ids[]`, `pages_count`, `estimated_input_tokens`, `estimated_output_tokens`, `estimated_provider_cost`, `price_cents`, `currency`, `valid_until`, `rights_status`.
+
+`BookProcessingOrder` : `order_id`, `quote_id`, `payment_status`, `job_status`, `idempotency_key`, `result_artifact_ids[]`, `refundable_amount_cents`, `actual_provider_cost`; l'identité/tenant proviennent toujours de la session serveur, et non du client.
+
+**Garde-fous** : pas de paiement par token brut visible au grand public ; devis clair par chapitre / nombre de pages, avec prix forfaitaire accepté. Les montants et les quotas définitifs restent à mesurer sur un pilote réel. Les droits d'utilisation et de traduction d'un ebook acheté doivent être vérifiés au regard de la licence, sans supposer qu'un achat autorise la traduction intégrale ou la redistribution.
+
 ## Parcours cibles
 
 1. **Audio CM** : l'étudiant choisit la formation et l'UE, importe une capture audio autorisée (MP3/M4A/WAV/WebM/OGG), confirme l'autorisation d'enregistrement, puis suit le job de transcription ; RKJO préserve horodatage, extrait, version source, incertitudes et éventuellement la séparation des intervenants. L'étudiant corrige les erreurs de transcription avant la génération des fiches/QCM.
