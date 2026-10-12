@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { backendPilotBearer, isLocalPilotRequest, localEducationApi, pilotEnabled, readPilotSession } from "@/lib/education/studyPilotSession";
 
 export const runtime = "nodejs";
 
 const MAX_BYTES = 15 * 1024 * 1024;
-const API_URL = process.env.RKJO_EDUCATION_API_URL;
 
 export async function POST(request: NextRequest) {
   // Pilot-only proxy: production must use an integrated authenticated session.
   // No document or bearer token is persisted or logged by this handler.
-  if (process.env.RKJO_EDUCATION_STUDY_PILOT !== "enabled") {
+  if (!pilotEnabled() || !isLocalPilotRequest(request)) {
     return NextResponse.json({ detail: "Pilote désactivé." }, { status: 503 });
   }
-  if (!API_URL) {
+  const apiUrl = localEducationApi();
+  if (!apiUrl) {
     return NextResponse.json({ detail: "API Education non configurée." }, { status: 503 });
   }
-  const bearer = request.headers.get("authorization");
-  if (!bearer?.startsWith("Bearer ") || bearer.length <= "Bearer ".length) {
+  const session = readPilotSession(request);
+  if (!session) {
     return NextResponse.json({ detail: "Connexion étudiant requise." }, { status: 401 });
   }
   const length = Number(request.headers.get("content-length") || 0);
@@ -40,14 +41,14 @@ export async function POST(request: NextRequest) {
       !["cm", "td", "tp"].includes(String(type))) {
     return NextResponse.json({ detail: "Filière, UE et type de cours requis." }, { status: 400 });
   }
-  const target = new URL("/education/study/preview-pdf", API_URL);
+  const target = new URL("/education/study/preview-pdf", apiUrl);
   if (!["http:", "https:"].includes(target.protocol)) {
     return NextResponse.json({ detail: "Configuration API invalide." }, { status: 503 });
   }
   try {
     const response = await fetch(target, {
       method: "POST",
-      headers: { authorization: bearer },
+      headers: { authorization: backendPilotBearer(session) },
       body: form,
       cache: "no-store",
       signal: AbortSignal.timeout(45000),
