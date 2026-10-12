@@ -224,7 +224,10 @@ def required_role_for_request(
 
     # Students may upload their own PDF for a stateless preview.
     # The endpoint itself requires an authenticated subject and tenant.
-    if normalized_method == "POST" and path in {"/education/study/preview-pdf", "/education/study/inspect-audio"}:
+    if normalized_method == "POST" and path in {"/education/study/preview-pdf", "/education/study/inspect-audio", "/education/study/stage-audio"}:
+        return ApiRole.VIEWER
+
+    if path.startswith("/education/study/staged-audio/") and normalized_method == "DELETE":
         return ApiRole.VIEWER
 
     # CE1 pilot learner turns require a verified individual Bearer identity,
