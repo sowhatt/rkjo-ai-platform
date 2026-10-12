@@ -8,12 +8,14 @@ No payment, transcription or learner result is claimed.
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID
 
 import psycopg
 
+from rkjo_education.curriculum.study_audio_synthetic import make_synthetic_study_wav
 from rkjo_education.curriculum.study_audio_workflow import (
     AudioWorkflowAdmission, build_audio_transcription_workflow,
 )
@@ -76,7 +78,9 @@ class SyntheticAudioRehearsal:
                 if source is None:
                     raise LookupError("No accessible staged audio")
                 filename, digest, state = source
-                if filename != "rkjo-synthetic-lecture.wav" or state != "staged":
+                if (filename != "rkjo-synthetic-lecture.wav"
+                        or state != "staged"
+                        or digest != sha256(make_synthetic_study_wav(seconds=1)).hexdigest()):
                     raise ValueError("Rehearsal accepts synthetic fixture only")
 
                 admission = AudioWorkflowAdmission(
