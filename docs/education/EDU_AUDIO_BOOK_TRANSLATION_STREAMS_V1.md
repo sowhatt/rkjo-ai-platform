@@ -1,6 +1,18 @@
 # RKJO Education — CM audio + livres 50 Mo + traduction vers le français
 Date : 2026-10-12. Addendum aux streams existants A/B/C/D/E/F/G/S/T. Ne remplace pas l'architecture d'origine.
 
+## Précision produit — livres numériques achetés par l'étudiant
+
+Le cas d'usage cible est un **ebook personnel acquis légalement par l'étudiant** (PDF/EPUB, jusqu'à 50 MiB). L'achat est déclaré par l'utilisateur, mais **n'implique pas automatiquement** le droit de contourner un DRM, de partager l'ouvrage ou d'en créer une traduction intégrale. Le traitement dépend de la licence et du droit applicable.
+
+**Règles de gestion :**
+- provenance déclarée : `student_purchased_ebook` ; preuve d'achat facultative et non stockée par défaut (minimisation) ;
+- ingestion uniquement si l'étudiant possède le fichier et dispose des droits de le traiter ; aucun contournement DRM ni récupération automatique depuis une boutique ;
+- bibliothèque **strictement personnelle**, sans partage ou téléchargement public ; suppression sur demande ;
+- traduction anglais → français uniquement des chapitres/extraits autorisés, en préservant la source et la terminologie médicale ; une traduction intégrale exige les droits adéquats ;
+- distinguer droit d'étude personnel, licence de traduction, redistribution et accès par modèle tiers ; ne pas présumer que l'achat autorise chacun de ces usages ;
+- si ouvrage bloqué par DRM : expliquer la limitation et proposer des passages que l'étudiant peut utiliser légitimement, plutôt que contourner la protection.
+
 ## Parcours cibles
 
 1. **Audio CM** : l'étudiant choisit la formation et l'UE, importe une capture audio autorisée (MP3/M4A/WAV/WebM/OGG), confirme l'autorisation d'enregistrement, puis suit le job de transcription ; RKJO préserve horodatage, extrait, version source, incertitudes et éventuellement la séparation des intervenants. L'étudiant corrige les erreurs de transcription avant la génération des fiches/QCM.
