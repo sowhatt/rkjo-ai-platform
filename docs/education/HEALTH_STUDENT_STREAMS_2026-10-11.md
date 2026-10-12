@@ -1,6 +1,8 @@
 # RKJO Education — Streams étudiants santé
 Date : 11 octobre 2026. Addendum au CDC Education existant ; ne remplace ni les 56 fonctionnalités ni l'architecture A/B/C/D/E/F/G/S/T validée.
 
+> **Versionnage (12/10/2026) :** ce texte du 11 octobre constitue la base historique de l'extension Santé (V1.0). La version consolidée actuellement applicable à l'audio est [CDC_RKJO_EDUCATION_SANTE_V1_1_2026-10-12.md](CDC_RKJO_EDUCATION_SANTE_V1_1_2026-10-12.md). Elle complète le CDC historique des 56 fonctionnalités sans le remplacer.
+
 ## Objectif
 Les étudiants en médecine, pharmacie et soins infirmiers importent leurs CM, TD, TP, exercices, corrigés et annales. RKJO les relie à leur année, UE et curriculum, puis génère des fiches de révision, cartes mentales interactives, flashcards, QCM, examens blancs et un planning de révisions adaptatif. Les supports générés portent des références à leurs documents sources.
 
