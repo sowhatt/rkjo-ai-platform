@@ -73,3 +73,11 @@ Le cas d'usage cible est un **ebook personnel acquis légalement par l'étudiant
 - **Non implémenté à cette date** : endpoint de téléversement 50 MiB, reconnaissance MIME réelle, traitement asynchrone, ASR, OCR d'ouvrage, EPUB parser, détection automatique de la langue, traduction IA, correction interactive, stockage/persistance, fonctionnalités d'export.
 - Ne pas afficher « traité », « transcrit », ou « traduit » dans le produit tant qu'un job réel n'est pas terminé.
 - Les vérifications métier et techniques du premier lot nécessitent une exécution pytest, lint et build dans le worktree Mac.
+
+## Prototype devis audio à la demande — 2026-10-12
+
+Sur `/education/study-tools`, un formulaire de simulation authentifié permet d'estimer un résumé audio de 1 à 600 minutes. Le serveur calcule par **tranche commencée de 120 minutes** : Express 1,49 EUR, Standard 2,49 EUR, Révision 3,99 EUR. Ces montants sont des **hypothèses commerciales**, ni un prix définitif ni un coût fournisseur mesuré. Route locale `POST /api/education/study/audio-estimate`, conditionnée à la session étudiant pilote. Réponse `estimation_only: true`, `payment_enabled: false`.
+
+**Non encore développés :** ingestion audio effective, métadonnées de durée vérifiées, devis contractuel, paiement et webhook, transcription, extraction des notions, synthèse et livraison. Avant toute vente, calculer les coûts réels sur un corpus de cours représentatifs et fixer une politique de remboursement et de quotas. Conserver le consentement à l'enregistrement comme prérequis.
+
+Vérifier sur le Mac : `npm --prefix apps/web run lint`, `npm --prefix apps/web run build`, puis ouvrir la page sur le serveur Next.js pilote local avec une session valide. Une estimation pour 120 min Standard doit afficher 2,49 EUR ; 121 min Standard doit afficher 4,98 EUR. Sans session la route doit refuser la demande avec HTTP 401. Aucun traitement ne doit être débité ni lancé.
