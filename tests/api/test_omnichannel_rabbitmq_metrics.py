@@ -75,6 +75,17 @@ def test_read_only_endpoint_blocks_viewer_and_operator():
 
 
 def test_admin_broker_failure_is_redacted(monkeypatch):
+    # The test API key can be tenant-bound; an infrastructure admin is unbound.
+    # Test broker failure only after the infrastructure authorization succeeds.
+    import rkjo_api.omnichannel_internal as internal
+    from rkjo_api.identity import AuthenticatedIdentity
+    from rkjo_api.security import ApiRole
+    monkeypatch.setattr(
+        internal, "get_authenticated_identity",
+        lambda request: AuthenticatedIdentity(
+            subject="infra-admin", role=ApiRole.ADMIN, tenant_id=None,
+        ),
+    )
     monkeypatch.delenv("RKJO_OMNI_RABBITMQ_MONITORED_QUEUES",raising=False)
     with TestClient(app) as client:
         response=client.get("/internal/omnichannel/rabbitmq",
