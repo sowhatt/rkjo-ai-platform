@@ -57,7 +57,7 @@ export default function EducationCoursesPage() {
         <p role="status" className="mt-8 text-slate-600">Chargement des cours…</p>
       ) : error ? (
         <section role="alert" className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
-          <h2 className="font-semibold">Impossible d'afficher tes cours</h2>
+          <h2 className="font-semibold">Impossible d&apos;afficher tes cours</h2>
           <p className="mt-2">{error}</p>
           <p className="mt-2 text-sm">Vérifie la connexion avec le service Education.</p>
         </section>
@@ -66,7 +66,7 @@ export default function EducationCoursesPage() {
           <h2 className="text-xl font-bold">Aucun cours disponible</h2>
           <p className="mt-2 text-slate-600">
             Ton établissement ou ton professeur doit encore ajouter un cours au catalogue.
-            Aucune progression n'est inventée.
+            Aucune progression n&apos;est inventée.
           </p>
           <Link href="/education/resources" className="mt-5 inline-block font-semibold text-blue-700">
             Explorer les ressources →
