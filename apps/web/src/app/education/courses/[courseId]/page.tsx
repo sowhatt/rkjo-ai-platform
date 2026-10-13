@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import EducationShell from "@/components/education/EducationShell";
+import GuidedLearningActivity from "@/components/education/GuidedLearningActivity";
 
 type Course = {
   course_id: string;
@@ -115,6 +116,14 @@ export default function EducationCourseDetailPage() {
               La séance d&apos;évaluation reste protégée tant que cette connexion n&apos;est pas disponible.
             </p>
           </section>
+          {!exerciseError && assessments.some((item) => item.questions.length > 0) && (
+            <GuidedLearningActivity
+              courseTitle={course.title}
+              subject={course.subject}
+              level={course.level}
+              questions={assessments.flatMap((item) => item.questions)}
+            />
+          )}
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/education/tutor" className="rounded-xl bg-blue-900 px-5 py-3 font-semibold text-white">
               Comprendre avec le professeur IA →
