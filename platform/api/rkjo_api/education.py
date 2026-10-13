@@ -565,8 +565,11 @@ def submit_attempt(
     assessment_service: AssessmentService = Depends(get_education_assessment_service),
 ) -> AttemptSubmitResponse:
     tenant_id, learner_id = require_individual_learner(request)
-    stored_attempt = assessment_service._repository.get_attempt(tenant_id=tenant_id, attempt_id=attempt_id)
-    if stored_attempt is None or stored_attempt.learner_id != learner_id:
+    try:
+        stored_attempt = assessment_service.get_attempt(tenant_id=tenant_id, attempt_id=attempt_id)
+    except AttemptNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Attempt not found") from exc
+    if stored_attempt.learner_id != learner_id:
         raise HTTPException(status_code=404, detail="Attempt not found")
     try:
         result = service.submit_attempt(
