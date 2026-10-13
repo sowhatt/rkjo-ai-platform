@@ -6,7 +6,9 @@ type Outline = { title: string; body: string; pages: number[] };
 type Citation = { page: number; segment_id: string };
 type RevisionNote = { title: string; excerpts: string[]; citation: Citation; source_only: boolean };
 type MindMapBranch = { id: string; label: string; page: number; children: { label: string; text: string; citation: Citation }[] };
+type GeneratedItem = { title: string; body: string; pages: number[] };
 type Preview = {
+  ai_materials: { revision_note: GeneratedItem[]; mind_map: GeneratedItem[]; mode: string } | null;
   revision_notes: RevisionNote[];
   mind_map: { root: string; branches: MindMapBranch[]; representation: string };
   generation_mode: string;
@@ -46,6 +48,7 @@ export default function StudyPdfPreview() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generateAi, setGenerateAi] = useState(false);
   const [studyTab, setStudyTab] = useState<"notes" | "map" | "sources">("notes");
 
   useEffect(() => {
@@ -102,6 +105,7 @@ export default function StudyPdfPreview() {
     form.append("programme_id", programme.trim());
     form.append("ue_id", ue.trim());
     form.append("document_type", kind);
+    form.append("generate_ai", String(generateAi));
     setLoading(true);
     try {
       const response = await fetch("/api/education/study/preview-pdf", {
@@ -211,6 +215,15 @@ export default function StudyPdfPreview() {
           N&apos;utilise pas de documents contenant des données patient. La session est gérée par
           un cookie HttpOnly ; l&apos;API ne stocke pas le PDF.
         </p>
+        <label className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <input type="checkbox" checked={generateAi} onChange={(event) => setGenerateAi(event.target.checked)}
+            className="mt-1" />
+          <span><strong>Essayer les fiches et cartes générées par IA (optionnel)</strong><br />
+            Si le pilote IA est activé, des extraits de mon document seront envoyés au fournisseur IA configuré.
+            Le résultat est expérimental, doit être vérifié avec le cours et ne constitue pas un avis médical.
+            Si je laisse cette case décochée, seul le traitement local par extraits est utilisé.
+          </span>
+        </label>
         <button disabled={loading || !connected} type="submit"
           className="rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white disabled:opacity-50 sm:col-span-2">
           {loading ? "Analyse du cours…" : "Analyser mon PDF"}
@@ -238,6 +251,22 @@ export default function StudyPdfPreview() {
             ))}
           </div>
           <p className="mt-3 text-sm text-amber-900">{preview.disclaimer}</p>
+          {preview.ai_materials && (
+            <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50 p-4">
+              <p className="font-semibold">Supports générés par IA · à vérifier avec les pages du cours</p>
+              <p className="mt-1 text-xs">Ces contenus sont des propositions pédagogiques non validées.</p>
+              <div className="mt-3 grid gap-3">
+                {(studyTab === "map" ? preview.ai_materials.mind_map :
+                  studyTab === "notes" ? preview.ai_materials.revision_note : []).map((item, index) => (
+                  <article key={index} className="rounded-lg border border-violet-100 bg-white p-3">
+                    <h4 className="font-semibold">{item.title}</h4>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">{item.body}</p>
+                    <p className="mt-2 text-xs text-blue-800">Références déclarées : page(s) {item.pages.join(", ")}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
           {studyTab === "notes" && (
             <section aria-label="Fiches de révision" className="mt-4 grid gap-3">
               {preview.revision_notes.map((note) => (
