@@ -85,7 +85,7 @@ export default function EducationCourseDetailPage() {
                 {course.document_ids.length} document{course.document_ids.length !== 1 ? "s" : ""} référencé{course.document_ids.length !== 1 ? "s" : ""} pour ce cours.
               </p>
             ) : (
-              <p className="mt-2 text-slate-600">Aucun support n'est encore associé à ce cours.</p>
+              <p className="mt-2 text-slate-600">Aucun support n&apos;est encore associé à ce cours.</p>
             )}
             <Link href="/education/resources" className="mt-4 inline-block font-semibold text-blue-700">
               Consulter les ressources →
@@ -95,7 +95,7 @@ export default function EducationCourseDetailPage() {
             <h2 className="text-xl font-bold">Exercices disponibles</h2>
             {exerciseError && <p role="alert" className="mt-2 text-amber-800">{exerciseError}</p>}
             {!exerciseError && assessments.length === 0 && (
-              <p className="mt-2 text-slate-600">Aucune évaluation n'a encore été préparée pour ce cours.</p>
+              <p className="mt-2 text-slate-600">Aucune évaluation n&apos;a encore été préparée pour ce cours.</p>
             )}
             <div className="mt-4 grid gap-3">
               {assessments.map((assessment) => (
@@ -112,7 +112,7 @@ export default function EducationCourseDetailPage() {
             </div>
             <p className="mt-4 text-sm text-slate-600">
               Pour répondre et faire valider les acquis, une session individuelle étudiante est nécessaire.
-              La séance d'évaluation reste protégée tant que cette connexion n'est pas disponible.
+              La séance d&apos;évaluation reste protégée tant que cette connexion n&apos;est pas disponible.
             </p>
           </section>
           <div className="mt-6 flex flex-wrap gap-3">
