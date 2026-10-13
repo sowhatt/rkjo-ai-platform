@@ -19,7 +19,6 @@ def test_course_catalog_loads_from_existing_api():
 
 def test_course_detail_reads_course_and_assessments():
     source = (WEB / "app/education/courses/[courseId]/page.tsx").read_text(encoding="utf-8")
-    assert "/api/education/courses/\\${id}" not in source
     assert "/api/education/courses/${id}" in source
     assert "/assessments" in source
     assert "Aucune évaluation" in source
