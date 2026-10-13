@@ -178,7 +178,7 @@ def required_role_for_request(
     # Semantic retrieval is read-only even though
     # HTTP POST is used to carry the search payload.
     if (
-        path == "/rag/search"
+        path in {"/rag/search", "/rag/lexia/search"}
         and normalized_method == "POST"
     ):
         return ApiRole.VIEWER
