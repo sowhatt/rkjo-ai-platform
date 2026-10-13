@@ -84,6 +84,12 @@ class AssessmentService:
             )
         )
 
+    def get_attempt(self, *, tenant_id: UUID, attempt_id: UUID) -> Attempt:
+        attempt = self._repository.get_attempt(tenant_id=tenant_id, attempt_id=attempt_id)
+        if attempt is None:
+            raise AttemptNotFoundError("attempt not found")
+        return attempt
+
     def submit_attempt(
         self,
         *,
