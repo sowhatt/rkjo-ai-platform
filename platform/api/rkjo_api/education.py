@@ -212,6 +212,22 @@ def require_uuid_tenant(request: Request) -> UUID:
         ) from exc
 
 
+
+def require_individual_learner(request: Request) -> tuple[UUID, UUID]:
+    """Bind student-only writes to the validated Bearer subject and tenant."""
+    identity = get_authenticated_identity(request)
+    if (
+        not request.headers.get("authorization", "").startswith("Bearer ")
+        or not identity.subject
+        or not identity.tenant_id
+    ):
+        raise HTTPException(status_code=403, detail="Individual Bearer identity required")
+    try:
+        return UUID(str(identity.tenant_id)), UUID(str(identity.subject))
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="UUID-bound learner identity required") from exc
+
+
 def to_response(course: Course) -> CourseResponse:
     return CourseResponse(
         course_id=course.course_id,
@@ -513,11 +529,14 @@ def start_attempt(
     request: Request,
     service: AssessmentService = Depends(get_education_assessment_service),
 ) -> AttemptResponse:
+    tenant_id, learner_id = require_individual_learner(request)
+    if payload.learner_id != learner_id:
+        raise HTTPException(status_code=403, detail="Attempt owner does not match identity")
     try:
         attempt = service.start_attempt(
-            tenant_id=require_uuid_tenant(request),
+            tenant_id=tenant_id,
             assessment_id=payload.assessment_id,
-            learner_id=payload.learner_id,
+            learner_id=learner_id,
         )
     except AssessmentNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Assessment not found.") from exc
@@ -543,10 +562,15 @@ def submit_attempt(
     service=Depends(
         get_education_assessment_learning_service
     ),
+    assessment_service: AssessmentService = Depends(get_education_assessment_service),
 ) -> AttemptSubmitResponse:
+    tenant_id, learner_id = require_individual_learner(request)
+    stored_attempt = assessment_service._repository.get_attempt(tenant_id=tenant_id, attempt_id=attempt_id)
+    if stored_attempt is None or stored_attempt.learner_id != learner_id:
+        raise HTTPException(status_code=404, detail="Attempt not found")
     try:
         result = service.submit_attempt(
-            tenant_id=require_uuid_tenant(request),
+            tenant_id=tenant_id,
             attempt_id=attempt_id,
             answers=payload.answers,
             evidence={
@@ -628,14 +652,15 @@ def get_proof_challenge(
         get_education_proof_service
     ),
 ):
-    identity = get_authenticated_identity(request)
-    tenant_id = UUID(str(identity.tenant_id))
+    tenant_id, learner_id = require_individual_learner(request)
 
     try:
         challenge = service.get_challenge(
             tenant_id=tenant_id,
             challenge_id=challenge_id,
         )
+        if challenge.learner_id != learner_id:
+            raise HTTPException(status_code=404, detail="Proof challenge not found")
         question = service.get_verification_question(
             tenant_id=tenant_id,
             challenge_id=challenge_id,
@@ -674,14 +699,16 @@ def submit_proof_challenge(
         get_education_proof_service
     ),
 ):
-    identity = get_authenticated_identity(request)
-    tenant_id = UUID(str(identity.tenant_id))
+    tenant_id, learner_id = require_individual_learner(request)
 
     try:
         challenge = service.get_challenge(
             tenant_id=tenant_id,
             challenge_id=challenge_id,
         )
+
+        if challenge.learner_id != learner_id:
+            raise HTTPException(status_code=404, detail="Proof challenge not found")
 
         result = service.submit(
             tenant_id=tenant_id,
