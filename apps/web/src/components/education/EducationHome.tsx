@@ -198,8 +198,8 @@ export default function EducationHome() {
             </div>
 
             <div className="rkjo-today-actions">
-              <Link href="/education/session" className="rkjo-start">
-                ▶ Commencer ma session
+              <Link href="/education/courses" className="rkjo-start">
+                ▶ Choisir un cours pour commencer
               </Link>
 
               <Link href="/education/tutor" className="rkjo-ask">
