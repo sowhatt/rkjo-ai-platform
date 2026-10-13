@@ -108,10 +108,10 @@ export default function EducationSession() {
   const [assessments, setAssessments] =
     useState<LearnerAssessment[]>([]);
 
-  const [assessmentIndex, setAssessmentIndex] =
+  const [assessmentIndex] =
     useState(0);
 
-  const [questionIndex, setQuestionIndex] =
+  const [questionIndex] =
     useState(0);
 
   const [attempt, setAttempt] =
