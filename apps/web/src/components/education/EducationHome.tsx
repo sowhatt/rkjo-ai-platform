@@ -155,6 +155,7 @@ export default function EducationHome() {
           </div>
         </header>
 
+        <p className="mt-3 text-xs font-semibold text-amber-800" role="note">Indicateurs ci-dessous : démonstration, non issus du suivi réel.</p>
         <section className="rkjo-edu-summary">
           <article>
             <span>Progression</span>
