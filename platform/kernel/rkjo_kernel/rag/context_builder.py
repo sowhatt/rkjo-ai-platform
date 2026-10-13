@@ -63,10 +63,17 @@ class CitationContextBuilder:
 
             citation = len(selected) + 1
 
+            page = result.metadata.get("page_number")
+            page_line = (
+                f"page_number: {page}\n"
+                if isinstance(page, int) and not isinstance(page, bool) and page > 0
+                else ""
+            )
             block = (
                 f"[{citation}]\n"
                 f"document_id: {result.document_id}\n"
                 f"chunk_id: {result.chunk_id}\n"
+                f"{page_line}"
                 f"content:\n{result.content}"
             )
 
