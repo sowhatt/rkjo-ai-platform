@@ -116,3 +116,15 @@ def get_education_assessment_learning_service():
         assessment_service=assessment_service,
         learning_evaluation_service=learning_evaluation_service,
     )
+
+
+def get_education_assessment_action_service():
+    """Load trusted tenant-scoped evidence for read-only learning decisions."""
+    from rkjo_education.learning.assessment_action_service import AssessmentActionService
+    from rkjo_education.intelligence.proof_postgres_repository import PostgresProofChallengeRepository
+
+    database_url = get_database_url()
+    return AssessmentActionService(
+        assessments=PostgresAssessmentRepository(database_url),
+        proofs=PostgresProofChallengeRepository(database_url),
+    )
