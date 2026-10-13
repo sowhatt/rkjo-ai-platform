@@ -119,6 +119,7 @@ export default function EducationCourseDetailPage() {
           </section>
           {!exerciseError && learningQuestions.length > 0 && (
             <GuidedLearningActivity
+              key={course.course_id}
               courseTitle={course.title}
               subject={course.subject}
               level={course.level}
