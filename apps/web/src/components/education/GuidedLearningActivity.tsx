@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type LearningQuestion = {
   id: string;
@@ -22,13 +22,6 @@ export default function GuidedLearningActivity({
   const [response, setResponse] = useState("");
   const [reflection, setReflection] = useState("");
   const [stage, setStage] = useState<"explain" | "respond" | "reflect">("explain");
-
-  useEffect(() => {
-    setIndex(0);
-    setResponse("");
-    setReflection("");
-    setStage("explain");
-  }, [courseTitle, questions]);
 
   const active = questions[index] ?? null;
   if (!active) return null;
