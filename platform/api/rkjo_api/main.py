@@ -11,6 +11,7 @@ from rkjo_api.bearer_auth import (
 from rkjo_api.rag import (
     router as rag_router,
 )
+from rkjo_api.rag_ocr import router as rag_ocr_router
 from rkjo_api.education import (
     router as education_router,
 )
@@ -58,6 +59,7 @@ app = FastAPI(
 app.include_router(
     rag_router
 )
+app.include_router(rag_ocr_router)
 app.include_router(
     education_router
 )
