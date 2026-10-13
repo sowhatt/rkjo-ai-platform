@@ -196,6 +196,7 @@ class RAGAnswerSourceResponse(BaseModel):
     document_id: str
     chunk_id: str
     score: float
+    page_number: int | None = None
 
 
 class RAGAnswerApiResponse(BaseModel):
@@ -862,6 +863,7 @@ def rag_answer(
                 document_id=source.document_id,
                 chunk_id=source.chunk_id,
                 score=source.score,
+                page_number=source.page_number,
             )
             for source in result.sources
         ],
