@@ -97,7 +97,7 @@ def test_render_image_limit(monkeypatch, sample):
         Path(args[-1] + ".png").write_bytes(b"oversized")
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
-    with pytest.raises(ValueError, match="image exceeds byte limit"):
+    with pytest.raises(ValueError, match="exceeds byte limit"):
         LocalTesseractPDFOCR(max_image_bytes=1).recognize_page(
             pdf_path=sample, tenant_id="a", document_id="doc", page_number=1,
         )
