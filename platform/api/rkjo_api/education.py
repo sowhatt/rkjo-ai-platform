@@ -11,6 +11,7 @@ from rkjo_api.dependencies import get_education_course_service
 from rkjo_api.education_dependencies import (
     get_education_assessment_learning_service,
     get_education_assessment_service,
+    get_education_assessment_action_service,
     get_education_learner_service,
     get_education_learning_service,
     get_education_proof_service,
@@ -25,6 +26,7 @@ from rkjo_education.assessment.service import (
 from rkjo_education.course.models import Course
 from rkjo_education.course.service import CourseService
 from rkjo_education.learner.service import LearnerNotFoundError, LearnerService
+from rkjo_education.learning.assessment_action_service import EvidenceNotFoundError
 from rkjo_education.learning.service import DuplicateEnrollmentError, LearningService
 from rkjo_education.intelligence.proof_application import (
     ProofApplicationService,
@@ -705,4 +707,58 @@ def submit_proof_challenge(
         competency_code=result.competency_code,
         status=result.status.value,
         independently_verified=result.independently_verified,
+    )
+
+
+class NextActionResponse(BaseModel):
+    attempt_id: UUID
+    question_id: UUID
+    action: str
+    reason: str
+
+
+@router.get(
+    "/attempts/{attempt_id}/questions/{question_id}/next-action",
+    response_model=NextActionResponse,
+)
+def get_next_action(
+    attempt_id: UUID,
+    question_id: UUID,
+    request: Request,
+    proof_challenge_id: UUID | None = None,
+    service=Depends(get_education_assessment_action_service),
+) -> NextActionResponse:
+    """Read only verified persisted evidence for the authenticated learner.
+
+    No user-supplied score, proof status, prerequisites, or learner ID.
+    At present this route requires the Bearer subject to be the learner UUID.
+    """
+    identity = get_authenticated_identity(request)
+    if (
+        not request.headers.get("authorization", "").startswith("Bearer ")
+        or not identity.subject
+        or not identity.tenant_id
+    ):
+        raise HTTPException(status_code=403, detail="Individual Bearer identity required")
+    try:
+        learner_id = UUID(str(identity.subject))
+        tenant_id = UUID(str(identity.tenant_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="UUID-bound learner identity required") from exc
+
+    try:
+        decision = service.recommend(
+            tenant_id=tenant_id,
+            learner_id=learner_id,
+            attempt_id=attempt_id,
+            question_id=question_id,
+            proof_challenge_id=proof_challenge_id,
+        )
+    except EvidenceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Learning evidence not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="Inconsistent learning evidence") from exc
+    return NextActionResponse(
+        attempt_id=attempt_id, question_id=question_id,
+        action=decision.action.value, reason=decision.reason,
     )
