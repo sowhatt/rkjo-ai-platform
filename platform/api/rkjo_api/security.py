@@ -222,6 +222,15 @@ def required_role_for_request(
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
 
+    # Learner-owned assessment/proof writes are authorized by individual
+    # Bearer subject and tenant inside education.py (never by API key).
+    if normalized_method == "POST" and (
+        path == "/education/attempts"
+        or (path.startswith("/education/attempts/") and path.endswith("/submit"))
+        or (path.startswith("/education/proof-challenges/") and path.endswith("/submit"))
+    ):
+        return ApiRole.VIEWER
+
     # Students may upload their own PDF for a stateless preview.
     # The endpoint itself requires an authenticated subject and tenant.
     if normalized_method == "POST" and path in {"/education/study/preview-pdf", "/education/study/inspect-audio", "/education/study/stage-audio"}:
