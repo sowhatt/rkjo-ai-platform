@@ -14,7 +14,9 @@ type Context = {
  * exist, replace this guard with a server-side session resolver and forward
  * a short-lived identity-bound Bearer token to FastAPI.
  */
-export async function GET(request: NextRequest, _context: Context) {
+export async function GET(request: NextRequest, context: Context) {
+  // Resolve route parameters without treating them as authentication.
+  await context.params;
   const session = readPilotSession(request);
 
   if (!session) {
