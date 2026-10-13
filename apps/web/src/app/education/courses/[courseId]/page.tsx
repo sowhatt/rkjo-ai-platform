@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import EducationShell from "@/components/education/EducationShell";
 import GuidedLearningActivity from "@/components/education/GuidedLearningActivity";
 
@@ -28,6 +28,7 @@ export default function EducationCourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exerciseError, setExerciseError] = useState("");
+  const learningQuestions = useMemo(() => assessments.flatMap((item) => item.questions), [assessments]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -116,12 +117,12 @@ export default function EducationCourseDetailPage() {
               La séance d&apos;évaluation reste protégée tant que cette connexion n&apos;est pas disponible.
             </p>
           </section>
-          {!exerciseError && assessments.some((item) => item.questions.length > 0) && (
+          {!exerciseError && learningQuestions.length > 0 && (
             <GuidedLearningActivity
               courseTitle={course.title}
               subject={course.subject}
               level={course.level}
-              questions={assessments.flatMap((item) => item.questions)}
+              questions={learningQuestions}
             />
           )}
           <div className="mt-6 flex flex-wrap gap-3">
