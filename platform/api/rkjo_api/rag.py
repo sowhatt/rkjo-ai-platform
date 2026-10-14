@@ -777,6 +777,7 @@ def semantic_search(
         filters = bind_identity_tenant(
             identity=identity,
             filters=filters,
+            require_tenant=True,
         )
 
         result = service.search(
@@ -840,6 +841,7 @@ def rag_answer(
         filters = bind_identity_tenant(
             identity=identity,
             filters=filters,
+            require_tenant=True,
         )
 
         result = service.answer(
