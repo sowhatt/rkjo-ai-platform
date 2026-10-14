@@ -222,6 +222,11 @@ def required_role_for_request(
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
 
+    # Formative tutor feedback is student-owned and additionally requires a
+    # verified individual Bearer identity and assessment ownership.
+    if normalized_method == "POST" and path == "/education/tutor/feedback":
+        return ApiRole.VIEWER
+
     # Learner-owned assessment/proof writes are authorized by individual
     # Bearer subject and tenant inside education.py (never by API key).
     if normalized_method == "POST" and (
