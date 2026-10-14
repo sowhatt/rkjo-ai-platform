@@ -13,8 +13,10 @@ from pydantic import BaseModel, Field
 from rkjo_api.dependencies import (
     get_education_course_service,
     get_rag_answering_service,
+    get_education_course_access,
 )
 from rkjo_api.security import ApiRole, role_allows
+from rkjo_education.course.membership import CourseAccess, CourseMembership, CourseMemberRole
 from rkjo_kernel.rag.rag_answering import RAGAnsweringService
 from rkjo_kernel.rag.retrieval_filters import RetrievalFilters
 from rkjo_api.identity import (
@@ -301,6 +303,89 @@ def answer_course_document(
         document_id=payload.document_id,
         answer=result.answer,
         sanitized_query=result.sanitized_query,
+        sources=[CourseAnswerSource(
+            citation=source.citation, document_id=source.document_id,
+            chunk_id=source.chunk_id, score=source.score,
+            page_number=source.page_number,
+        ) for source in result.sources],
+    )
+
+
+class CourseMembershipRequest(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    role: CourseMemberRole
+
+
+class CourseMembershipResponse(BaseModel):
+    course_id: str
+    subject: str
+    role: CourseMemberRole
+
+
+@router.post("/courses/{course_id}/members", response_model=CourseMembershipResponse)
+def enroll_course_member(
+    course_id: str,
+    payload: CourseMembershipRequest,
+    request: Request,
+    courses: CourseService = Depends(get_education_course_service),
+    access: CourseAccess = Depends(get_education_course_access),
+) -> CourseMembershipResponse:
+    """Administrative enrollment; requires a named, tenant-bound admin identity."""
+    identity = get_authenticated_identity(request)
+    if identity.role != ApiRole.ADMIN or not identity.subject or not identity.tenant_id:
+        raise HTTPException(status_code=403, detail="Named tenant-bound administrator required.")
+    try:
+        courses.get(tenant_id=identity.tenant_id, course_id=course_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Course not found.") from None
+    member = access.repository.upsert(CourseMembership(
+        tenant_id=identity.tenant_id, course_id=course_id,
+        subject=payload.subject.strip(), role=payload.role,
+    ))
+    return CourseMembershipResponse(
+        course_id=member.course_id, subject=member.subject, role=member.role,
+    )
+
+
+@router.post("/courses/{course_id}/learner-answer", response_model=CourseAnswerResponse)
+def answer_course_as_learner(
+    course_id: str,
+    payload: CourseQuestionRequest,
+    request: Request,
+    courses: CourseService = Depends(get_education_course_service),
+    access: CourseAccess = Depends(get_education_course_access),
+    answering: RAGAnsweringService = Depends(get_rag_answering_service),
+) -> CourseAnswerResponse:
+    """Enrollment-gated document QA; never trusts a client-provided tenant/role."""
+    identity = get_authenticated_identity(request)
+    if identity.tenant_id is None or not identity.subject:
+        raise HTTPException(status_code=403, detail="Named tenant-bound identity required.")
+    try:
+        access.require(
+            tenant_id=identity.tenant_id, course_id=course_id,
+            subject=identity.subject,
+            allowed_roles=(CourseMemberRole.LEARNER, CourseMemberRole.TEACHER),
+        )
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Course enrollment required.") from None
+    try:
+        course = courses.get(tenant_id=identity.tenant_id, course_id=course_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Course not found.") from None
+    if payload.document_id not in course.document_ids:
+        raise HTTPException(status_code=404, detail="Document not found in course.")
+    result = answering.answer(
+        payload.question, limit=payload.limit,
+        filters=RetrievalFilters(metadata={
+            "tenant_id": identity.tenant_id,
+            "evidence_document_id": payload.document_id,
+        }),
+    )
+    if any(source.document_id != payload.document_id for source in result.sources):
+        raise HTTPException(status_code=502, detail="Unscoped source returned by RAG.")
+    return CourseAnswerResponse(
+        course_id=course_id, document_id=payload.document_id,
+        answer=result.answer, sanitized_query=result.sanitized_query,
         sources=[CourseAnswerSource(
             citation=source.citation, document_id=source.document_id,
             chunk_id=source.chunk_id, score=source.score,
