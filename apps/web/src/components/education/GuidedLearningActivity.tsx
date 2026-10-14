@@ -27,9 +27,43 @@ export default function GuidedLearningActivity({
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
+  const [studentPassword, setStudentPassword] = useState("");
+  const [studentConnected, setStudentConnected] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState("");
 
   const active = questions[index] ?? null;
   if (!active) return null;
+
+  async function loginStudent(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoginBusy(true);
+    setLoginError("");
+    try {
+      const response = await fetch("/api/education/student/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: studentPassword }),
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const payload: { detail?: string } = await response.json().catch(() => ({}));
+        throw new Error(payload.detail ?? "Connexion indisponible.");
+      }
+      setStudentConnected(true);
+      setStudentPassword("");
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Connexion impossible.");
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function logoutStudent() {
+    await fetch("/api/education/student/session", { method: "DELETE", cache: "no-store" });
+    setStudentConnected(false);
+    setFeedback("");
+  }
 
   async function requestFeedback() {
     if (!active || !response.trim() || feedbackBusy) return;
@@ -146,7 +180,30 @@ export default function GuidedLearningActivity({
               Le retour IA est distinct de la note et doit s&apos;appuyer sur les sources de ton cours.
               Un compte étudiant personnel est nécessaire pour y accéder.
             </p>
-            <button type="button" onClick={() => void requestFeedback()} disabled={feedbackBusy}
+            <div className="mt-3 rounded-lg border border-slate-200 p-3">
+              {studentConnected ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-emerald-800">Compte étudiant individuel connecté (démo locale)</p>
+                  <button type="button" onClick={() => void logoutStudent()}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Se déconnecter</button>
+                </div>
+              ) : (
+                <form onSubmit={(event) => void loginStudent(event)} className="flex flex-wrap items-end gap-3">
+                  <label className="flex-1 text-sm font-semibold">
+                    Code individuel de démonstration (localhost uniquement)
+                    <input type="password" required autoComplete="off" maxLength={256}
+                      value={studentPassword} onChange={(event) => setStudentPassword(event.target.value)}
+                      className="mt-2 w-full rounded-lg border border-slate-300 p-2" />
+                  </label>
+                  <button type="submit" disabled={loginBusy}
+                    className="rounded-lg border border-blue-300 px-3 py-2 text-sm font-semibold disabled:opacity-50">
+                    {loginBusy ? "Connexion…" : "Connexion étudiant"}
+                  </button>
+                </form>
+              )}
+              {loginError && <p role="alert" className="mt-2 text-sm text-amber-800">{loginError}</p>}
+            </div>
+            <button type="button" onClick={() => void requestFeedback()} disabled={feedbackBusy || !studentConnected}
               className="mt-3 rounded-xl bg-blue-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
               {feedbackBusy ? "Analyse en cours…" : "Demander un retour au professeur IA"}
             </button>
