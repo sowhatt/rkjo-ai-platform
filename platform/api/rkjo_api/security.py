@@ -224,6 +224,9 @@ def required_role_for_request(
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
 
+    if path.startswith("/education/courses/") and path.endswith("/learner-answer") and normalized_method == "POST":
+        return ApiRole.VIEWER
+
     if path.startswith(
         "/education"
     ):
