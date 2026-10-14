@@ -4,27 +4,68 @@ import { useState } from "react";
 
 type LearningQuestion = {
   id: string;
+  assessment_id: string;
   prompt: string;
   competency_code: string | null;
 };
 
 type Props = {
   courseTitle: string;
+  courseId: string;
   subject: string;
   level: string;
   questions: LearningQuestion[];
 };
 
 export default function GuidedLearningActivity({
-  courseTitle, subject, level, questions,
+  courseTitle, courseId, subject, level, questions,
 }: Props) {
   const [index, setIndex] = useState(0);
   const [response, setResponse] = useState("");
   const [reflection, setReflection] = useState("");
   const [stage, setStage] = useState<"explain" | "respond" | "reflect">("explain");
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [feedbackError, setFeedbackError] = useState("");
 
   const active = questions[index] ?? null;
   if (!active) return null;
+
+  async function requestFeedback() {
+    if (!active || !response.trim() || feedbackBusy) return;
+    setFeedbackBusy(true);
+    setFeedback("");
+    setFeedbackError("");
+    try {
+      const result = await fetch("/api/education/tutor/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          course_id: courseId,
+          assessment_id: active.assessment_id,
+          question_id: active.id,
+          student_answer: response.trim(),
+          help_requested: true,
+        }),
+      });
+      const payload: unknown = await result.json();
+      if (!result.ok) {
+        const detail = payload && typeof payload === "object" && "detail" in payload
+          ? String(payload.detail) : "Le professeur IA est momentanément indisponible.";
+        throw new Error(detail);
+      }
+      if (!payload || typeof payload !== "object" || !("answer" in payload) ||
+          typeof payload.answer !== "string" || !payload.answer.trim()) {
+        throw new Error("La réponse du professeur IA est invalide.");
+      }
+      setFeedback(payload.answer);
+    } catch (error) {
+      setFeedbackError(error instanceof Error ? error.message : "Erreur de connexion au professeur IA.");
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }
 
   function next() {
     if (index >= questions.length - 1) return;
@@ -32,6 +73,8 @@ export default function GuidedLearningActivity({
     setResponse("");
     setReflection("");
     setStage("explain");
+    setFeedback("");
+    setFeedbackError("");
   }
 
   return (
@@ -97,6 +140,24 @@ export default function GuidedLearningActivity({
             justifié ton raisonnement et donné un exemple ? Ce retour ne valide pas
             l&apos;exactitude de ta réponse.
           </p>
+          <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
+            <h4 className="font-semibold">Professeur IA — retour sur ton raisonnement</h4>
+            <p className="mt-2 text-sm text-slate-600">
+              Le retour IA est distinct de la note et doit s&apos;appuyer sur les sources de ton cours.
+              Un compte étudiant personnel est nécessaire pour y accéder.
+            </p>
+            <button type="button" onClick={() => void requestFeedback()} disabled={feedbackBusy}
+              className="mt-3 rounded-xl bg-blue-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
+              {feedbackBusy ? "Analyse en cours…" : "Demander un retour au professeur IA"}
+            </button>
+            {feedbackError && <p role="alert" className="mt-3 text-sm text-amber-900">{feedbackError}</p>}
+            {feedback && (
+              <div role="status" className="mt-3 whitespace-pre-wrap rounded-lg bg-blue-50 p-3 text-sm text-slate-900">
+                {feedback}
+                <p className="mt-2 font-semibold">Retour formatif : aucune maîtrise validée automatiquement.</p>
+              </div>
+            )}
+          </div>
           <label htmlFor="learning-reflection" className="mt-4 block font-semibold">
             Que modifierais-tu après avoir revu ton cours ?
           </label>
