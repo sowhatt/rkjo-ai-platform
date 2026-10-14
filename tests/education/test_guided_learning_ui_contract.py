@@ -41,8 +41,7 @@ def test_guided_feedback_preserves_question_ownership_and_fails_closed():
     assert 'fetch("/api/education/tutor/feedback"' in component
     assert "role=\"alert\"" in component
     assert "readPilotSession(request)" in gateway
-    assert "status: 401" in gateway
-    assert "status: 403" in gateway
+    assert "status: shared ? 403 : 401" in gateway
     assert "RKJO_OPERATOR_API_KEY" not in gateway
     assert "backendPilotBearer" not in gateway
 
