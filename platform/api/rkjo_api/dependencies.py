@@ -480,3 +480,13 @@ def get_education_curriculum_service():
             get_database_url()
         )
     )
+
+
+def get_education_course_access():
+    """Build course membership authorization on persistent PostgreSQL."""
+    from rkjo_education.course.membership import (
+        CourseAccess, PostgresCourseMembershipRepository,
+    )
+    repository = PostgresCourseMembershipRepository(get_database_url())
+    repository.initialize_schema()
+    return CourseAccess(repository)
