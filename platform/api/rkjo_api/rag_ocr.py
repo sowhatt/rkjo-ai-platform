@@ -10,7 +10,9 @@ from pydantic import BaseModel
 
 from rkjo_api.dependencies import (
     get_database_url, get_embedding_dimensions, get_embedding_space,
+    get_education_course_service,
 )
+from rkjo_education.course.service import CourseService
 from rkjo_api.identity import get_authenticated_identity
 from rkjo_api.rag import MAX_UPLOAD_BYTES, persist_upload_temporarily
 from rkjo_kernel.rag.chunking import TextChunker
@@ -97,5 +99,56 @@ async def ingest_scanned_pdf(
             raise HTTPException(status_code=403, detail="Document access denied.") from None
         except ValueError:
             raise HTTPException(status_code=422, detail="Unable to process PDF evidence.") from None
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+@router.post("/courses/{course_id}/documents", response_model=OCRUploadResult, status_code=201)
+async def ingest_course_scanned_pdf(
+    course_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    service: OCRIngestionService = Depends(get_ocr_ingestion_service),
+    courses: CourseService = Depends(get_education_course_service),
+) -> OCRUploadResult:
+    """OCR for an existing course, bound to the authenticated tenant.
+
+    This endpoint is still feature-gated and not exposed to public web clients.
+    """
+    if os.getenv("RKJO_RAG_OCR_API_ENABLED", "").lower() != "true":
+        raise HTTPException(status_code=404, detail="OCR ingestion not enabled.")
+    identity = get_authenticated_identity(request)
+    tenant_id = identity.tenant_id
+    if not tenant_id or not tenant_id.strip():
+        raise HTTPException(status_code=403, detail="Tenant-bound identity required.")
+    if not course_id.strip() or len(course_id) > 200:
+        raise HTTPException(status_code=422, detail="Invalid course identifier.")
+    try:
+        courses.get(tenant_id=tenant_id, course_id=course_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Course not found.") from None
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=415, detail="Only PDF OCR ingestion is supported.")
+    # Generated IDs avoid allowing users to overwrite an unrelated document.
+    document_id = "education-" + str(uuid4())
+    temporary = await persist_upload_temporarily(file)
+    try:
+        with temporary.open("rb") as stream:
+            if stream.read(5) != b"%PDF-":
+                raise HTTPException(status_code=422, detail="Invalid PDF signature.")
+        try:
+            result = service.ingest(
+                temporary, tenant_id=tenant_id, document_id=document_id,
+            )
+        except PermissionError:
+            raise HTTPException(status_code=403, detail="Document access denied.") from None
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Unable to process PDF evidence.") from None
+        # Association follows committed indexation. Failure needs compensating
+        # cleanup in a future cross-service transaction/outbox workflow.
+        courses.attach_document(
+            tenant_id=tenant_id, course_id=course_id, document_id=document_id,
+        )
+        return result
     finally:
         temporary.unlink(missing_ok=True)
