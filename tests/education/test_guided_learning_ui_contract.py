@@ -27,3 +27,21 @@ def test_guided_learning_has_real_learner_interaction():
     assert "Ta réponse et ton raisonnement" in source
     assert "Question suivante" in source
     assert 'disabled={!reflection.trim()}' in source
+
+
+def test_guided_feedback_preserves_question_ownership_and_fails_closed():
+    page = (WEB / "app/education/courses/[courseId]/page.tsx").read_text()
+    component = (WEB / "components/education/GuidedLearningActivity.tsx").read_text()
+    gateway = (WEB / "app/api/education/tutor/feedback/route.ts").read_text()
+    assert "assessment_id: item.id" in page
+    assert "courseId={course.course_id}" in page
+    for field in ("course_id: courseId", "assessment_id: active.assessment_id",
+                  "question_id: active.id", "student_answer: response.trim()"):
+        assert field in component
+    assert 'fetch("/api/education/tutor/feedback"' in component
+    assert "role=\"alert\"" in component
+    assert "readPilotSession(request)" in gateway
+    assert "status: 401" in gateway
+    assert "status: 403" in gateway
+    assert "RKJO_OPERATOR_API_KEY" not in gateway
+    assert "backendPilotBearer" not in gateway
