@@ -8,7 +8,7 @@ def test_course_page_embeds_guided_learning_from_real_assessments():
     source = (WEB / "app/education/courses/[courseId]/page.tsx").read_text()
     assert 'import GuidedLearningActivity' in source
     assert 'questions={learningQuestions}' in source
-    assert 'assessments.flatMap((item) => item.questions)' in source
+    assert 'assessments.flatMap((item) => item.questions.map((question) => ({ ...question, assessment_id: item.id })))' in source
     assert 'learningQuestions.length > 0' in source
 
 
