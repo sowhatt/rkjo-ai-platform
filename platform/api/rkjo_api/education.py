@@ -12,7 +12,11 @@ from pydantic import BaseModel, Field
 
 from rkjo_api.dependencies import (
     get_education_course_service,
+    get_rag_answering_service,
 )
+from rkjo_api.security import ApiRole, role_allows
+from rkjo_kernel.rag.rag_answering import RAGAnsweringService
+from rkjo_kernel.rag.retrieval_filters import RetrievalFilters
 from rkjo_api.identity import (
     get_authenticated_identity,
 )
@@ -229,4 +233,77 @@ def attach_document(
 
     return to_response(
         course
+    )
+
+
+class CourseQuestionRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    document_id: str = Field(min_length=1, max_length=300)
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class CourseAnswerSource(BaseModel):
+    citation: int
+    document_id: str
+    chunk_id: str
+    score: float
+    page_number: int | None = None
+
+
+class CourseAnswerResponse(BaseModel):
+    course_id: str
+    document_id: str
+    answer: str
+    sanitized_query: str
+    sources: list[CourseAnswerSource]
+
+
+@router.post(
+    "/courses/{course_id}/answer",
+    response_model=CourseAnswerResponse,
+)
+def answer_course_document(
+    course_id: str,
+    payload: CourseQuestionRequest,
+    request: Request,
+    courses: CourseService = Depends(get_education_course_service),
+    answering: RAGAnsweringService = Depends(get_rag_answering_service),
+) -> CourseAnswerResponse:
+    """Answer using only one document explicitly attached to an authorized course.
+
+    Until enrollment-based learner access exists, this route is operator-only.
+    """
+    identity = get_authenticated_identity(request)
+    if not role_allows(actual_role=identity.role, required_role=ApiRole.OPERATOR):
+        raise HTTPException(status_code=403, detail="Course access requires operator role.")
+    tenant_id = identity.tenant_id
+    if not tenant_id or not tenant_id.strip():
+        raise HTTPException(status_code=403, detail="Tenant-bound identity required.")
+    try:
+        course = courses.get(tenant_id=tenant_id, course_id=course_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Course not found.") from None
+    if payload.document_id not in course.document_ids:
+        raise HTTPException(status_code=404, detail="Document not found in course.")
+    result = answering.answer(
+        payload.question,
+        limit=payload.limit,
+        filters=RetrievalFilters(metadata={
+            "tenant_id": tenant_id,
+            "evidence_document_id": payload.document_id,
+        }),
+    )
+    # Fail closed even for a misconfigured retrieval or answering adapter.
+    if any(source.document_id != payload.document_id for source in result.sources):
+        raise HTTPException(status_code=502, detail="Unscoped source returned by RAG.")
+    return CourseAnswerResponse(
+        course_id=course_id,
+        document_id=payload.document_id,
+        answer=result.answer,
+        sanitized_query=result.sanitized_query,
+        sources=[CourseAnswerSource(
+            citation=source.citation, document_id=source.document_id,
+            chunk_id=source.chunk_id, score=source.score,
+            page_number=source.page_number,
+        ) for source in result.sources],
     )
