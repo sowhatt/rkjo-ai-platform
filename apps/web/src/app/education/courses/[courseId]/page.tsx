@@ -28,7 +28,7 @@ export default function EducationCourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exerciseError, setExerciseError] = useState("");
-  const learningQuestions = useMemo(() => assessments.flatMap((item) => item.questions), [assessments]);
+  const learningQuestions = useMemo(() => assessments.flatMap((item) => item.questions.map((question) => ({ ...question, assessment_id: item.id }))), [assessments]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -121,6 +121,7 @@ export default function EducationCourseDetailPage() {
             <GuidedLearningActivity
               key={course.course_id}
               courseTitle={course.title}
+              courseId={course.course_id}
               subject={course.subject}
               level={course.level}
               questions={learningQuestions}
