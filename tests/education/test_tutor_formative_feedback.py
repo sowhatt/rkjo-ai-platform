@@ -46,8 +46,12 @@ def make_client(assessments, tutor):
 
     @app.middleware("http")
     async def identity(request, call_next):
-        request.state.api_tenant_id = str(TENANT)
-        request.state.api_subject = str(LEARNER)
+        # Mirror the authenticated request state supplied by the real
+        # middleware; this unit test does not verify JWT signatures.
+        if request.headers.get("authorization") == "Bearer test":
+            request.state.api_role = "viewer"
+            request.state.api_tenant_id = str(TENANT)
+            request.state.api_subject = str(LEARNER)
         return await call_next(request)
 
     app.include_router(router)
