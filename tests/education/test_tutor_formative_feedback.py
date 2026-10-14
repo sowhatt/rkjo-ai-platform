@@ -73,7 +73,10 @@ def body(**kw):
 def test_feedback_requires_individual_bearer():
     tutor = TutorFake()
     r = make_client(AssessmentServiceFake(), tutor).post("/education/tutor/feedback", json=body())
-    assert r.status_code == 403
+    # No authenticated role is present: authentication fails with 401 before
+    # the endpoint can evaluate the individual Bearer ownership guard.
+    assert r.status_code == 401
+    assert r.json()["detail"] == "Authenticated identity is unavailable."
     assert tutor.calls == []
 
 
