@@ -45,3 +45,21 @@ def test_guided_feedback_preserves_question_ownership_and_fails_closed():
     assert "status: 403" in gateway
     assert "RKJO_OPERATOR_API_KEY" not in gateway
     assert "backendPilotBearer" not in gateway
+
+
+def test_local_individual_student_demo_never_uses_shared_identity():
+    component = (WEB / "components/education/GuidedLearningActivity.tsx").read_text()
+    session = (WEB / "app/api/education/student/session/route.ts").read_text()
+    auth = (WEB / "lib/education/individualStudentSession.ts").read_text()
+    feedback = (WEB / "app/api/education/tutor/feedback/route.ts").read_text()
+    assert 'fetch("/api/education/student/session"' in component
+    assert "disabled={feedbackBusy || !studentConnected}" in component
+    assert "studentDemoAllowed(request)" in session
+    assert "httpOnly: true" in auth
+    assert 'process.env.NODE_ENV === "development"' in auth
+    assert "RKJO_EDUCATION_STUDENT_ID" in auth
+    assert "getStudentSession(request)" in feedback
+    assert "studentBackendBearer(identity)" in feedback
+    assert "readPilotSession(request)" in feedback
+    assert '"RKJO_OPERATOR_API_KEY"' not in feedback
+    assert "backendPilotBearer" not in feedback
