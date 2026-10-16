@@ -92,6 +92,34 @@ def test_lexia_hybrid_pgvector_and_lexical_are_tenant_scoped(client):
                 json={"query": "foncier", "filters": {"tenant_id": "cabinet-b"}},
             )
             assert denied.status_code == 403
+
+            # Without client filters, server MUST still scope retrieval to JWT tenant.
+            unfiltered = client.post(
+                "/rag/lexia/search",
+                headers=signed_headers("cabinet-a"),
+                json={"query": "foncier donation", "limit": 10},
+            )
+            assert unfiltered.status_code == 200, unfiltered.text
+            unfiltered_rows = unfiltered.json()["results"]
+            assert len(unfiltered_rows) == 1
+            assert unfiltered_rows[0]["metadata"]["tenant_id"] == "cabinet-a"
+
+            # An authenticated but unbound JWT cannot choose its own tenant.
+            unbound = client.post(
+                "/rag/lexia/search",
+                headers=signed_headers(None),
+                json={"query": "foncier", "filters": {"tenant_id": "cabinet-a"}},
+            )
+            assert unbound.status_code == 403
+
+            # Empty metadata match must not expand search to foreign documents.
+            no_match = client.post(
+                "/rag/lexia/search",
+                headers=signed_headers("cabinet-a"),
+                json={"query": "foncier", "filters": {"country": "FR"}},
+            )
+            assert no_match.status_code == 200, no_match.text
+            assert no_match.json()["results"] == []
         finally:
             app.dependency_overrides.pop(get_rag_search_service, None)
     finally:
