@@ -11,6 +11,7 @@ from rkjo_api.bearer_auth import (
 from rkjo_api.rag import (
     router as rag_router,
 )
+from rkjo_api.lexia_review import router as lexia_review_router
 from rkjo_api.education import (
     router as education_router,
 )
@@ -56,6 +57,7 @@ app = FastAPI(
 app.include_router(
     rag_router
 )
+app.include_router(lexia_review_router)
 app.include_router(
     education_router
 )
