@@ -20,7 +20,7 @@ def test_review_inbox_is_persistent_private_and_never_publishes():
 
     prefix = "lexia_review_e2e_" + uuid4().hex[:12]
     inbox = PostgresLegalReviewInbox(database_url=url, table_prefix=prefix)
-    document = b"Imaginary Bénin legal source, not legally verified"
+    document = "Imaginary Bénin legal source, not legally verified".encode("utf-8")
     digest = hashlib.sha256(document).hexdigest()
     packet = prepare_legal_intake(
         document=document,
