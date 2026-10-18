@@ -14,6 +14,7 @@ from rkjo_api.dependencies import get_database_url
 from rkjo_api.identity import get_authenticated_identity
 from rkjo_api.security import ApiRole
 from rkjo_kernel.rag.postgres_legal_review import PostgresLegalReviewInbox
+from rkjo_kernel.rag.legal_four_eyes import LegalFourEyesWorkflow
 
 
 router = APIRouter(prefix="/rag/lexia/review", tags=["lexia-review"])
@@ -23,6 +24,11 @@ def get_legal_review_inbox() -> PostgresLegalReviewInbox:
     # Initialized as part of a controlled deployment/migration, not on
     # every request. No automatic schema creation from HTTP handlers.
     return PostgresLegalReviewInbox(database_url=get_database_url())
+
+
+def get_legal_four_eyes_workflow() -> LegalFourEyesWorkflow:
+    # Schema is deployed by administrator, never auto-created over HTTP.
+    return LegalFourEyesWorkflow(database_url=get_database_url())
 
 
 def require_reviewer(request: Request) -> tuple[str, str]:
@@ -90,3 +96,41 @@ def append_review_event(
     if not found:
         raise HTTPException(status_code=404, detail="Review packet not found.")
     return {"status": "recorded", "packet_id": str(packet_id)}
+
+
+class FourEyesVerificationRequest(BaseModel):
+    dossier_id: str = Field(min_length=1, max_length=255)
+    note: str = Field(min_length=1, max_length=4000)
+
+
+class FourEyesVerificationResponse(BaseModel):
+    state: str
+    reviewer_count: int
+    publishable: bool
+
+
+@router.post("/{packet_id}/verify", response_model=FourEyesVerificationResponse)
+def verify_legal_packet(
+    packet_id: UUID,
+    payload: FourEyesVerificationRequest,
+    request: Request,
+    workflow: LegalFourEyesWorkflow = Depends(get_legal_four_eyes_workflow),
+) -> FourEyesVerificationResponse:
+    """Two distinct authorized people may review; NEVER approve publication."""
+    tenant_id, actor_id = require_reviewer(request)
+    try:
+        result = workflow.verify(
+            packet_id=packet_id, tenant_id=tenant_id,
+            dossier_id=payload.dossier_id, actor_id=actor_id, note=payload.note,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Legal review not permitted.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Invalid review input.") from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Review packet not found.")
+    return FourEyesVerificationResponse(
+        state=result.state,
+        reviewer_count=result.reviewer_count,
+        publishable=False,
+    )
