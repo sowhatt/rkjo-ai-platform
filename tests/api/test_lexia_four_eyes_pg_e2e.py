@@ -56,6 +56,23 @@ def test_four_eyes_requires_two_different_authorized_reviewers_and_never_publish
             actor_id="submitter", granted_by="admin",
         )
 
+        workflow.grant_reviewer(
+            tenant_id="cabinet-a", dossier_id="dossier-1",
+            actor_id="temporarily-authorized", granted_by="admin",
+        )
+        assert workflow.revoke_reviewer(
+            tenant_id="cabinet-a", dossier_id="dossier-1",
+            actor_id="temporarily-authorized", revoked_by="admin",
+        )
+        assert not workflow.revoke_reviewer(
+            tenant_id="cabinet-a", dossier_id="dossier-1",
+            actor_id="temporarily-authorized", revoked_by="admin",
+        )
+        with pytest.raises(PermissionError):
+            workflow.verify(packet_id=packet_id, tenant_id="cabinet-a",
+                            dossier_id="dossier-1", actor_id="temporarily-authorized",
+                            note="Revoked reviewers cannot sign")
+
         with pytest.raises(PermissionError):
             workflow.verify(packet_id=packet_id, tenant_id="cabinet-a",
                             dossier_id="dossier-1", actor_id="submitter", note="My own")
