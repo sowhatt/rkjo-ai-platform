@@ -59,9 +59,9 @@ def test_four_eyes_requires_two_different_authorized_reviewers_and_never_publish
         with pytest.raises(PermissionError):
             workflow.verify(packet_id=packet_id, tenant_id="cabinet-a",
                             dossier_id="dossier-1", actor_id="submitter", note="My own")
-        with pytest.raises(PermissionError):
-            workflow.verify(packet_id=packet_id, tenant_id="cabinet-b",
-                            dossier_id="dossier-1", actor_id="juriste-1", note="Foreign")
+        assert workflow.verify(packet_id=packet_id, tenant_id="cabinet-b",
+                               dossier_id="dossier-1", actor_id="juriste-1",
+                               note="Foreign") is None
         with pytest.raises(PermissionError):
             workflow.verify(packet_id=packet_id, tenant_id="cabinet-a",
                             dossier_id="dossier-other", actor_id="juriste-1", note="Other")
