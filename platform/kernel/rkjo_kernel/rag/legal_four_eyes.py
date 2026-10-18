@@ -72,6 +72,24 @@ class LegalFourEyesWorkflow:
             """).format(sql.Identifier(self.grants)),
                          (tenant_id, dossier_id, actor_id, granted_by))
 
+    def revoke_reviewer(self, *, tenant_id: str, dossier_id: str,
+                        actor_id: str, revoked_by: str) -> bool:
+        """Trusted administrative revocation; effective for subsequent reviews.
+
+        Never exposed to review users through the HTTP API.
+        """
+        self._nonempty(tenant_id, dossier_id, actor_id, revoked_by)
+        if actor_id == revoked_by:
+            raise PermissionError("Self-revocation prohibited")
+        with psycopg.connect(self.url) as conn:
+            row = conn.execute(sql.SQL("""
+                DELETE FROM {}
+                WHERE tenant_id = %s AND dossier_id = %s AND actor_id = %s
+                RETURNING actor_id
+            """).format(sql.Identifier(self.grants)),
+                (tenant_id, dossier_id, actor_id)).fetchone()
+        return row is not None
+
     def verify(
         self, *, packet_id: UUID, tenant_id: str, dossier_id: str,
         actor_id: str, note: str,
