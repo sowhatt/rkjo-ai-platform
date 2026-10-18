@@ -866,3 +866,65 @@ def rag_answer(
             for source in result.sources
         ],
     )
+
+
+@router.post(
+    "/lexia/search",
+    response_model=SemanticSearchApiResponse,
+)
+def lexia_tenant_search(
+    request: SemanticSearchRequest,
+    http_request: Request,
+    service: SemanticSearchService = Depends(
+        get_rag_search_service
+    ),
+) -> SemanticSearchApiResponse:
+    """Strict tenant-scoped legal search; rejects unbound credentials.
+
+    Generic /rag/search remains backward compatible for existing RKJO users.
+    LexIA must use this endpoint for private notarial data.
+    """
+    identity = get_authenticated_identity(http_request)
+    tenant_id = identity.tenant_id
+    if not isinstance(tenant_id, str) or not tenant_id.strip():
+        raise HTTPException(
+            status_code=403,
+            detail="A tenant-bound RKJO identity is required for LexIA.",
+        )
+    filters = (
+        request.filters.to_retrieval_filters()
+        if request.filters is not None
+        else None
+    )
+    filters = bind_identity_tenant(identity=identity, filters=filters)
+    try:
+        result = service.search(
+            request.query,
+            limit=request.limit,
+            filters=filters,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # Defense in depth: never send unscoped or foreign chunks to a cabinet.
+    for item in result.results:
+        if item.metadata.get("tenant_id") != tenant_id:
+            raise HTTPException(
+                status_code=502,
+                detail="RKJO retrieval returned unscoped or foreign results.",
+            )
+
+    return SemanticSearchApiResponse(
+        sanitized_query=result.sanitized_query,
+        result_count=result.result_count,
+        results=[
+            SemanticSearchItemResponse(
+                chunk_id=item.chunk_id,
+                document_id=item.document_id,
+                content=item.content,
+                score=item.score,
+                metadata=item.metadata,
+            )
+            for item in result.results
+        ],
+    )
