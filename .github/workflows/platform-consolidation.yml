@@ -70,3 +70,4 @@ jobs:
       - run: npm run lint -- --max-warnings=0
       - run: npm audit --audit-level=moderate
       - run: npm run build
+      - run: node tests/proxy-security.mjs
