@@ -24,6 +24,7 @@ def api_process(database_url, secret):
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     env = {**os.environ, 'RKJO_DATABASE_URL': database_url, 'RKJO_JWT_SECRET': secret,
+           'RKJO_API_KEY': secrets.token_hex(32),
            'PYTHONPATH': os.pathsep.join(str(ROOT / p) for p in
                ['platform/api', 'platform/kernel', 'platform/worker', 'domains/education', '.'])}
     process = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'rkjo_api.main:app',
