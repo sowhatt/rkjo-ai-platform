@@ -123,9 +123,14 @@ class AsyncWorkflowDispatcher:
         structured_log(
             self.logger,
             event="workflow.dispatched",
+            trace_id=message.metadata.get("trace_id"),
+            mission_id=message.metadata.get("mission_id"),
             execution_id=execution_id,
             step_id=step.step_id,
             agent_name=message.target,
+            capability_name=message.metadata.get(
+                "capability_name"
+            ),
             queue_name=prepared_queue,
             message_id=message.message_id,
             correlation_id=message.correlation_id,

@@ -8,6 +8,10 @@ from rkjo_kernel.workflow.models.workflow_execution import WorkflowExecution
 class WorkflowRepository(Protocol):
     """Persistence contract for workflow executions."""
 
+    def create(self, execution: WorkflowExecution) -> None:
+        """Insert once; raise ValueError if the execution ID already exists."""
+        ...
+
     def save(self, execution: WorkflowExecution) -> None:
         ...
 

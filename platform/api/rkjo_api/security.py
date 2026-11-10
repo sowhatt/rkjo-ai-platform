@@ -30,6 +30,8 @@ PROTECTED_PATH_PREFIXES = (
     "/metrics",
     "/rag",
     "/education",
+    "/omnichannel",
+    "/internal/omnichannel",
 )
 
 
@@ -222,6 +224,9 @@ def required_role_for_request(
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
 
+    if path.startswith("/education/courses/") and path.endswith("/learner-answer") and normalized_method == "POST":
+        return ApiRole.VIEWER
+
     if path.startswith(
         "/education"
     ):
@@ -237,6 +242,13 @@ def required_role_for_request(
 
         if normalized_method == "DELETE":
             return ApiRole.ADMIN
+
+    if path.startswith("/omnichannel"):
+        if normalized_method == "GET":
+            return ApiRole.VIEWER
+        if normalized_method == "POST" and path.endswith("/acknowledge"):
+            return ApiRole.OPERATOR
+        return ApiRole.ADMIN
 
     # Protected resources default to
     # the safest privilege.

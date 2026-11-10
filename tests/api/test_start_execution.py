@@ -181,6 +181,7 @@ def create_execution(
     return engine.create_execution(
         definition,
         execution_id="start-api-001",
+        metadata={"tenant_id": "tenant-a"},
     )
 
 

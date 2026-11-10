@@ -93,7 +93,8 @@ def test_create_execution(
     }
 
     assert stored.metadata == {
-        "product": "ADIP"
+        "product": "ADIP",
+        "tenant_id": "tenant-a",
     }
 
 

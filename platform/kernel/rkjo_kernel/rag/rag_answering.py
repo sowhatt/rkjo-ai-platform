@@ -133,6 +133,13 @@ class RAGAnsweringService:
                 document_id=result.document_id,
                 chunk_id=result.chunk_id,
                 score=result.score,
+                page_number=(
+                    result.metadata.get('page_number')
+                    if isinstance(result.metadata.get('page_number'), int)
+                    and not isinstance(result.metadata.get('page_number'), bool)
+                    and result.metadata.get('page_number') > 0
+                    else None
+                ),
             )
             for index, result in enumerate(
                 context.results,

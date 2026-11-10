@@ -9,6 +9,7 @@ import pytest
 
 from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
+from rkjo_kernel.mission import ExecutionContext
 from rkjo_kernel.registry.descriptor import (
     AgentDescriptor,
     AgentStatus,
@@ -71,8 +72,6 @@ class RetryThenSuccessAgent(BaseAgent):
             "attempt": attempt,
         }
 
-        # Stop consumer from the thread that owns
-        # the BlockingConnection once retry succeeds.
         self.event_bus.channel.stop_consuming()
 
         return result
@@ -199,6 +198,13 @@ def test_retry_then_success_end_to_end(
         execution_id="retry-e2e-001",
     )
 
+    execution.bind_execution_context(
+        ExecutionContext(
+            mission_id="mission-e2e-retry",
+            trace_id="trace-e2e-retry",
+        )
+    )
+
     engine.start(execution)
 
     step = engine.start_next_step(
@@ -310,6 +316,16 @@ def test_retry_then_success_end_to_end(
             "temperature": 31,
             "attempt": 2,
         }
+
+        assert result_message.metadata["mission_id"] == (
+            "mission-e2e-retry"
+        )
+        assert result_message.metadata["trace_id"] == (
+            "trace-e2e-retry"
+        )
+        assert result_message.metadata[
+            "workflow_execution_id"
+        ] == execution.execution_id
 
         restored = repository.get(
             execution.execution_id

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from rkjo_kernel.mission.execution_context import ExecutionContext
 from rkjo_kernel.workflow.exceptions import (
     InvalidWorkflowTransitionError,
 )
@@ -66,6 +67,39 @@ class WorkflowExecution:
         return self.definition.get_step(
             self.current_step_id
         )
+
+    def bind_execution_context(
+        self,
+        execution_context: ExecutionContext,
+    ) -> ExecutionContext:
+        """Bind mission/trace context to this workflow execution.
+
+        The workflow owns business data in ``WorkflowContext`` while the
+        transverse ``ExecutionContext`` carries correlation/governance data.
+        Binding once here makes every asynchronous step inherit the same
+        mission and trace identifiers because AsyncWorkflowDispatcher already
+        forwards ``WorkflowContext.metadata`` into AgentMessage.metadata.
+        """
+        workflow_context = execution_context
+
+        if execution_context.workflow_execution_id is None:
+            workflow_context = execution_context.for_workflow(
+                self.execution_id
+            )
+        elif (
+            execution_context.workflow_execution_id
+            != self.execution_id
+        ):
+            raise ValueError(
+                "ExecutionContext workflow_execution_id does not match "
+                f"WorkflowExecution '{self.execution_id}'."
+            )
+
+        metadata = workflow_context.as_metadata()
+        self.metadata.update(metadata)
+        self.context.metadata.update(metadata)
+
+        return workflow_context
 
     def start(self) -> None:
         """Start a pending workflow execution."""

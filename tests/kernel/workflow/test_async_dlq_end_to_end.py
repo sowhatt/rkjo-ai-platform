@@ -8,6 +8,7 @@ import pytest
 
 from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
+from rkjo_kernel.mission import ExecutionContext
 from rkjo_kernel.registry.descriptor import (
     AgentDescriptor,
     AgentStatus,
@@ -199,6 +200,13 @@ def test_retry_exhaustion_moves_message_to_dlq_and_fails_workflow(
         execution_id="dlq-e2e-001",
     )
 
+    execution.bind_execution_context(
+        ExecutionContext(
+            mission_id="mission-e2e-dlq",
+            trace_id="trace-e2e-dlq",
+        )
+    )
+
     engine.start(execution)
 
     step = engine.start_next_step(
@@ -282,9 +290,6 @@ def test_retry_exhaustion_moves_message_to_dlq_and_fails_workflow(
         timeout=5
     )
 
-    # runtime continues listening after terminal failure,
-    # so stop it safely from its own connection thread context
-    # by scheduling stop_consuming on the connection.
     if agent_bus.connection.is_open:
         agent_bus.connection.add_callback_threadsafe(
             agent_bus.channel.stop_consuming
@@ -311,6 +316,13 @@ def test_retry_exhaustion_moves_message_to_dlq_and_fails_workflow(
         assert (
             failure_result.payload["error"]
             == "provider timeout"
+        )
+
+        assert failure_result.metadata["mission_id"] == (
+            "mission-e2e-dlq"
+        )
+        assert failure_result.metadata["trace_id"] == (
+            "trace-e2e-dlq"
         )
 
         restored = repository.get(
@@ -348,6 +360,16 @@ def test_retry_exhaustion_moves_message_to_dlq_and_fails_workflow(
         assert dead_letter.metadata[
             "attempt"
         ] == 3
+
+        assert dead_letter.metadata["mission_id"] == (
+            "mission-e2e-dlq"
+        )
+        assert dead_letter.metadata["trace_id"] == (
+            "trace-e2e-dlq"
+        )
+        assert dead_letter.metadata[
+            "workflow_execution_id"
+        ] == execution.execution_id
 
     finally:
         if result_bus.connection.is_open:

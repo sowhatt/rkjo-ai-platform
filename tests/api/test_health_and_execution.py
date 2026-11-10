@@ -41,6 +41,7 @@ def make_engine():
     execution = engine.create_execution(
         definition,
         execution_id="api-exec-001",
+        metadata={"tenant_id": "tenant-a"},
     )
 
     engine.start(execution)
