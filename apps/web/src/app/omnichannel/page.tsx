@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 type QueueHealth = { pending: number; failed: number; expired_leases: number };
@@ -51,8 +51,6 @@ export default function OmnichannelPage() {
   const [loading, setLoading] = useState(false);
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const tokenRef = useRef(token);
-  tokenRef.current = token;
   const [autoRefresh, setAutoRefresh] = useState(false);
 
   const load = useCallback(async (bearer: string) => {
@@ -90,8 +88,8 @@ export default function OmnichannelPage() {
   useEffect(() => {
     if (!autoRefresh || !token) return;
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible" && tokenRef.current) {
-        void load(tokenRef.current);
+      if (document.visibilityState === "visible" && token) {
+        void load(token);
       }
     }, 30000);
     return () => clearInterval(interval);
@@ -153,7 +151,7 @@ export default function OmnichannelPage() {
             Jeton Bearer utilisateur (tenant-bound)
           </label>
           <p className="mt-1 text-xs text-slate-500">
-            Conservé uniquement dans cette page, jamais dans localStorage, les cookies ou l'URL.
+            Conservé uniquement dans cette page, jamais dans localStorage, les cookies ou l&apos;URL.
             Utilise un jeton à durée limitée ; ne colle pas de clé API partagée.
           </p>
           <div className="mt-3 flex flex-wrap gap-3">
@@ -191,7 +189,7 @@ export default function OmnichannelPage() {
         {!dashboard && !loading &&
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
             Identifie-toi avec un jeton autorisé pour charger les données réelles du cockpit.
-            Aucun chiffre de démonstration n'est présenté comme donnée de production.
+            Aucun chiffre de démonstration n&apos;est présenté comme donnée de production.
           </div>}
 
         {dashboard && <>
@@ -267,7 +265,7 @@ export default function OmnichannelPage() {
             <div className="rounded-2xl border bg-white p-5 shadow-sm lg:col-span-3">
               <h2 className="text-xl font-bold">Incidents à traiter</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Acquittement réservé aux opérateurs. Il n'entraîne aucun renvoi de message.
+                Acquittement réservé aux opérateurs. Il n&apos;entraîne aucun renvoi de message.
               </p>
               <div className="mt-4 space-y-3">
                 {dashboard.incidents.length === 0 && <p className="text-sm text-slate-500">Aucun incident ouvert enregistré.</p>}
