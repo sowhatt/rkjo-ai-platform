@@ -1,3 +1,5 @@
+from rkjo_api.workflow_security import require_workflow_identity, bind_workflow_metadata, authorize_workflow
+from rkjo_api.identity import AuthenticatedIdentity
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import Any
@@ -303,6 +305,7 @@ def ready(
 )
 def get_execution(
     execution_id: str,
+    identity: AuthenticatedIdentity = Depends(require_workflow_identity),
     engine: WorkflowEngine = Depends(
         get_workflow_engine
     ),
@@ -316,6 +319,8 @@ def get_execution(
             status_code=404,
             detail="Workflow execution not found.",
         ) from exc
+
+    authorize_workflow(identity, execution)
 
     return WorkflowExecutionResponse(
         execution_id=execution.execution_id,
@@ -334,6 +339,7 @@ def get_execution(
 )
 def create_execution(
     request: CreateWorkflowExecutionRequest,
+    identity: AuthenticatedIdentity = Depends(require_workflow_identity),
     engine: WorkflowEngine = Depends(
         get_workflow_engine
     ),
@@ -362,7 +368,7 @@ def create_execution(
         execution = engine.create_execution(
             definition,
             input_data=request.input_data,
-            metadata=request.metadata,
+            metadata=bind_workflow_metadata(identity, request.metadata),
             execution_id=request.execution_id,
         )
 
@@ -371,6 +377,8 @@ def create_execution(
             status_code=422,
             detail=str(exc),
         ) from exc
+
+    authorize_workflow(identity, execution)
 
     return WorkflowExecutionResponse(
         execution_id=execution.execution_id,
@@ -389,6 +397,7 @@ def create_execution(
 )
 def start_execution(
     execution_id: str,
+    identity: AuthenticatedIdentity = Depends(require_workflow_identity),
     engine: WorkflowEngine = Depends(
         get_workflow_engine
     ),
@@ -408,6 +417,8 @@ def start_execution(
             status_code=404,
             detail="Workflow execution not found.",
         ) from exc
+
+    authorize_workflow(identity, execution)
 
     try:
         engine.start(execution)

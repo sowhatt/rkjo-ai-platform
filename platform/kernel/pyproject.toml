@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rkjo-kernel"
+version = "0.2.0.dev1"
+description = "RKJO agent runtime, workflow and retrieval kernel"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2,<3", "pydantic-settings>=2,<3", "pika>=1,<2", "psycopg[binary]>=3,<4", "httpx>=0.27,<1", "pgvector>=0.3,<1", "pypdf>=5", "openai>=1"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=2,<3"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rkjo_kernel*"]

@@ -28,6 +28,23 @@ class PostgreSQLTransactionalWorkflowRepository:
     ) -> None:
         self._connection = connection
 
+    def create(self, execution: WorkflowExecution) -> None:
+        """Atomic create prevents caller-selected IDs overwriting another tenant."""
+        query = """
+        INSERT INTO workflow_executions
+          (execution_id, workflow_id, status, payload, created_at, updated_at)
+        VALUES (%s, %s, %s, %s::jsonb, %s, CURRENT_TIMESTAMP)
+        ON CONFLICT (execution_id) DO NOTHING
+        RETURNING execution_id;
+        """
+        values = (execution.execution_id, execution.definition.workflow_id,
+                  execution.status.value, json.dumps(workflow_execution_to_dict(execution)),
+                  execution.created_at)
+        with self._connection.cursor() as cursor:
+            cursor.execute(query, values)
+            if cursor.fetchone() is None:
+                raise ValueError("Workflow execution already exists.")
+
     def save(
         self,
         execution: WorkflowExecution,

@@ -263,3 +263,14 @@ def test_workflow_engine_can_persist_directly_to_postgres(
         .status.value
         == "completed"
     )
+
+
+def test_create_rejects_duplicate_without_overwriting(repository):
+    from rkjo_kernel.workflow.models.workflow_execution import WorkflowExecution
+    from rkjo_kernel.workflow.models.workflow_definition import WorkflowDefinition
+    first = WorkflowExecution(definition=WorkflowDefinition(workflow_id="first", name="First", steps=[]), metadata={"tenant_id": "tenant-a"})
+    second = WorkflowExecution(definition=WorkflowDefinition(workflow_id="second", name="Second", steps=[]), execution_id=first.execution_id, metadata={"tenant_id": "tenant-b"})
+    repository.create(first)
+    with pytest.raises(ValueError, match="already exists"):
+        repository.create(second)
+    assert repository.get(first.execution_id).metadata["tenant_id"] == "tenant-a"

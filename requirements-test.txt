@@ -1,0 +1,5 @@
+-r requirements-prod.txt
+-r requirements-mcp-test.txt
+pytest
+pytest-asyncio
+pillow
