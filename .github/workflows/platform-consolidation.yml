@@ -14,12 +14,12 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_DB: rkjo
+          POSTGRES_DB: rkjo_test
           POSTGRES_USER: rkjo
           POSTGRES_PASSWORD: rkjo_password
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U rkjo -d rkjo"
+          --health-cmd "pg_isready -U rkjo -d rkjo_test"
           --health-interval 5s --health-timeout 5s --health-retries 12
       rabbitmq:
         image: rabbitmq:3-management
@@ -31,9 +31,9 @@ jobs:
           --health-cmd "rabbitmq-diagnostics -q ping"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
-      RKJO_TEST_DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo
-      RKJO_DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo
-      DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo
+      RKJO_TEST_DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo_test
+      RKJO_DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo_test
+      DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo_test
       RABBITMQ_URL: amqp://rkjo:rkjo_password@localhost:5672/
       RKJO_TEST_RABBITMQ_URL: amqp://rkjo:rkjo_password@localhost:5672/
     steps:
