@@ -10,7 +10,7 @@ from rkjo_api.jwt_auth import (
     resolve_jwt_identity,
     resolve_jwt_role,
 )
-from rkjo_api.oidc_auth import resolve_oidc_identity
+from rkjo_api.oidc_auth import resolve_oidc_identity, resolve_oidc_identity_with_tenant
 from rkjo_api.security import ApiRole
 
 
@@ -82,13 +82,7 @@ def resolve_bearer_identity_with_tenant(
         local_error = exc
 
     if oidc_is_configured():
-        subject, role = resolve_oidc_identity(
-            token
-        )
-
-        # OIDC tenant mapping will be introduced
-        # when provider claim mapping is configured.
-        return subject, role, None
+        return resolve_oidc_identity_with_tenant(token)
 
     if local_error is not None:
         raise local_error

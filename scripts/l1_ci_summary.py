@@ -24,6 +24,16 @@ EXPECTED_L1 = {
 }
 
 
+EXPECTED_L2 = {
+    "tests.l2.test_authorization.test_document_mutations_two_tenants_and_no_legacy_fallback",
+    "tests.l2.test_authorization.test_queued_work_revoked_before_worker_admission",
+    "tests.l2.test_authorization.test_authority_unavailable_refuses_http_and_worker_without_effect",
+    "tests.l2.test_authorization.test_concurrent_grants_cas_and_durable_audit_across_processes",
+    "tests.l2.test_authorization.test_audit_failure_refuses_before_operation",
+    "tests.l2.test_authorization.test_revocation_waits_for_admitted_operation_and_migration_integrity",
+    "tests.l2.test_authorization.test_real_oidc_tenant_mapping_and_foreign_expired_forged_tokens",
+}
+
 def summarize(suite, junit, lockfile):
     issues = []
     dependencies = []
@@ -57,6 +67,9 @@ def summarize(suite, junit, lockfile):
     if suite == "l1":
         if len(cases) != 8 or {c["test"] for c in cases} != EXPECTED_L1:
             issues.append("expected_eight_named_l1_tests_not_executed")
+    elif suite == "l2":
+        if len(cases) != len(EXPECTED_L2) or {c["test"] for c in cases} != EXPECTED_L2:
+            issues.append("expected_seven_named_l2_tests_not_executed")
     elif len(cases) < 1368:
         issues.append("regression_suite_smaller_than_consolidation_baseline")
     return {"suite": suite, "counts": counts, "total": len(cases),
@@ -66,7 +79,7 @@ def summarize(suite, junit, lockfile):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--suite", choices=["l1", "regression"], required=True)
+    parser.add_argument("--suite", choices=["l1", "l2", "regression"], required=True)
     parser.add_argument("--junit", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()

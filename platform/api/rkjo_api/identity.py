@@ -113,9 +113,8 @@ def bind_identity_metadata_tenant(
 
     tenant_id = identity.tenant_id
 
-    # Backward-compatible identities remain unbound.
-    if tenant_id is None:
-        return dict(metadata)
+    if not tenant_id or not tenant_id.strip():
+        raise HTTPException(status_code=403, detail="Tenant-bound identity required for document mutations.")
 
     result = dict(metadata)
 

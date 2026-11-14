@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -322,3 +324,37 @@ def resolve_oidc_identity(
         ) from exc
 
     return subject, role
+
+
+def resolve_oidc_identity_with_tenant(token: str) -> tuple[str, ApiRole, str]:
+    """Bind a verified provider claim through an explicit operator allowlist.
+
+    No tenant from a request/header, fallback default or unverified JWT is used.
+    Namespacing keeps provider subjects distinct from locally issued principals.
+    """
+    payload = decode_oidc_token(token)
+    claim_name = os.getenv("RKJO_OIDC_TENANT_CLAIM", "").strip()
+    raw_mapping = os.getenv("RKJO_OIDC_TENANT_MAP", "")
+    if not claim_name or not raw_mapping:
+        raise RuntimeError("Explicit OIDC tenant claim and mapping are required.")
+    try:
+        mapping = json.loads(raw_mapping)
+    except (ValueError, TypeError):
+        raise RuntimeError("Invalid OIDC tenant mapping configuration.") from None
+    if (not isinstance(mapping, dict) or not mapping
+            or any(not isinstance(k, str) or not k or k != k.strip()
+                   or not isinstance(v, str) or not 1 <= len(v) <= 200 or v != v.strip()
+                   for k,v in mapping.items())):
+        raise RuntimeError("Invalid OIDC tenant mapping configuration.")
+    external = payload.get(claim_name)
+    if not isinstance(external, str) or external not in mapping:
+        raise jwt.InvalidTokenError("Unrecognized OIDC tenant claim.")
+    tenant = mapping[external]
+    if claim_name != "tenant_id" and payload.get("tenant_id", tenant) != tenant:
+        raise jwt.InvalidTokenError("Conflicting OIDC tenant claims.")
+    subject = payload.get("sub")
+    if not isinstance(subject, str) or not subject or subject != subject.strip():
+        raise jwt.InvalidTokenError("Invalid OIDC subject.")
+    role = ApiRole(payload["role"])
+    issuer_namespace = hashlib.sha256(payload["iss"].encode()).hexdigest()
+    return "oidc:" + issuer_namespace + ":" + subject, role, tenant

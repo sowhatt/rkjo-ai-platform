@@ -191,7 +191,7 @@ def test_api_blocks_cross_tenant_ingestion(
     assert pipeline.calls == []
 
 
-def test_api_unbound_operator_remains_compatible(
+def test_api_unbound_operator_cannot_supply_legacy_tenant(
     client,
     monkeypatch,
 ):
@@ -223,11 +223,5 @@ def test_api_unbound_operator_remains_compatible(
     finally:
         clear_pipeline()
 
-    assert response.status_code == 201
-
-    assert (
-        pipeline.calls[0][
-            "metadata"
-        ]["tenant_id"]
-        == "legacy-tenant"
-    )
+    assert response.status_code == 403
+    assert pipeline.calls == []

@@ -645,6 +645,7 @@ async def replace_document(
     filters = bind_identity_tenant(
         identity=identity,
         filters=None,
+        require_tenant=True,
     )
 
     temporary_path = (
@@ -717,6 +718,7 @@ def delete_document(
     filters = bind_identity_tenant(
         identity=identity,
         filters=None,
+        require_tenant=True,
     )
 
     try:

@@ -1,0 +1,8 @@
+# Real IdP for L2 acceptance only. No admin endpoint is provisioned for users.
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2
+    command: ["start-dev", "--import-realm"]
+    ports: ["127.0.0.1::8080"]
+    volumes:
+      - ./tests/l2/keycloak/rkjo-l2-realm.json:/opt/keycloak/data/import/rkjo-l2-realm.json:ro

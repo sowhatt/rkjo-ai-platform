@@ -53,3 +53,14 @@ def test_summary_drops_parametrized_data_and_failure_content(tmp_path, monkeypat
     assert not result["qualified"]
     serialized = json.dumps(result)
     assert all(value not in serialized for value in ["sensitive-argument", "private-failure-detail", "private-traceback"])
+
+
+def test_l2_summary_requires_every_named_process_scenario(tmp_path,monkeypatch):
+    from scripts.l1_ci_summary import EXPECTED_L2, summarize
+    lock = tmp_path/"lock.txt"; lock.write_text("")
+    junit = tmp_path/"l2.xml"
+    cases = ''.join('<testcase classname="'+name.rsplit('.',1)[0]+'" name="'+name.rsplit('.',1)[1]+'"/>' for name in sorted(EXPECTED_L2))
+    junit.write_text('<testsuites><testsuite>'+cases+'</testsuite></testsuites>')
+    assert summarize('l2',junit,lock)['qualified']
+    junit.write_text('<testsuites><testsuite/></testsuites>')
+    assert not summarize('l2',junit,lock)['qualified']

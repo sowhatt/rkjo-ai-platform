@@ -83,6 +83,8 @@ services:
         "8000"
       ]
     environment:
+      RKJO_SECURITY_PROFILE: ${RKJO_SECURITY_PROFILE:-distributed}
+      RKJO_SECURITY_AUTHORITY_DATABASE_URL: ${RKJO_SECURITY_AUTHORITY_DATABASE_URL:-}
       APP_ENV: production
       DEBUG: "false"
       LOG_LEVEL: INFO
@@ -172,6 +174,8 @@ services:
       ]
 
     environment:
+      RKJO_SECURITY_PROFILE: ${RKJO_SECURITY_PROFILE:-distributed}
+      RKJO_SECURITY_AUTHORITY_DATABASE_URL: ${RKJO_SECURITY_AUTHORITY_DATABASE_URL:-}
       RKJO_DATABASE_URL: postgresql://rkjo:rkjo_password@postgres:5432/rkjo
       RKJO_WORKFLOW_RESULT_SECRET: ${RKJO_WORKFLOW_RESULT_SECRET:?Set a dedicated result signing key of at least 32 bytes}
       APP_ENV: production
