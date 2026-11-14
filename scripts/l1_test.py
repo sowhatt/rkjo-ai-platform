@@ -13,18 +13,37 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def dedicated_ports(output, project):
+    """Select published service ports, never Docker's first exposed port.
+
+    Compose versions can include unpublished image ports (PublishedPort=0),
+    notably RabbitMQ's Erlang/management ports, before its AMQP publisher.
+    """
+    decoded = [json.loads(line) for line in output.splitlines() if line.strip()]
+    rows = decoded[0] if len(decoded) == 1 and isinstance(decoded[0], list) else decoded
+    ports = {}
+    for row in rows:
+        assert row["Project"] == project and row["Health"] == "healthy"
+        required = {"postgres": 5432, "rabbitmq": 5672}[row["Service"]]
+        matches = [p for p in row["Publishers"]
+                   if p.get("TargetPort") == required and p.get("URL") == "127.0.0.1"
+                   and p.get("PublishedPort", 0) > 0]
+        if len(matches) != 1:
+            raise ValueError(f"Dedicated localhost publisher required for {row['Service']}:{required}")
+        ports[row["Service"]] = matches[0]["PublishedPort"]
+    if set(ports) != {"postgres", "rabbitmq"}:
+        raise ValueError("Both dedicated PostgreSQL and RabbitMQ services are required.")
+    return ports
+
+
 def environment(project):
     if (ROOT / ".env").exists():
         raise ValueError("The isolated recipe must not contain a .env file.")
     if not project.startswith("rkjo-l1-"):
         raise ValueError("A dedicated rkjo-l1-* project is mandatory.")
     command = ["docker", "compose", "-p", project, "-f", str(ROOT / "compose.l1.yml")]
-    rows = [json.loads(line) for line in subprocess.check_output(
-        command + ["ps", "--format", "json"], text=True).splitlines()]
-    ports = {}
-    for row in rows:
-        assert row["Project"] == project and row["Health"] == "healthy"
-        ports[row["Service"]] = row["Publishers"][0]["PublishedPort"]
+    ports = dedicated_ports(subprocess.check_output(
+        command + ["ps", "--format", "json"], text=True), project)
     env = {k: v for k, v in os.environ.items() if not k.startswith(
         ("RKJO_", "DATABASE", "RABBIT", "OPENAI", "PYTHONPATH"))}
     db = f"postgresql://l1:l1-test-only@127.0.0.1:{ports['postgres']}/l1_test"

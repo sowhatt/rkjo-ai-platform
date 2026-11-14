@@ -87,10 +87,14 @@ class Stack:
         self.processes[service] = subprocess.Popen(cmd, cwd=ROOT, env=self.env,
                                                   stdout=log, stderr=subprocess.STDOUT)
         self.events.append({"start": service, "pid": self.processes[service].pid, "command": cmd})
+        def service_ready(url):
+            if self.processes[service].poll() is not None:
+                raise RuntimeError(f"L1 {service} process exited before readiness; see its local log.")
+            return httpx.get(url).status_code == 200
         if service == "api":
-            wait(lambda: httpx.get(self.url + "/health").status_code == 200)
+            wait(lambda: service_ready(self.url + "/health"))
         elif service == "worker":
-            wait(lambda: httpx.get("http://127.0.0.1:" + self.env["RKJO_WORKER_HEALTH_PORT"] + "/ready").status_code == 200)
+            wait(lambda: service_ready("http://127.0.0.1:" + self.env["RKJO_WORKER_HEALTH_PORT"] + "/ready"))
 
     def stop(self, service, kill=False):
         process = self.processes.pop(service, None)
