@@ -1,10 +1,14 @@
-from rkjo_api.workflow_security import require_workflow_identity, bind_workflow_metadata, authorize_workflow
+import os
+import psycopg
+from datetime import datetime, timezone
+from rkjo_kernel.workflow.outbox import OutboxMessage
+from rkjo_api.workflow_security import require_workflow_identity, bind_workflow_metadata, authorize_workflow, authorize_workflow_start, RESERVED
 from rkjo_api.identity import AuthenticatedIdentity
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from rkjo_api.bearer_auth import (
     resolve_bearer_identity_with_tenant,
@@ -35,6 +39,7 @@ from rkjo_api.dependencies import (
     get_workflow_agent_router,
     get_workflow_engine,
     get_workflow_repository,
+    get_workflow_uow_factory,
 )
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
@@ -219,6 +224,7 @@ class HealthResponse(BaseModel):
 
 
 class WorkflowStepRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     step_id: str
     name: str
     agent_name: str | None = None
@@ -234,6 +240,7 @@ class WorkflowStepRequest(BaseModel):
 
 
 class CreateWorkflowExecutionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     workflow_id: str
     name: str
     version: str = "1.0.0"
@@ -345,6 +352,8 @@ def create_execution(
     ),
 ) -> WorkflowExecutionResponse:
     try:
+        if any((RESERVED | {"tenant_id"}).intersection(step.metadata) for step in request.steps):
+            raise HTTPException(status_code=403, detail="Step authority is server-managed.")
         definition = WorkflowDefinition(
             workflow_id=request.workflow_id,
             name=request.name,
@@ -398,52 +407,78 @@ def create_execution(
 def start_execution(
     execution_id: str,
     identity: AuthenticatedIdentity = Depends(require_workflow_identity),
-    engine: WorkflowEngine = Depends(
-        get_workflow_engine
-    ),
     dispatcher: AsyncWorkflowDispatcher = Depends(
         get_async_dispatcher
     ),
     router: WorkflowAgentRouter = Depends(
         get_workflow_agent_router
     ),
+    uow_factory=Depends(
+        get_workflow_uow_factory
+    ),
 ) -> WorkflowDispatchResponse:
+    """Atomically start a workflow and enqueue its first dispatch intent."""
     try:
-        execution = engine.load_execution(
-            execution_id
-        )
-    except KeyError as exc:
-        raise HTTPException(
-            status_code=404,
-            detail="Workflow execution not found.",
-        ) from exc
-
-    authorize_workflow(identity, execution)
-
-    try:
-        engine.start(execution)
-
-        step = engine.start_next_step(
-            execution
-        )
-
-        if step is None:
-            raise ValueError(
-                "Workflow has no executable step."
+        with uow_factory() as uow:
+            engine = WorkflowEngine(
+                repository=uow.workflows,
+                metrics=get_metrics_registry(),
             )
 
-        route = router.resolve(
-            step
-        )
+            try:
+                execution = engine.load_execution(
+                    execution_id
+                )
+            except KeyError as exc:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Workflow execution not found.",
+                ) from exc
 
-        result = dispatcher.dispatch(
-            step=step,
-            context=execution.context,
-            queue_name=route.queue_name,
-            execution_id=execution.execution_id,
-            reply_queue="rkjo.workflow.results",
-        )
+            authorize_workflow_start(identity, execution)
+            engine.start(execution)
 
+            step = engine.start_next_step(
+                execution
+            )
+
+            if step is None:
+                raise ValueError(
+                    "Workflow has no executable step."
+                )
+
+            route = router.resolve(
+                step
+            )
+
+            queue_name, message = dispatcher.prepare(
+                step=step,
+                context=execution.context,
+                queue_name=route.queue_name,
+                execution_id=execution.execution_id,
+                reply_queue=os.getenv("RKJO_WORKFLOW_RESULT_QUEUE", "rkjo.workflow.results"),
+                target_agent_name=route.agent_name,
+            )
+
+            uow.outbox.add(
+                OutboxMessage(
+                    outbox_id=message.message_id,
+                    queue_name=queue_name,
+                    message=message,
+                    created_at=datetime.now(
+                        timezone.utc
+                    ),
+                )
+            )
+
+            uow.commit()
+
+    except LookupError as exc:
+        raise HTTPException(status_code=503, detail="No available workflow agent.") from exc
+    except psycopg.Error as exc:
+        raise HTTPException(status_code=503, detail="Workflow transaction unavailable.") from exc
+    except HTTPException:
+        raise
     except (
         ValueError,
         InvalidWorkflowTransitionError,
@@ -457,10 +492,10 @@ def start_execution(
         execution_id=execution.execution_id,
         workflow_id=execution.definition.workflow_id,
         status=execution.status.value,
-        step_id=result.step_id,
-        queue_name=result.queue_name,
-        message_id=result.message_id,
-        correlation_id=result.correlation_id,
+        step_id=step.step_id,
+        queue_name=queue_name,
+        message_id=message.message_id,
+        correlation_id=message.correlation_id,
     )
 
 

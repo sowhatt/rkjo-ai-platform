@@ -147,8 +147,8 @@ class CapabilityToolExecutionAdapter(AgentExecutionAdapter):
                 "correlation_id",
             ),
             metadata={
-                **deepcopy(context.metadata),
                 **deepcopy(step.metadata),
+                **deepcopy(context.metadata),
             },
         )
 

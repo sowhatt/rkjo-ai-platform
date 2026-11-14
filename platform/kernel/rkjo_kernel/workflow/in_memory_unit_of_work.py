@@ -42,6 +42,9 @@ class InMemoryOutboxStore(OutboxStore):
     ) -> None:
         self._messages[message.outbox_id] = message
 
+    def get(self, outbox_id: str) -> OutboxMessage | None:
+        return self._messages.get(outbox_id)
+
     def pending(
         self,
         *,

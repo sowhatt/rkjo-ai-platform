@@ -6,6 +6,7 @@ from rkjo_api.dependencies import (
     get_async_dispatcher,
     get_workflow_agent_router,
     get_workflow_engine,
+    get_workflow_uow_factory,
 )
 from rkjo_api.main import app
 from rkjo_kernel.events.event_bus import EventBus
@@ -20,6 +21,7 @@ from rkjo_kernel.workflow.async_dispatch import (
     AsyncWorkflowDispatcher,
 )
 from rkjo_kernel.workflow.engine import WorkflowEngine
+from rkjo_kernel.workflow.in_memory_unit_of_work import InMemoryWorkflowUnitOfWork
 from rkjo_kernel.workflow.models.workflow_definition import (
     WorkflowDefinition,
 )
@@ -115,6 +117,11 @@ def client(
     event_bus,
     router,
 ):
+    uow = InMemoryWorkflowUnitOfWork()
+    uow.workflows = engine.repository
+    app.dependency_overrides[get_workflow_uow_factory] = lambda: lambda: uow
+    event_bus.outbox = uow.outbox
+
     def override_engine():
         return engine
 
@@ -146,6 +153,7 @@ def client(
     ) as test_client:
         yield test_client
 
+    app.dependency_overrides.pop(get_workflow_uow_factory, None)
     app.dependency_overrides.pop(
         get_workflow_engine,
         None,
@@ -181,7 +189,9 @@ def create_execution(
     return engine.create_execution(
         definition,
         execution_id="start-api-001",
-        metadata={"tenant_id": "tenant-a"},
+        metadata={"tenant_id": "tenant-a", "user_id": "test-user",
+                  "mission_id": "test-mission", "trace_id": "test-trace", "request_id": "test-request",
+                  "policy_context": {"api_role": "admin"}},
     )
 
 
@@ -222,11 +232,10 @@ def test_start_execution_dispatches_first_step(
 
     assert payload["correlation_id"]
 
-    assert len(event_bus.messages) == 1
-
-    queue_name, message = (
-        event_bus.messages[0]
-    )
+    assert event_bus.messages == []
+    pending = event_bus.outbox.pending()
+    assert len(pending) == 1
+    queue_name, message = pending[0].queue_name, pending[0].message
 
     assert queue_name == "weather.queue"
 

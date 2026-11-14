@@ -29,6 +29,10 @@ class OutboxStore(Protocol):
         """Persist one message for later publication."""
         ...
 
+    def get(self, outbox_id: str) -> OutboxMessage | None:
+        """Read a retained intent, including one already published."""
+        ...
+
     def pending(
         self,
         *,

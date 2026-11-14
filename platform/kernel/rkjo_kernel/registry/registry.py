@@ -160,11 +160,17 @@ class AgentRegistry:
         self,
         agent_name: str,
         status: AgentStatus,
+        *,
+        instance_id: str | None = None,
     ) -> AgentDescriptor:
         """
         Met à jour le statut d'un agent.
 
-        Retourne le descripteur mis à jour.
+        Lorsque instance_id est fourni, la mise à jour
+        n'est appliquée que si l'instance est toujours
+        propriétaire de l'enregistrement courant.
+
+        Retourne le descripteur courant.
         """
 
         descriptor = self.find_by_name(agent_name)
@@ -173,6 +179,13 @@ class AgentRegistry:
             raise KeyError(
                 f"Agent '{agent_name}' is not registered."
             )
+
+        if (
+            instance_id is not None
+            and descriptor.metadata.get("instance_id")
+            != instance_id
+        ):
+            return descriptor
 
         updated_descriptor = descriptor.model_copy(
             update={
