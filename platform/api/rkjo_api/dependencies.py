@@ -64,11 +64,16 @@ from rkjo_kernel.rag.semantic_search import (
     SemanticSearchService,
 )
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
-from rkjo_kernel.registry.registry import AgentRegistry
+from rkjo_kernel.registry.postgres_registry import (
+    PostgresAgentRegistry,
+)
 from rkjo_kernel.services.registry_service import RegistryService
 from rkjo_kernel.workflow.agent_routing import WorkflowAgentRouter
 from rkjo_kernel.workflow.async_dispatch import AsyncWorkflowDispatcher
 from rkjo_kernel.workflow.engine import WorkflowEngine
+from rkjo_kernel.workflow.postgres_unit_of_work import (
+    PostgreSQLWorkflowUnitOfWork,
+)
 from rkjo_kernel.workflow.repository.postgres import (
     PostgreSQLWorkflowRepository,
 )
@@ -96,6 +101,18 @@ def get_workflow_engine() -> WorkflowEngine:
     )
 
 
+def get_workflow_uow_factory():
+    """Build transactions that atomically persist workflow state and outbox."""
+    database_url = get_database_url()
+
+    def factory() -> PostgreSQLWorkflowUnitOfWork:
+        return PostgreSQLWorkflowUnitOfWork(
+            database_url
+        )
+
+    return factory
+
+
 
 def get_event_bus() -> RabbitMQEventBus:
     return RabbitMQEventBus()
@@ -103,14 +120,18 @@ def get_event_bus() -> RabbitMQEventBus:
 
 def get_async_dispatcher() -> AsyncWorkflowDispatcher:
     return AsyncWorkflowDispatcher(
-        event_bus=get_event_bus(),
+        event_bus=None,
         metrics=get_metrics_registry(),
     )
 
 
 
-def get_agent_registry() -> AgentRegistry:
-    return AgentRegistry()
+def get_agent_registry() -> PostgresAgentRegistry:
+    registry = PostgresAgentRegistry(
+        get_database_url()
+    )
+    registry.initialize_schema()
+    return registry
 
 
 def get_registry_service() -> RegistryService:

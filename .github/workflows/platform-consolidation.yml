@@ -36,6 +36,8 @@ jobs:
       DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo_test
       RABBITMQ_URL: amqp://rkjo:rkjo_password@localhost:5672/
       RKJO_TEST_RABBITMQ_URL: amqp://rkjo:rkjo_password@localhost:5672/
+      RKJO_WORKFLOW_RESULT_SECRET: ci-test-only-result-signing-key-12345678901234567890
+      L1_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,12 +49,50 @@ jobs:
       - name: Verify installed kernel outside repository
         working-directory: /tmp
         run: python -c "import rkjo_kernel.harness, rkjo_kernel.tools, rkjo_kernel.voice, rkjo_kernel.omnichannel"
-      - run: python -m pytest tests -q --junitxml=test-results.xml
+      - name: Run locked regression suite on dedicated CI services
+        run: |
+          mkdir -p .test-results
+          python -m pytest tests --ignore=tests/l1 -q --junitxml=.test-results/regression.xml > .test-results/regression.stdout 2>&1
+      - name: Verify execution and prepare publication-safe regression summary
+        if: always()
+        run: python scripts/l1_ci_summary.py --suite regression --junit .test-results/regression.xml --output .test-results/regression-summary.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: qualification-results
-          path: test-results.xml
+          name: regression-summary
+          path: .test-results/regression-summary.json
+          if-no-files-found: error
+  l1:
+    name: L1 acceptance (locked dependencies, real processes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      L1_PROJECT: rkjo-l1-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      L1_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-test-lock.txt
+      - name: Start only the dedicated L1 infrastructure
+        run: docker compose -p "$L1_PROJECT" -f compose.l1.yml up -d --wait
+      - name: Run the eight L1 acceptance tests without factory overrides
+        run: |
+          mkdir -p .test-results
+          python scripts/l1_test.py --project "$L1_PROJECT" tests/l1 -q --junitxml=.test-results/l1-acceptance.xml > .test-results/l1-acceptance.stdout 2>&1
+      - name: Require all eight named tests, zero skips, and exact locked versions
+        if: always()
+        run: python scripts/l1_ci_summary.py --suite l1 --junit .test-results/l1-acceptance.xml --output .test-results/l1-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: l1-acceptance-summary
+          path: .test-results/l1-summary.json
+          if-no-files-found: error
+      - name: Stop only the dedicated L1 project
+        if: always()
+        run: docker compose -p "$L1_PROJECT" -f compose.l1.yml down --volumes
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -20,6 +20,7 @@ _TRACE_METADATA_KEYS = (
     "user_id",
     "request_id",
     "parent_span_id",
+    "policy_context",
 )
 
 
@@ -45,9 +46,11 @@ class AgentResultPublisher:
         *,
         event_bus: EventBus,
         source: str,
+        authenticator=None,
     ) -> None:
         self.event_bus = event_bus
         self.source = source
+        self.authenticator = authenticator
 
     def publish_success(
         self,
@@ -75,6 +78,9 @@ class AgentResultPublisher:
             },
             metadata=_result_metadata(request),
         )
+
+        if self.authenticator is not None:
+            self.authenticator.sign(response)
 
         self.event_bus.publish_agent_message(
             queue_name=reply_queue,
@@ -109,6 +115,9 @@ class AgentResultPublisher:
             },
             metadata=_result_metadata(request),
         )
+
+        if self.authenticator is not None:
+            self.authenticator.sign(response)
 
         self.event_bus.publish_agent_message(
             queue_name=reply_queue,

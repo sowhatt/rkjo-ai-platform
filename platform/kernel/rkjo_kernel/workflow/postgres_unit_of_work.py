@@ -253,6 +253,16 @@ class PostgreSQLTransactionalOutboxStore:
                 ),
             )
 
+    def get(self, outbox_id: str) -> OutboxMessage | None:
+        with self._connection.cursor() as cursor:
+            cursor.execute("SELECT outbox_id, queue_name, message_payload, created_at "
+                           "FROM workflow_outbox WHERE outbox_id = %s", (outbox_id,))
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return OutboxMessage(outbox_id=row[0], queue_name=row[1],
+                             message=AgentMessage.model_validate(row[2]), created_at=row[3])
+
     def pending(
         self,
         *,

@@ -1,0 +1,30 @@
+# Dedicated acceptance infrastructure. Never reuse development/production DSNs.
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    environment:
+      POSTGRES_USER: l1
+      POSTGRES_PASSWORD: l1-test-only
+      POSTGRES_DB: l1_test
+    ports: ["127.0.0.1::5432"]
+    volumes: ["l1_pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U l1 -d l1_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  rabbitmq:
+    image: rabbitmq:3.13.7-management
+    environment:
+      RABBITMQ_DEFAULT_USER: l1
+      RABBITMQ_DEFAULT_PASS: l1-test-only
+    ports: ["127.0.0.1::5672"]
+    volumes: ["l1_mq:/var/lib/rabbitmq"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+volumes:
+  l1_pg:
+  l1_mq:

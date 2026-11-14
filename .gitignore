@@ -12,6 +12,7 @@ __pycache__/
 
 # Pytest
 .pytest_cache/
+.test-results/
 
 # macOS
 .DS_Store
