@@ -86,15 +86,13 @@ Depuis la copie isolée, sans autre campagne simultanée dans ce projet :
 
 ```bash
 docker compose -p rkjo-l1-20261114 -f compose.l1.yml up -d --wait
-/Users/rkjo/Projects/rkjo-ai-platform/.venv/bin/python scripts/l1_test.py --project rkjo-l1-20261114 tests/l1 -q --junitxml=.test-results/l1/acceptance.xml
-/Users/rkjo/Projects/rkjo-ai-platform/.venv/bin/python scripts/l1_test.py --project rkjo-l1-20261114 tests -q --junitxml=.test-results/l1/full-suite.xml
+python scripts/l1_test.py --project rkjo-l1-20261114 tests/l1 -q --junitxml=.test-results/l1/acceptance.xml
+python scripts/l1_test.py --project rkjo-l1-20261114 tests -q --junitxml=.test-results/l1/full-suite.xml
 ```
 
-Ces commandes utilisent le venv existant en lecture seule. Sur une autre machine,
-créer son propre venv et installer les versions de `environment-freeze.txt` des
-preuves, ou qualifier séparément `requirements-test-lock.txt` ; remplacer ensuite
-le chemin Python dans les deux commandes. Aucune installation de dépendances ne
-doit modifier un environnement partagé.
+Exécuter ces commandes dans un venv Python 3.12 dédié, après installation de
+`requirements-test-lock.txt`. Aucune installation ne doit modifier un environnement
+partagé. La CI vérifie chaque version verrouillée effectivement installée.
 
 Le runner lance, sans remplacer leurs factories, les commandes suivantes en
 enfants indépendants avec DSN dédiés et clés de test :
@@ -170,3 +168,23 @@ docker compose -p rkjo-l1-20261114 -f compose.l1.yml stop
 ```
 
 Cette commande conserve les volumes. Ne pas arrêter ou nettoyer d'autres projets.
+
+
+## Livraison et qualification CI de L1
+
+Le candidat local accepté est `2820c5a4a7071a6c348602f3f149aa09bbc7cd0a`.
+Les commits de livraison qui le suivent conservent cette provenance et bornent
+la PR au delta L1 vers `feat/platform-consolidation-20261109`.
+
+La CI exécute séparément les régressions (services PostgreSQL/RabbitMQ du job)
+et les huit tests L1 (projet Compose éphémère dédié). Les deux jobs installent
+le même `requirements-test-lock.txt`, inchangé. La qualification échoue si une
+version installée diffère, si un test est skipped, ou si les huit identifiants
+attendus ne figurent pas tous dans le JUnit L1. Le nombre de régressions doit au
+moins conserver les 1 368 tests du socle de consolidation historique.
+
+Seuls les résumés JSON produits par `scripts/l1_ci_summary.py` sont téléversés :
+SHA candidat/checkout, noms et statuts des tests, durées, versions et verdicts.
+Les sorties stdout, propriétés JUnit, traces d'exception, dumps SQL et archives
+locales ne sont pas publiés. Les clés codées dans le banc et Compose L1 sont des
+valeurs synthétiques de test, sans accès à un service partagé ou de production.
