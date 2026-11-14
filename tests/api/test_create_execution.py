@@ -92,10 +92,12 @@ def test_create_execution(
         "parcel_id": "P-100"
     }
 
-    assert stored.metadata == {
-        "product": "ADIP",
-        "tenant_id": "tenant-a",
-    }
+    assert stored.metadata["product"] == "ADIP"
+    assert stored.metadata["tenant_id"] == "tenant-a"
+    assert stored.metadata["user_id"].startswith("api-key:")
+    assert stored.metadata["policy_context"] == {"api_role": "admin"}
+    assert all(stored.metadata[k] for k in ("mission_id", "trace_id", "request_id"))
+    assert stored.metadata == stored.context.metadata
 
 
 def test_create_capability_routed_execution(

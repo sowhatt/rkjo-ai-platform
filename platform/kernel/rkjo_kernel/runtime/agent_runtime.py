@@ -8,7 +8,7 @@ from rkjo_kernel.logging.structured import structured_log
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 from rkjo_kernel.mission.execution_context import ExecutionContext
-from rkjo_kernel.registry.descriptor import AgentStatus
+from rkjo_kernel.registry.descriptor import AgentDescriptor, AgentStatus
 from rkjo_kernel.runtime.context_runtime import AgentContextRuntime, RuntimeContextRequest
 from rkjo_kernel.runtime.dead_letter_publisher import DeadLetterPublisher
 from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
@@ -50,6 +50,9 @@ class AgentRuntime:
         dead_letter_publisher: DeadLetterPublisher | None = None,
         metrics: MetricsRegistry | None = None,
         context_runtime: AgentContextRuntime | None = None,
+        instance_id: str | None = None,
+        descriptor: AgentDescriptor | None = None,
+        authorization=None,
     ) -> None:
         """
         Initialise le Runtime sans le démarrer.
@@ -69,6 +72,9 @@ class AgentRuntime:
         self.dead_letter_publisher = dead_letter_publisher
         self.metrics = metrics
         self.context_runtime = context_runtime
+        self.instance_id = instance_id
+        self.descriptor = descriptor
+        self.authorization = authorization
 
         self.status = RuntimeStatus.CREATED
         self.last_error: str | None = None
@@ -111,9 +117,12 @@ class AgentRuntime:
         self.last_error = None
 
         try:
+            if self.descriptor is not None:
+                self.registry_service.register_agent(self.descriptor)
             self.registry_service.update_agent_status(
                 agent_name=self.agent.agent_name,
                 status=AgentStatus.AVAILABLE,
+                instance_id=self.instance_id,
             )
 
             self.status = RuntimeStatus.RUNNING
@@ -183,6 +192,11 @@ class AgentRuntime:
         Message lifecycle, metrics and registry status changes remain
         centralized in the internal runtime pipeline.
         """
+        if self.authorization is not None:
+            with self.authorization.admit(message, self.agent.agent_name) as admitted:
+                if not admitted:
+                    return None
+                return self._handle_message(message)
         return self._handle_message(message)
 
     def _consume_message(
@@ -322,11 +336,14 @@ class AgentRuntime:
         self.registry_service.update_agent_status(
             agent_name=self.agent.agent_name,
             status=AgentStatus.BUSY,
+            instance_id=self.instance_id,
         )
 
+        result_ready = False
         try:
             self._prepare_context(message)
             result = self.agent._handle_message(message)
+            result_ready = True
 
             self.total_runtime_messages += 1
             self._increment_metric(
@@ -430,6 +447,7 @@ class AgentRuntime:
             if (
                 self.result_publisher is not None
                 and not should_retry
+                and not result_ready
             ):
                 self.result_publisher.publish_failure(
                     request=message,
@@ -465,6 +483,7 @@ class AgentRuntime:
                 self.registry_service.update_agent_status(
                     agent_name=self.agent.agent_name,
                     status=AgentStatus.AVAILABLE,
+                    instance_id=self.instance_id,
                 )
 
     def _prepare_context(self, message: AgentMessage) -> None:
@@ -523,6 +542,7 @@ class AgentRuntime:
             self.registry_service.update_agent_status(
                 agent_name=self.agent.agent_name,
                 status=AgentStatus.ERROR,
+                instance_id=self.instance_id,
             )
         except KeyError:
             self.logger.warning(
@@ -539,6 +559,7 @@ class AgentRuntime:
             self.registry_service.update_agent_status(
                 agent_name=self.agent.agent_name,
                 status=AgentStatus.STOPPED,
+                instance_id=self.instance_id,
             )
         except KeyError:
             self.logger.warning(

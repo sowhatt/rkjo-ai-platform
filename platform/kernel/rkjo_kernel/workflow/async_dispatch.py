@@ -31,7 +31,7 @@ class AsyncWorkflowDispatcher:
     def __init__(
         self,
         *,
-        event_bus: EventBus,
+        event_bus: EventBus | None,
         source: str = "rkjo.workflow",
         metrics: MetricsRegistry | None = None,
     ) -> None:
@@ -110,6 +110,8 @@ class AsyncWorkflowDispatcher:
             target_agent_name=target_agent_name,
         )
 
+        if self.event_bus is None:
+            raise RuntimeError("This dispatcher only prepares durable intents.")
         self.event_bus.publish_agent_message(
             queue_name=prepared_queue,
             message=message,

@@ -11,49 +11,20 @@ from rkjo_worker.workflow_result_consumer import (
 )
 
 
-def test_result_consumer_bootstraps_routable_worker(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv(
-        "RKJO_WORKER_AGENT_NAME",
-        "rkjo.result.worker",
-    )
-    monkeypatch.setenv(
-        "RKJO_WORKER_QUEUE",
-        "rkjo.result.queue",
-    )
-    monkeypatch.setenv(
-        "RKJO_WORKER_CAPABILITY",
-        "platform_task",
-    )
-    monkeypatch.setenv(
-        "RKJO_WORKFLOW_RESULT_QUEUE",
-        "rkjo.workflow.results.test",
-    )
-
-    event_bus = Mock(
-        spec=EventBus
-    )
-
-    result_queue, handler = build_result_handler(
-        event_bus=event_bus,
-    )
-
-    descriptor = (
-        handler.router.registry_service.get_agent(
-            "rkjo.result.worker"
-        )
-    )
-
-    assert result_queue == (
-        "rkjo.workflow.results.test"
-    )
-    assert descriptor is not None
-    assert descriptor.status == AgentStatus.AVAILABLE
-    assert descriptor.queue_name == "rkjo.result.queue"
-    assert descriptor.has_capability(
-        "platform_task"
-    )
+def test_result_consumer_uses_shared_registry_without_inventing_workers(monkeypatch):
+    from rkjo_kernel.registry.postgres_registry import PostgresAgentRegistry
+    from rkjo_kernel.registry.descriptor import AgentDescriptor
+    monkeypatch.setenv("RKJO_WORKFLOW_RESULT_SECRET", "test-only-result-secret-long-enough-123456")
+    registry = PostgresAgentRegistry(__import__('os').environ['RKJO_TEST_DATABASE_URL'])
+    registry.initialize_schema()
+    name = "rkjo.result.worker"
+    registry.register(AgentDescriptor(name=name, display_name="Test", product="RKJO",
+                                     queue_name="test.queue", status=AgentStatus.STOPPED))
+    _, handler = build_result_handler(event_bus=Mock(spec=EventBus))
+    descriptor = handler.router.registry_service.get_agent(name)
+    assert descriptor.status == AgentStatus.STOPPED
+    assert handler.authorization is not None
+    registry.unregister(name)
 
 
 def test_consumer_rebuilds_bus_and_handler_after_failure() -> None:

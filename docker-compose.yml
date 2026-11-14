@@ -172,6 +172,8 @@ services:
       ]
 
     environment:
+      RKJO_DATABASE_URL: postgresql://rkjo:rkjo_password@postgres:5432/rkjo
+      RKJO_WORKFLOW_RESULT_SECRET: ${RKJO_WORKFLOW_RESULT_SECRET:?Set a dedicated result signing key of at least 32 bytes}
       APP_ENV: production
       DEBUG: "false"
       LOG_LEVEL: INFO
@@ -213,6 +215,33 @@ services:
 
     restart: unless-stopped
 
+
+  workflow-results:
+    build: .
+    command: ["python", "-m", "rkjo_worker.workflow_result_consumer"]
+    environment:
+      RKJO_DATABASE_URL: postgresql://rkjo:rkjo_password@postgres:5432/rkjo
+      RABBITMQ_URL: amqp://rkjo:rkjo_password@rabbitmq:5672/
+      RKJO_WORKFLOW_RESULT_SECRET: ${RKJO_WORKFLOW_RESULT_SECRET:?Set a dedicated result signing key of at least 32 bytes}
+    depends_on:
+      workflow-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  workflow-outbox:
+    build: .
+    command: ["python", "-m", "rkjo_worker.outbox_worker"]
+    environment:
+      RKJO_DATABASE_URL: postgresql://rkjo:rkjo_password@postgres:5432/rkjo
+      RABBITMQ_URL: amqp://rkjo:rkjo_password@rabbitmq:5672/
+    depends_on:
+      workflow-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   rabbitmq_data:

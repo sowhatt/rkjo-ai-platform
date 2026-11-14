@@ -186,9 +186,10 @@ class RabbitMQEventBus(EventBus):
                 message = AgentMessage.model_validate_json(body)
 
                 self.logger.info(
-                    "AgentMessage '%s' received from queue '%s'.",
+                    "AgentMessage '%s' received from queue '%s' (redelivered=%s).",
                     message.message_id,
                     queue_name,
+                    getattr(method, "redelivered", False),
                 )
 
                 callback(message)

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from rkjo_api.main import app
-from rkjo_api.dependencies import get_workflow_engine, get_async_dispatcher, get_workflow_agent_router
+from rkjo_api.dependencies import get_workflow_engine, get_async_dispatcher, get_workflow_agent_router, get_workflow_uow_factory
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.repository.memory import InMemoryWorkflowRepository
 
@@ -14,10 +14,14 @@ HEADERS = {"X-API-Key": "rkjo-test-api-key"}
 def setup():
     repository = InMemoryWorkflowRepository()
     engine = WorkflowEngine(repository=repository)
+    from rkjo_kernel.workflow.in_memory_unit_of_work import InMemoryWorkflowUnitOfWork
+    uow = InMemoryWorkflowUnitOfWork()
+    uow.workflows = repository
     class NeverDispatch:
         def dispatch(self, **kwargs):
             pytest.fail("Unauthorized request reached dispatcher")
     overrides = dict(app.dependency_overrides)
+    app.dependency_overrides[get_workflow_uow_factory] = lambda: lambda: uow
     app.dependency_overrides[get_workflow_engine] = lambda: engine
     app.dependency_overrides[get_async_dispatcher] = NeverDispatch
     app.dependency_overrides[get_workflow_agent_router] = lambda: None
