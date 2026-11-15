@@ -1,15 +1,16 @@
 """Workflow admission against server-owned state and durable dispatch intents.
 
 Adapted from S1 WorkflowAuthorization: retain consolidation's dual metadata,
-capability routing and canonical result queue. Dynamic grant revocation is a
-separate concern. SQL and the result-signing key belong to trusted services.
+capability routing and canonical result queue. L2 optionally adds the explicitly
+configured persistent grant authority to admission. SQL and the result-signing key belong to trusted services.
 """
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import hashlib
 import hmac
 import json
 import os
 
+from rkjo_kernel.security.authority import user_claim, api_claim
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.runtime.result_publisher import _result_metadata
 
@@ -46,10 +47,11 @@ class ResultAuthenticator:
 
 
 class WorkflowAuthorization:
-    def __init__(self, *, uow_factory, reply_queue, authenticator=None):
+    def __init__(self, *, uow_factory, reply_queue, authenticator=None, authority=None):
         self.uow_factory = uow_factory
         self.reply_queue = reply_queue
         self.authenticator = authenticator
+        self.authority = authority
 
     @staticmethod
     def _owned(execution):
@@ -85,7 +87,9 @@ class WorkflowAuthorization:
     def admit(self, message, agent_name):
         # The row lock serializes admission with workflow transitions. No
         # untrusted fields are applied to persisted ownership or agent context.
-        with self.uow_factory() as uow:
+        # Same lock order as HTTP: authority, then workflow. Revocation waits
+        # for admitted operations, and queued tasks recheck without a cache.
+        with (self.authority.operation() if self.authority else nullcontext()), self.uow_factory() as uow:
             execution = uow.workflows.get(message.metadata.get("workflow_execution_id"))
             request, step = self._request(uow, execution, message.message_id)
             if message != request or message.target != agent_name:
@@ -98,6 +102,10 @@ class WorkflowAuthorization:
                                            "variables": execution.context.variables,
                                            "outputs": execution.context.outputs}):
                 raise WorkflowAdmissionDenied("Workflow step unavailable.")
+            if self.authority is not None:
+                meta = self._owned(execution)
+                self.authority.check(user_claim(meta["tenant_id"], meta["user_id"]))
+                self.authority.check(api_claim(meta["tenant_id"], meta["user_id"], meta["policy_context"]["api_role"]))
             yield True
 
     def authorize_result(self, uow, execution, message):

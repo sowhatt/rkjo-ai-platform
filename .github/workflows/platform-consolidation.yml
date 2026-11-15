@@ -48,11 +48,11 @@ jobs:
       - run: python -m pip install --no-deps ./platform/kernel
       - name: Verify installed kernel outside repository
         working-directory: /tmp
-        run: python -c "import rkjo_kernel.harness, rkjo_kernel.tools, rkjo_kernel.voice, rkjo_kernel.omnichannel"
+        run: python -c "import rkjo_kernel.harness, rkjo_kernel.tools, rkjo_kernel.voice, rkjo_kernel.omnichannel; from importlib.resources import files; assert files('rkjo_kernel.security').joinpath('migrations/001_principal_authority.sql').read_text().startswith('--')"
       - name: Run locked regression suite on dedicated CI services
         run: |
           mkdir -p .test-results
-          python -m pytest tests --ignore=tests/l1 -q --junitxml=.test-results/regression.xml > .test-results/regression.stdout 2>&1
+          python -m pytest tests --ignore=tests/l1 --ignore=tests/l2 -q --junitxml=.test-results/regression.xml > .test-results/regression.stdout 2>&1
       - name: Verify execution and prepare publication-safe regression summary
         if: always()
         run: python scripts/l1_ci_summary.py --suite regression --junit .test-results/regression.xml --output .test-results/regression-summary.json
@@ -93,6 +93,42 @@ jobs:
       - name: Stop only the dedicated L1 project
         if: always()
         run: docker compose -p "$L1_PROJECT" -f compose.l1.yml down --volumes
+  l2:
+    name: L2 authorization (real processes and IdP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      L2_PROJECT: rkjo-l1-l2-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      L2_OIDC_PROJECT: rkjo-l2-oidc-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      L1_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-test-lock.txt
+      - name: Start only the dedicated L2 database, broker and real IdP
+        run: |
+          docker compose -p "$L2_PROJECT" -f compose.l1.yml up -d --wait
+          docker compose -p "$L2_OIDC_PROJECT" -f compose.l2-oidc.yml up -d
+      - name: Execute seven L2 scenarios with shipped factories
+        run: |
+          mkdir -p .test-results
+          python scripts/l2_test.py --project "$L2_PROJECT" --oidc-project "$L2_OIDC_PROJECT" tests/l2 -q --junitxml=.test-results/l2-acceptance.xml > .test-results/l2-acceptance.stdout 2>&1
+      - name: Require named L2 tests, zero skips and locked dependencies
+        if: always()
+        run: python scripts/l1_ci_summary.py --suite l2 --junit .test-results/l2-acceptance.xml --output .test-results/l2-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: l2-acceptance-summary
+          path: .test-results/l2-summary.json
+          if-no-files-found: error
+      - name: Stop only the dedicated L2 projects
+        if: always()
+        run: |
+          docker compose -p "$L2_OIDC_PROJECT" -f compose.l2-oidc.yml down --volumes
+          docker compose -p "$L2_PROJECT" -f compose.l1.yml down --volumes
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 15

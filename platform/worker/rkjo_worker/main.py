@@ -8,6 +8,7 @@ from threading import Event, Thread
 from typing import Any
 from uuid import uuid4
 
+from rkjo_kernel.security.configuration import authority_from_env
 from rkjo_kernel.workflow.postgres_unit_of_work import PostgreSQLWorkflowUnitOfWork
 from rkjo_kernel.workflow.security_authorization import WorkflowAuthorization, ResultAuthenticator
 from rkjo_kernel.agents.base_agent import BaseAgent
@@ -71,6 +72,7 @@ def build_runtime(
     """
 
     database_url = (os.getenv("RKJO_DATABASE_URL") or os.getenv("DATABASE_URL") or "").strip()
+    authority = authority_from_env()
     bus = event_bus or RabbitMQEventBus()
 
     registry_backend = registry
@@ -126,11 +128,12 @@ def build_runtime(
 
     authorization = None
     authenticator = None
-    if event_bus is None:
+    if event_bus is None or authority is not None:
         authenticator = ResultAuthenticator.from_env()
         authorization = WorkflowAuthorization(
             uow_factory=lambda: PostgreSQLWorkflowUnitOfWork(database_url),
             reply_queue=get_env("RKJO_WORKFLOW_RESULT_QUEUE", "rkjo.workflow.results"),
+            authority=authority,
         )
 
     result_publisher = AgentResultPublisher(

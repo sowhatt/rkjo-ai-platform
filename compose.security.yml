@@ -1,0 +1,10 @@
+# Explicit secured overlay. Does not provision grants or run a production migration.
+services:
+  api:
+    environment:
+      RKJO_SECURITY_PROFILE: distributed
+      RKJO_SECURITY_AUTHORITY_DATABASE_URL: ${RKJO_SECURITY_AUTHORITY_DATABASE_URL:?Set the dedicated security authority DSN}
+  worker:
+    environment:
+      RKJO_SECURITY_PROFILE: distributed
+      RKJO_SECURITY_AUTHORITY_DATABASE_URL: ${RKJO_SECURITY_AUTHORITY_DATABASE_URL:?Set the same security authority DSN as API}

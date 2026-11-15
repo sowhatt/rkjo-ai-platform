@@ -1,3 +1,6 @@
+import hashlib
+from rkjo_kernel.security.configuration import authority_from_env
+from rkjo_api.distributed_security import authorized_request
 import os
 import psycopg
 from datetime import datetime, timezone
@@ -61,6 +64,8 @@ app = FastAPI(
     title="RKJO AI Platform API",
     version="0.1.0",
 )
+
+app.state.security_authority = authority_from_env()
 
 
 app.include_router(
@@ -208,9 +213,17 @@ async def api_key_security(
     if tenant_id is not None:
         request.state.api_tenant_id = tenant_id
 
-    return await call_next(
-        request
-    )
+    # Deny legacy document mutations before FastAPI constructs SQL/services or
+    # persists uploads. Endpoint helpers independently enforce the same binding.
+    if (request.url.path.startswith("/rag/documents")
+            and request.method in {"POST", "PUT", "PATCH", "DELETE"}
+            and not tenant_id):
+        return JSONResponse(status_code=403, content={"detail": "Tenant-bound identity required for document mutations."})
+    principal = subject
+    if principal is None:
+        principal = "api-key:" + hashlib.sha256((provided_api_key or "").encode()).hexdigest()[:24]
+    return await authorized_request(request, call_next, tenant=tenant_id,
+                                    subject=principal, role=role.value)
 
 
 class MetricsResponse(BaseModel):
