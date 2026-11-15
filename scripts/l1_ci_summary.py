@@ -34,6 +34,11 @@ EXPECTED_L2 = {
     "tests.l2.test_authorization.test_real_oidc_tenant_mapping_and_foreign_expired_forged_tokens",
 }
 
+EXPECTED_L3 = {
+    "tests.l3.test_acceptance.test_real_corpus_memory_worker_restart_and_http_factory",
+    "tests.l3.test_acceptance.test_real_budget_exhaustion_survives_new_factory",
+}
+
 def summarize(suite, junit, lockfile):
     issues = []
     dependencies = []
@@ -70,6 +75,9 @@ def summarize(suite, junit, lockfile):
     elif suite == "l2":
         if len(cases) != len(EXPECTED_L2) or {c["test"] for c in cases} != EXPECTED_L2:
             issues.append("expected_seven_named_l2_tests_not_executed")
+    elif suite == "l3":
+        if len(cases) != len(EXPECTED_L3) or {c["test"] for c in cases} != EXPECTED_L3:
+            issues.append("expected_two_named_real_provider_l3_tests_not_executed")
     elif len(cases) < 1368:
         issues.append("regression_suite_smaller_than_consolidation_baseline")
     return {"suite": suite, "counts": counts, "total": len(cases),
@@ -79,7 +87,7 @@ def summarize(suite, junit, lockfile):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--suite", choices=["l1", "l2", "regression"], required=True)
+    parser.add_argument("--suite", choices=["l1", "l2", "l3", "regression"], required=True)
     parser.add_argument("--junit", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()

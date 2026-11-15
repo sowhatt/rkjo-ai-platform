@@ -8,6 +8,9 @@ from threading import Event, Thread
 from typing import Any
 from uuid import uuid4
 
+from rkjo_kernel.composition import build_platform_kernel, build_answering_service
+from rkjo_kernel.mission.execution_context import ExecutionContext
+from dataclasses import asdict
 from rkjo_kernel.security.configuration import authority_from_env
 from rkjo_kernel.workflow.postgres_unit_of_work import PostgreSQLWorkflowUnitOfWork
 from rkjo_kernel.workflow.security_authorization import WorkflowAuthorization, ResultAuthenticator
@@ -32,10 +35,30 @@ from rkjo_kernel.services.registry_service import RegistryService
 class PlatformWorkerAgent(BaseAgent):
     """Minimal production worker used to validate distributed runtime."""
 
+    kernel = None
+
     def process(
         self,
         message: AgentMessage,
     ) -> Any:
+        data = message.payload.get("input_data", {})
+        if data.get("operation") == "rag_answer":
+            if self.kernel is None:
+                raise RuntimeError("Durable kernel is required for governed answering.")
+            meta = message.metadata
+            context = ExecutionContext(
+                mission_id=meta["mission_id"], tenant_id=meta["tenant_id"], trace_id=meta["trace_id"],
+                workflow_execution_id=meta["workflow_execution_id"], step_id=meta["workflow_step_id"],
+                user_id=meta["user_id"], request_id=message.message_id, agent_id=self.agent_name,
+                policy_context=meta.get("policy_context", {}), budget=meta.get("budget", {}),
+            )
+            result = build_answering_service(self.kernel).answer(
+                data["question"], limit=3, execution_context=context,
+            )
+            package = meta["context_package"]
+            return {"answer": result.answer, "sources": [asdict(s) for s in result.sources],
+                    "context": {"tenant_id": package.tenant_id, "mission_id": package.mission_id,
+                                "trace_id": package.trace_id, "memory_ids": [m.memory_id for m in package.items]}}
         return {
             "processed_by": self.agent_name,
             "message_id": message.message_id,
@@ -142,7 +165,9 @@ def build_runtime(
         authenticator=authenticator,
     )
 
-    return AgentRuntime(
+    kernel = build_platform_kernel(agent_registry=registry_backend) if event_bus is None else None
+    agent.kernel = kernel
+    runtime = AgentRuntime(
         agent=agent,
         event_bus=bus,
         registry_service=registry_service,
@@ -150,7 +175,10 @@ def build_runtime(
         instance_id=instance_id,
         descriptor=descriptor,
         authorization=authorization,
+        context_runtime=kernel.context_runtime if kernel else None,
     )
+    runtime.kernel = kernel
+    return runtime
 
 
 def main() -> None:
@@ -202,6 +230,8 @@ def main() -> None:
     heartbeat_thread = Thread(target=heartbeat, daemon=True)
 
     try:
+        if runtime.kernel:
+            runtime.kernel.start()
         heartbeat_thread.start()
         health_server.start()
         runtime.start()
@@ -212,6 +242,8 @@ def main() -> None:
         heartbeat_thread.join(timeout=2)
         health_server.stop()
         runtime.event_bus.close()
+        if runtime.kernel:
+            runtime.kernel.stop()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+from urllib.parse import quote
 
 from openai import OpenAI
 
@@ -21,6 +22,7 @@ class OpenAILLMAdapter:
         *,
         api_key: str,
         default_model: str = "gpt-5-mini",
+        require_usage: bool = False,
         timeout_seconds: float = 20.0,
         max_retries: int = 2,
         client: OpenAI | None = None,
@@ -47,6 +49,8 @@ class OpenAILLMAdapter:
 
         self.default_model = default_model
 
+        self.require_usage = require_usage
+        self._owns_client = client is None
         self.client = (
             client
             or OpenAI(
@@ -55,6 +59,11 @@ class OpenAILLMAdapter:
                 max_retries=max_retries,
             )
         )
+
+    def close(self) -> None:
+        if self._owns_client:
+            self._owns_client = False
+            self.client.close()
 
     def generate(
         self,
@@ -82,9 +91,14 @@ class OpenAILLMAdapter:
             "input": conversation,
         }
 
+        if request.max_output_tokens is not None:
+            kwargs["max_output_tokens"] = request.max_output_tokens
+
         if instructions:
             kwargs["instructions"] = instructions
 
+        kwargs["extra_headers"] = {"X-RKJO-" + key.replace("_", "-"): quote(str(request.metadata[key]), safe="")
+                                   for key in ("tenant_id", "mission_id", "trace_id") if key in request.metadata}
         response = self.client.responses.create(**kwargs)
 
         latency_ms = int(
@@ -112,6 +126,8 @@ class OpenAILLMAdapter:
             else 0
         )
 
+        if self.require_usage and any(type(v) is not int or v <= 0 for v in (input_tokens, output_tokens)):
+            raise RuntimeError("OpenAI usage is missing or invalid; call remains charged.")
         return LLMResponse(
             content=content,
             provider=self.provider,

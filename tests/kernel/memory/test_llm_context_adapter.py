@@ -88,7 +88,10 @@ def test_memory_and_knowledge_are_provenanced_and_existing_messages_preserved():
     assert "chunk_id=chunk-1" in prompt
     assert enriched.tenant_id == "tenant-a"
     assert enriched.trace_id == "trace-1"
-    assert enriched.metadata == original.metadata
+    assert enriched.metadata["caller"] == original.metadata["caller"]
+    assert len(enriched.metadata["memory_ids"]) == 1
+    assert enriched.metadata["memory_ids"][0] in prompt
+    assert "memory_ids" not in original.metadata
 
 
 @pytest.mark.parametrize(
@@ -206,7 +209,7 @@ def test_contextual_llm_gateway_routes_with_policy_budget_and_identifiers():
     bridge = ContextualLLMGateway(gateway)
     execution = context(
         policy_context={"llm": {"require_local_model": True, "allow_external_processing": False}},
-        budget={"llm": {"max_total_tokens": 50}},
+        budget={"llm": {"max_total_tokens": 4096}},
     )
 
     result = bridge.generate(

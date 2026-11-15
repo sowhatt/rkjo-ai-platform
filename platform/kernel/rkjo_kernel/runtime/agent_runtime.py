@@ -496,6 +496,8 @@ class AgentRuntime:
         trace_id = message.metadata.get("trace_id")
 
         if not mission_id or not tenant_id:
+            if self.authorization is not None:
+                raise ValueError("Canonical tenant and mission required for context preparation.")
             return
 
         execution_context = ExecutionContext(
@@ -510,13 +512,16 @@ class AgentRuntime:
             request_id=message.message_id,
         )
 
-        raw_query = message.payload.get("query")
+        data = message.payload.get("input_data", message.payload)
+        raw_query = data.get("query")
         if raw_query is None:
-            raw_query = message.payload.get("question")
+            raw_query = data.get("question")
 
+        from rkjo_kernel.memory import ContextBudget
         request = RuntimeContextRequest(
-            query=str(raw_query) if raw_query is not None else None,
-            entity_id=message.metadata.get("entity_id"),
+            budget=ContextBudget(max_items=12, max_characters=5000),            query=str(raw_query) if raw_query is not None else None,
+            # Mission memory only: untrusted entity metadata is not authority.
+            entity_id=None,
         )
         package = self.context_runtime.prepare(
             execution_context=execution_context,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+from urllib.parse import quote
 from typing import Any
 
 import httpx
@@ -24,8 +25,10 @@ class OllamaLLMAdapter:
         *,
         base_url: str = "http://127.0.0.1:11434",
         default_model: str = "qwen3:8b",
+        require_usage: bool = False,
         timeout_seconds: float = 60.0,
         client: httpx.Client | None = None,
+        think: bool | None = None,
     ) -> None:
         normalized_url = base_url.strip().rstrip("/")
 
@@ -40,12 +43,20 @@ class OllamaLLMAdapter:
                 "timeout_seconds must be greater than 0."
             )
 
+        self.think = think
         self.base_url = normalized_url
         self.default_model = default_model.strip()
+        self.require_usage = require_usage
+        self._owns_client = client is None
         self.client = client or httpx.Client(
             base_url=self.base_url,
             timeout=timeout_seconds,
         )
+
+    def close(self) -> None:
+        if self._owns_client:
+            self._owns_client = False
+            self.client.close()
 
     def generate(
         self,
@@ -65,11 +76,17 @@ class OllamaLLMAdapter:
             ],
         }
 
+        if request.max_output_tokens is not None:
+            payload["options"] = {"num_predict": request.max_output_tokens, "temperature": 0}
+        if self.think is not None:
+            payload["think"] = self.think
         started = perf_counter()
 
         response = self.client.post(
             "/api/chat",
             json=payload,
+            headers={"X-RKJO-" + key.replace("_", "-"): quote(str(request.metadata[key]), safe="")
+                     for key in ("tenant_id", "mission_id", "trace_id") if key in request.metadata},
         )
         response.raise_for_status()
 
@@ -88,6 +105,9 @@ class OllamaLLMAdapter:
                 "Ollama returned empty output."
             )
 
+        if self.require_usage and any(type(body.get(k)) is not int or body[k] <= 0
+                                      for k in ("prompt_eval_count", "eval_count")):
+            raise RuntimeError("Ollama usage is missing or invalid; call remains charged.")
         return LLMResponse(
             content=content,
             provider=self.provider,

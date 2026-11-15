@@ -65,7 +65,8 @@ def build_platform_worker_descriptor(
                 name=capability_name,
                 description=(
                     "Execute a generic RKJO platform mission and "
-                    "return its processed payload."
+                    "return its processed payload; explicit input_data.operation=rag_answer "
+                    "uses the configured governed documentary answer service."
                 ),
                 input_schema={
                     "payload": "dict",
