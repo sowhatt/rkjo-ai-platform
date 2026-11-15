@@ -7,6 +7,7 @@ from threading import Thread
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from uuid import uuid4
+from datetime import datetime, timezone
 
 import httpx
 import psycopg
@@ -88,6 +89,11 @@ def test_real_corpus_memory_worker_restart_and_http_factory(real_stack):
             kernel.stop()
         s.stop('worker')
         s.start('worker')
+        registry = s.sql("SELECT status, updated_at, clock_timestamp(), payload->'metadata'->>'instance_id' FROM agent_registry WHERE name='rkjo.platform.worker'")[0]
+        observed = {'process_time':datetime.now(timezone.utc).isoformat(), 'status':registry[0],
+                    'updated_at':registry[1].isoformat(), 'sql_time':registry[2].isoformat(), 'instance_id':registry[3]}
+        (s.dir/(identifier+'-registry.json')).write_text(json.dumps(observed,indent=2))
+        assert registry[0] == 'available' and abs((datetime.now(timezone.utc)-registry[1]).total_seconds()) < 3, observed
         s.start_execution(identifier)
         wait(lambda: s.stored(identifier)['status'] in {'completed','failed'}, timeout=90)
         stored = s.stored(identifier)

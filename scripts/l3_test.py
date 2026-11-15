@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import httpx
+import psycopg
 from l1_test import ROOT, environment
 
 if __name__ == '__main__':
@@ -34,6 +35,13 @@ if __name__ == '__main__':
                RKJO_EMBEDDING_PROVIDER='deterministic', RKJO_EMBEDDING_DIMENSIONS='16',
                RKJO_RETRIEVAL_MODE='hybrid', RKJO_RERANKER='lexical',
                RKJO_RERANKING_MIN_SCORE='0.2', RKJO_RERANKING_MIN_RESULTS='0')
+    before = datetime.now(timezone.utc)
+    with psycopg.connect(env['RKJO_DATABASE_URL']) as con:
+        sql_time = con.execute('SELECT clock_timestamp()').fetchone()[0]
+    after = datetime.now(timezone.utc)
+    skew = min(abs((sql_time-before).total_seconds()), abs((sql_time-after).total_seconds()))
+    if skew > 0.5:
+        raise RuntimeError(f'Dedicated PostgreSQL/process clocks differ by {skew:.3f}s; synchronize test infrastructure before running, no retry performed.')
     tags = httpx.get(args.ollama_url + '/api/tags', timeout=5).raise_for_status().json()
     model = next((m for m in tags['models'] if m['name'] == args.model), None)
     if model is None:
@@ -43,7 +51,7 @@ if __name__ == '__main__':
     evidence = Path(env['RKJO_L1_EVIDENCE'])
     evidence.mkdir(parents=True, exist_ok=True)
     (evidence/'preflight.json').write_text(json.dumps({
-        'recorded_at':datetime.now(timezone.utc).isoformat(), 'project':args.project, 'provider':'ollama', 'model':args.model, 'digest':model['digest'],
+        'clock_skew_seconds':skew, 'recorded_at':datetime.now(timezone.utc).isoformat(), 'project':args.project, 'provider':'ollama', 'model':args.model, 'digest':model['digest'],
         'corpus_sha256':hashlib.sha256((ROOT/'tests/l3/corpus.json').read_bytes()).hexdigest(),
         'head':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
     }, indent=2))

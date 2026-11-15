@@ -114,7 +114,9 @@ docker compose -p rkjo-l1-l3-recette -f compose.l1.yml stop
 ```
 
 Le runner enlève les variables RKJO/DB/broker/OpenAI héritées, refuse `.env`, vérifie
-les ports loopback du projet dédié et le digest du modèle. Il ne copie aucun
+les ports loopback du projet dédié, un écart d’horloge PostgreSQL/processus inférieur
+à 0,5 seconde, et le digest du modèle. Un écart supérieur bloque la recette ;
+le runner ne corrige pas l’horloge et ne relance pas automatiquement. Il ne copie aucun
 mapping OIDC L2. La recette provisionne ses grants synthétiques dans sa base L3.
 La preuve du transport utilise un proxy loopback qui **transmet réellement** à
 Ollama : aucune réponse synthétisée, aucun override de gateway/factory. Les corps
