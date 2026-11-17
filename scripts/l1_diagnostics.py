@@ -66,6 +66,14 @@ def infrastructure(root, project, output):
         except Exception:
             value = {"time": timestamp(), "exception": traceback.format_exc()}
         (output/f'{name}.json').write_text(json.dumps(value,indent=2))
+    for service in ('postgres','rabbitmq'):
+        try:
+            container = subprocess.check_output(compose+['ps','-q',service],text=True,timeout=10).strip()
+            health = subprocess.check_output(['docker','inspect','--format','{{json .State.Health}}',container],text=True,timeout=10)
+            value = {'time':timestamp(),'health':json.loads(health)}
+        except Exception:
+            value = {'time':timestamp(),'exception':traceback.format_exc()}
+        (output/f'{service}-health.json').write_text(json.dumps(value,indent=2))
 
 
 def redact(text, env=None):
@@ -77,6 +85,7 @@ def redact(text, env=None):
                 'l1-only-jwt-signing-key-12345678901234567890']
     for secret in sorted(set(secrets),key=len,reverse=True):
         text = text.replace(secret,'[REDACTED]')
+    text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',text)
     text = re.sub(r'(?i)([a-z][a-z0-9+.-]*://)[^\s/\"\'<>]*@',r'\1[REDACTED]@',text)
     text = re.sub(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+','[REDACTED-JWT]',text)
     text = re.sub(r'(?i)(bearer\s+)[A-Za-z0-9._~+/-]+=*',r'\1[REDACTED]',text)

@@ -28,7 +28,7 @@ jobs:
           RABBITMQ_DEFAULT_PASS: rkjo_password
         ports: ["5672:5672", "15672:15672"]
         options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-cmd "rabbitmq-diagnostics -q check_port_listener 5672"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       RKJO_TEST_DATABASE_URL: postgresql://rkjo:rkjo_password@localhost:5432/rkjo_test

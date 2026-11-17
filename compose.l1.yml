@@ -21,7 +21,8 @@ services:
     ports: ["127.0.0.1::5672"]
     volumes: ["l1_mq:/var/lib/rabbitmq"]
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # Erlang ping can succeed before the AMQP listener exists on cold boot.
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_listener", "5672"]
       interval: 2s
       timeout: 5s
       retries: 30

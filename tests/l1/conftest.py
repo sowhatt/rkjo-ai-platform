@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+import traceback
 import pytest
 from scripts.l1_diagnostics import timestamp
 
@@ -16,6 +17,6 @@ def pytest_runtest_makereport(item, call):
     value = {'nodeid': item.nodeid, 'phase': report.when, 'outcome': report.outcome,
              'time': timestamp(), 'duration': report.duration,
              'exception_type': call.excinfo.typename if call.excinfo else None,
-             'exception': str(call.excinfo.getrepr(showlocals=False,style='long',chain=True)) if call.excinfo else None}
+             'exception': ''.join(traceback.format_exception(call.excinfo.type,call.excinfo.value,call.excinfo.tb)) if call.excinfo else None}
     filename = re.sub(r'[^a-zA-Z0-9_.-]','_',item.nodeid)+'-'+report.when+'.json'
     (directory/filename).write_text(json.dumps(value,indent=2))
