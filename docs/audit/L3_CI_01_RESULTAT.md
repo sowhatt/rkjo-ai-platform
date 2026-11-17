@@ -1,6 +1,6 @@
 # L3-CI-01 — diagnostic et qualification
 
-État : correctif en qualification. Base ce4de07cee91c92ddbf6c9a8206b5f56ec2f3891.
+État : correctif backend qualifié ; livraison bloquée par npm audit (détails ci-dessous). Base ce4de07cee91c92ddbf6c9a8206b5f56ec2f3891.
 Protocole initial commité avant exécution : d5cf335a178f46871b4b4a3ec35975ab2c3dc4fb,
 SHA-256 du protocole 8e765d1d696f4bf88e364ce7f72b4ccdf5038bf33e8b878a7018925380815660.
 
@@ -79,3 +79,55 @@ vingt exécutions : zéro détection. Aucun log brut n'est ajouté au dépôt.
 
 L3-CI-01 reste ouvert jusqu'aux contrôles complets et à la CI post-fusion verte.
 L4 n'est pas commencé.
+
+## Bilan de livraison du correctif — 17 novembre 2026
+
+**Correctif L3-CI-01 reproduit et qualifié côté backend ; livraison BLOQUÉE
+par le contrôle de sécurité web.** [PR #18](https://github.com/sowhatt/rkjo-ai-platform/pull/18)
+en brouillon, non fusionnée. Candidat d2521db0bd4dbfef7fb9fa11a42b0c0e49fe9b19,
+base de consolidation inchangée ce4de07cee91c92ddbf6c9a8206b5f56ec2f3891.
+
+[CI 44142422117](https://github.com/sowhatt/rkjo-ai-platform/actions/runs/44142422117),
+première tentative, checkout du merge synthétique
+674561df0696465ae52654643eed0ef61ba48a3d : **8 L1, 7 L2 et 1 448 régressions
+réussis, zéro échec/erreur/skip**, 55 dépendances verrouillées, packaging installé
+et importé hors dépôt réussi. Les artefacts L1 contiennent 24 rapports de phase
+réussis, un JUnit complet et 33 logs de processus expurgés ; Gitleaks zéro détection.
+La CI a passé npm ci et lint, puis s'est arrêtée sur npm audit : build/proxy non
+exécutés par cette CI. Ils ont ensuite été exécutés localement sur le même
+candidat dans un conteneur Node 24.22.3 dédié, lock inchangé : npm ci, lint,
+build et six routes Next réelles du test proxy réussis (upstream synthétique).
+
+### Prérequis externe manquant : version corrigée de picomatch
+
+L'audit web signale 14 dépendances affectées directement ou transitivement par
+[GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf), sévérité
+high. L'avis a été mis à jour le 17 novembre ; versions affectées <=4.0.7,
+aucune version corrigée déclarée. La consultation du registre npm confirme
+`latest=4.0.7` ; le lock contient 2.3.2 et 4.0.5. L'audit local indépendant du
+lock reproduit le signalement. Il ne s'agit ni d'une erreur réseau ni d'un test
+instable : aucune relance identique n'a été demandée.
+
+La suggestion npm `audit fix --force` implique un changement non compatible de
+configuration ESLint/Next et ne fournit pas une version corrigée de picomatch.
+Elle n'est pas appliquée. Aucun seuil d'audit abaissé, exclusion des devDependencies,
+suppression du contrôle ou renommage de paquet pour masquer l'avis. Remplacer
+la chaîne de lint ou maintenir un fork du parseur serait un chantier supplémentaire,
+hors correctif AMQP autorisé.
+
+Déblocage attendu : publication amont d'une version corrigée compatible, ou
+solution de dépendances explicitement validée dans un périmètre approprié ;
+actualiser seulement le lock nécessaire, conserver les tests/audit puis obtenir
+une CI complète verte avant fusion et une CI post-fusion verte. Responsable
+externe de la correction : mainteneurs picomatch ; intégration à affecter au socle.
+Le présent correctif reste prêt pour cette requalification, sans contournement.
+
+L'ancienne CI 44116538750, ses preuves et les vingt résultats avant/après sont
+conservés. La reproduction établit la cause AMQP, mais ne restaure pas l'exception
+historique perdue : cette limite demeure explicite. Aucun nouvel appel Ollama,
+aucune revendication de qualité générale RAG. Les sept clôtures fonctionnelles
+L3 restent distinctes de l'acceptation de livraison bloquée.
+
+**Pas de fusion PR #18, donc pas de CI post-fusion du correctif. L4 — outils
+sensibles et transports MCP n'est pas commencé.** Aucun autre lot, aucune fusion
+vers main ni déploiement. WIP d'origine et branche candidate préservés.
