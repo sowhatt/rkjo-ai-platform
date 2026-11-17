@@ -82,12 +82,16 @@ class LLMContextAdapter:
             if item.metadata.get("tenant_id") != context.tenant_id:
                 raise ValueError("Missing or mismatched RAG tenant provenance")
 
+        selected_memory_ids = []
         for item in package.items[: self.limits.max_memory_items]:
             entry = (
                 f"[Memory scope={item.scope.value} type={item.memory_type.value} "
                 f"id={item.memory_id}]\n{item.content}"
             )
+            before = len(lines)
             remaining = self._append(lines, entry, remaining)
+            if len(lines) > before:
+                selected_memory_ids.append(item.memory_id)
 
         for item in package.knowledge_items[: self.limits.max_knowledge_items]:
             entry = (
@@ -109,6 +113,7 @@ class LLMContextAdapter:
         return replace(
             request,
             messages=(*request.messages, LLMMessage(role="user", content=body)),
+            metadata={**request.metadata, "memory_ids": selected_memory_ids},
             tenant_id=context.tenant_id,
             trace_id=context.trace_id,
         )

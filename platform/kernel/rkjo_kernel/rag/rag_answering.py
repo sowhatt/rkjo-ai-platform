@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+from rkjo_kernel.mission.execution_context import ExecutionContext
 
 from rkjo_kernel.rag.context_builder import (
     CitationContextBuilder,
@@ -32,7 +33,10 @@ class RAGAnsweringService:
         generator: AnswerGenerator,
         context_builder: CitationContextBuilder | None = None,
         observer: RAGObserver | None = None,
+        preflight=None,
     ) -> None:
+        self.preflight = preflight
+        self.execution_context = None
         self.search_service = search_service
         self.generator = generator
         self.context_builder = (
@@ -47,11 +51,24 @@ class RAGAnsweringService:
         *,
         limit: int = 5,
         filters: RetrievalFilters | None = None,
+        execution_context: ExecutionContext | None = None,
     ) -> RAGAnswer:
+        execution_context = execution_context or self.execution_context
+        if execution_context is not None:
+            tenant = execution_context.tenant_id
+            if not tenant:
+                raise ValueError("Tenant required for governed retrieval.")
+            metadata = dict(filters.metadata) if filters else {}
+            if metadata.get("tenant_id", tenant) != tenant:
+                raise ValueError("Retrieval tenant conflicts with execution context.")
+            filters = RetrievalFilters(metadata={**metadata, "tenant_id": tenant})
         if not question.strip():
             raise ValueError(
                 "Question must not be empty."
             )
+
+        if self.preflight is not None:
+            self.preflight(execution_context)
 
         total_started = perf_counter()
 
@@ -114,9 +131,11 @@ class RAGAnsweringService:
 
         generation_started = perf_counter()
 
+        extra = {"execution_context": execution_context} if execution_context is not None else {}
         answer = self.generator.generate(
             question=search.sanitized_query,
             context=context.content,
+            **extra,
         )
 
         generation_ms = int(

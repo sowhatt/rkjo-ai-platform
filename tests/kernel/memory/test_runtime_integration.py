@@ -140,3 +140,15 @@ def test_runtime_skips_context_when_tenant_metadata_is_missing() -> None:
     result = runtime.execute(msg)
 
     assert result["has_context"] is False
+
+
+def test_secured_runtime_rejects_missing_canonical_context_before_preparation():
+    import pytest
+    runtime, _ = build_runtime()
+    runtime.authorization = object()  # only the context-boundary guard is exercised here
+    for field in ('tenant_id', 'mission_id'):
+        msg = message()
+        msg.metadata.pop(field)
+        with pytest.raises(ValueError, match='Canonical tenant and mission'):
+            runtime._prepare_context(msg)
+        assert 'context_package' not in msg.metadata

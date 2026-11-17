@@ -38,8 +38,11 @@ class LLMRequest:
     tenant_id: str | None = None
     trace_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    max_output_tokens: int | None = None
 
     def __post_init__(self) -> None:
+        if self.max_output_tokens is not None and (type(self.max_output_tokens) is not int or self.max_output_tokens <= 0):
+            raise ValueError("max_output_tokens must be a positive integer.")
         if not self.messages:
             raise ValueError(
                 "LLMRequest messages must not be empty."

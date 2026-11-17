@@ -1,0 +1,97 @@
+{
+  "schema": "rkjo-l3-public-qualification-v1",
+  "qualified_source_sha": "92e2194e3d0d1add48cf77d39c877ea45549a886",
+  "base_sha": "cf7c08dc7a824f747949496e0f5738240dabd649",
+  "recorded_at": "2026-11-15T12:59:23.842426+00:00",
+  "provider": {
+    "provider": "ollama",
+    "model": "qwen3:8b",
+    "digest": "500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41",
+    "corpus_sha256": "c902a005f5ce832fd470aca6e3f39db773877f84d69aad2dc764945b6fa84eb6",
+    "clock_skew_seconds": 0.001357
+  },
+  "recipe": {
+    "real_provider_tests": 2,
+    "passed": 2,
+    "skipped": 0,
+    "real_provider_calls": 4,
+    "factory_overrides": false,
+    "forwarding_proxy_synthesizes_answers": false
+  },
+  "regression": {
+    "source_sha": "2df5b2ec7d481ff64bca19168b06e61370d89d33",
+    "passed": 1445,
+    "skipped": 0,
+    "controlled_provider_contracts": 14
+  },
+  "l1": {
+    "passed": 8,
+    "skipped": 0
+  },
+  "locked_dependencies": 55,
+  "corpus": {
+    "thresholds": {
+      "hit_at_3": 1.0,
+      "mrr": 1.0,
+      "faithfulness": 1.0,
+      "no_answer": 1.0
+    },
+    "measured": {
+      "hit_at_3": 1.0,
+      "mrr": 1.0,
+      "faithfulness": 1.0,
+      "no_answer": 1
+    },
+    "cases": [
+      {
+        "answer": "Le code du coffre Atlas est AZUR [1].",
+        "source_ids": [
+          "atlas"
+        ],
+        "citation_errors": 0,
+        "usage": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "input_tokens": 294,
+          "output_tokens": 13,
+          "output_cap": 256,
+          "latency_ms": 5479
+        }
+      },
+      {
+        "answer": "La couleur du relais Boréal est verte [1].",
+        "source_ids": [
+          "boreal"
+        ],
+        "citation_errors": 0,
+        "usage": {
+          "provider": "ollama",
+          "model": "qwen3:8b",
+          "input_tokens": 297,
+          "output_tokens": 13,
+          "output_cap": 256,
+          "latency_ms": 970
+        }
+      },
+      {
+        "answer": "The available sources do not provide enough information to answer this question.",
+        "source_ids": [],
+        "citation_errors": 0
+      }
+    ]
+  },
+  "prior_failure": {
+    "source_sha": "2df5b2ec7d481ff64bca19168b06e61370d89d33",
+    "result": "1 failed / 1 passed; workflow start HTTP 503 after worker restart",
+    "diagnosis": "Registry/process timestamp discrepancy about 292s, compatible with transient infrastructure clock skew. Initial registry before dispatch missing; causal attribution unconfirmed.",
+    "action": "First failure preserved privately; no runtime or lease modification. Explicit clock preflight and registry capture, then one qualified execution.",
+    "raw_logs_published": false
+  },
+  "limits": [
+    "Tiny fixed neutral corpus; lexical fact/citation check, not a general hallucination benchmark.",
+    "Real Ollama is local acceptance only; CI runs contracts plus L1/L2/regressions, not these two real-model tests.",
+    "OpenAI contract only; no actual remote call.",
+    "Token admission reservation is not exact tokenization or monetary pricing; max_cost refused.",
+    "No production mapping, deployment or new-lot merge."
+  ]
+}
