@@ -61,5 +61,21 @@ le script refuse tout réemploi de répertoire/projet. Il conserve les dix résu
 et arrête seulement ses projets dédiés, sans supprimer leurs volumes. Les
 commandes de qualification complète sont celles du workflow de consolidation.
 
+## Qualification ciblée après correction
+
+Campagne corrigée au SHA cfa13a0, exactement dix démarrages à froid : **10/10
+réussis, zéro erreur/échec/skip**, setup/call/teardown tous réussis. Les volumes
+et preuves de la campagne initiale restent conservés. Les captures Docker du
+nouveau healthcheck montrent son refus pendant le démarrage puis l'ouverture
+effective du listener avant admission. Ce résultat qualifie le protocole annoncé,
+sans garantie universelle de stabilité ni attribution certaine de l'ancienne CI.
+Les détails des vingt exécutions sont dans `L3_CI_01_EVIDENCE.json` ; le manifeste
+privé donne les SHA-256 de chaque fichier brut conservé sous `.test-results/`.
+
+Collecte/expurgation et résumé CI : huit tests ciblés réussis sans skip, dont
+injection contrôlée de setup/call/teardown dans un sous-pytest pour vérifier la
+conservation des exceptions complètes. Gitleaks sur les copies publiables des
+vingt exécutions : zéro détection. Aucun log brut n'est ajouté au dépôt.
+
 L3-CI-01 reste ouvert jusqu'aux contrôles complets et à la CI post-fusion verte.
 L4 n'est pas commencé.

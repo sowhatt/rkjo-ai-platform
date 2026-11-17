@@ -1,0 +1,725 @@
+{
+  "schema": "rkjo-l3-ci-01-v1",
+  "original_ci": 44116538750,
+  "original_ci_retried": false,
+  "original_exception_available": false,
+  "campaigns": {
+    "initial": {
+      "repetitions": 10,
+      "protocol_sha256": "8e765d1d696f4bf88e364ce7f72b4ccdf5038bf33e8b878a7018925380815660",
+      "source_sha": "d5cf335a178f46871b4b4a3ec35975ab2c3dc4fb",
+      "lock": {
+        "annotated-doc": "0.0.5",
+        "annotated-types": "0.8.0",
+        "anyio": "4.16.0",
+        "attrs": "26.1.0",
+        "certifi": "2026.10.23",
+        "cffi": "2.1.1",
+        "click": "8.5.1",
+        "cryptography": "50.0.2",
+        "fastapi": "0.162.2",
+        "h11": "0.16.0",
+        "httpcore": "1.0.9",
+        "httpcore2": "2.16.0",
+        "httptools": "0.9.0",
+        "httpx": "0.28.1",
+        "httpx2": "2.16.0",
+        "idna": "3.20",
+        "iniconfig": "2.3.1",
+        "jiter": "0.19.0",
+        "jsonschema": "4.26.0",
+        "jsonschema-specifications": "2025.9.1",
+        "mcp": "2.3.0",
+        "mcp-types": "2.3.0",
+        "openai": "3.48.0",
+        "opentelemetry-api": "1.45.2",
+        "packaging": "26.3",
+        "pgvector": "0.5.1",
+        "pika": "1.4.4",
+        "pillow": "13.0.0",
+        "pluggy": "1.7.0",
+        "psycopg": "3.3.8",
+        "psycopg-binary": "3.3.8",
+        "pycparser": "3.12",
+        "pydantic": "2.14.3",
+        "pydantic-settings": "2.16.2",
+        "pydantic_core": "2.50.4",
+        "Pygments": "2.21.0",
+        "PyJWT": "2.15.1",
+        "pypdf": "7.0.0",
+        "pytest": "9.2.0",
+        "pytest-asyncio": "1.4.1.post1",
+        "python-dotenv": "1.2.4",
+        "python-multipart": "0.0.33",
+        "PyYAML": "6.0.3",
+        "referencing": "0.37.0",
+        "rpds-py": "2026.9.1",
+        "sniffio": "1.3.1",
+        "sse-starlette": "3.7.0",
+        "starlette": "1.10.0",
+        "truststore": "0.10.5",
+        "typing-inspection": "0.4.5",
+        "typing_extensions": "4.16.0",
+        "uvicorn": "0.54.0",
+        "uvloop": "0.23.0",
+        "watchfiles": "1.3.0",
+        "websockets": "17.4"
+      },
+      "results": [
+        {
+          "index": 1,
+          "project": "rkjo-l1-l3ci-20261117a-initial-01",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "project": "rkjo-l1-l3ci-20261117a-initial-02",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 3,
+          "project": "rkjo-l1-l3ci-20261117a-initial-03",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 4,
+          "project": "rkjo-l1-l3ci-20261117a-initial-04",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 5,
+          "project": "rkjo-l1-l3ci-20261117a-initial-05",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 6,
+          "project": "rkjo-l1-l3ci-20261117a-initial-06",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 7,
+          "project": "rkjo-l1-l3ci-20261117a-initial-07",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 8,
+          "project": "rkjo-l1-l3ci-20261117a-initial-08",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 9,
+          "project": "rkjo-l1-l3ci-20261117a-initial-09",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        },
+        {
+          "index": 10,
+          "project": "rkjo-l1-l3ci-20261117a-initial-10",
+          "infrastructure_exit": 0,
+          "exit_code": 1,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": [
+                "error"
+              ]
+            }
+          ],
+          "passed": false,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "failed",
+              "exception_type": "RuntimeError"
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ],
+          "worker_exception": "pika.exceptions.IncompatibleProtocolError: StreamLostError: Transport indicated EOF"
+        }
+      ]
+    },
+    "corrected": {
+      "repetitions": 10,
+      "protocol_sha256": "8e765d1d696f4bf88e364ce7f72b4ccdf5038bf33e8b878a7018925380815660",
+      "source_sha": "cfa13a027e8804840adbcb8d73b4a4d73522fc8f",
+      "lock": {
+        "annotated-doc": "0.0.5",
+        "annotated-types": "0.8.0",
+        "anyio": "4.16.0",
+        "attrs": "26.1.0",
+        "certifi": "2026.10.23",
+        "cffi": "2.1.1",
+        "click": "8.5.1",
+        "cryptography": "50.0.2",
+        "fastapi": "0.162.2",
+        "h11": "0.16.0",
+        "httpcore": "1.0.9",
+        "httpcore2": "2.16.0",
+        "httptools": "0.9.0",
+        "httpx": "0.28.1",
+        "httpx2": "2.16.0",
+        "idna": "3.20",
+        "iniconfig": "2.3.1",
+        "jiter": "0.19.0",
+        "jsonschema": "4.26.0",
+        "jsonschema-specifications": "2025.9.1",
+        "mcp": "2.3.0",
+        "mcp-types": "2.3.0",
+        "openai": "3.48.0",
+        "opentelemetry-api": "1.45.2",
+        "packaging": "26.3",
+        "pgvector": "0.5.1",
+        "pika": "1.4.4",
+        "pillow": "13.0.0",
+        "pluggy": "1.7.0",
+        "psycopg": "3.3.8",
+        "psycopg-binary": "3.3.8",
+        "pycparser": "3.12",
+        "pydantic": "2.14.3",
+        "pydantic-settings": "2.16.2",
+        "pydantic_core": "2.50.4",
+        "Pygments": "2.21.0",
+        "PyJWT": "2.15.1",
+        "pypdf": "7.0.0",
+        "pytest": "9.2.0",
+        "pytest-asyncio": "1.4.1.post1",
+        "python-dotenv": "1.2.4",
+        "python-multipart": "0.0.33",
+        "PyYAML": "6.0.3",
+        "referencing": "0.37.0",
+        "rpds-py": "2026.9.1",
+        "sniffio": "1.3.1",
+        "sse-starlette": "3.7.0",
+        "starlette": "1.10.0",
+        "truststore": "0.10.5",
+        "typing-inspection": "0.4.5",
+        "typing_extensions": "4.16.0",
+        "uvicorn": "0.54.0",
+        "uvloop": "0.23.0",
+        "watchfiles": "1.3.0",
+        "websockets": "17.4"
+      },
+      "results": [
+        {
+          "index": 1,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-01",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-02",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-03",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-04",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-05",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-06",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-07",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-08",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-09",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "project": "rkjo-l1-l3ci-20261117b-corrected-10",
+          "infrastructure_exit": 0,
+          "exit_code": 0,
+          "tests": [
+            {
+              "name": "test_two_steps_restart_and_insert_only",
+              "outcomes": []
+            }
+          ],
+          "passed": true,
+          "phases": [
+            {
+              "phase": "setup",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "call",
+              "outcome": "passed",
+              "exception_type": null
+            },
+            {
+              "phase": "teardown",
+              "outcome": "passed",
+              "exception_type": null
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "cause_demonstrated_in_reproduction": "RabbitMQ ping admits tests before AMQP listener startup; worker setup connection fails",
+  "historical_cause_certainty": "not retrospectively provable without the missing original exception",
+  "limits": [
+    "ten cold starts per campaign on macOS/Docker; not a universal stability guarantee",
+    "no clock attribution",
+    "no LLM calls or general RAG quality measurement"
+  ]
+}
