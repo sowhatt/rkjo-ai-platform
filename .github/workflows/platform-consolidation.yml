@@ -88,7 +88,9 @@ jobs:
         if: always()
         with:
           name: l1-acceptance-summary
-          path: .test-results/l1-summary.json
+          path: |
+            .test-results/l1-summary.json
+            .test-results/l1-public/
           if-no-files-found: error
       - name: Stop only the dedicated L1 project
         if: always()
