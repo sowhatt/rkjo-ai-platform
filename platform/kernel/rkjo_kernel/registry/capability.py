@@ -64,6 +64,7 @@ class AgentCapability(BaseModel):
     # Exemple :
     # ["climate", "agriculture", "france"]
     tags: list[str] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
 
     # Niveau de confiance annoncé par l'agent.
     #
@@ -89,6 +90,36 @@ class AgentCapability(BaseModel):
 
     # Métadonnées libres pour les besoins futurs.
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("tools")
+    @classmethod
+    def validate_tools(
+        cls,
+        value: list[str],
+    ) -> list[str]:
+        """Normalize and validate declared tool names."""
+
+        normalized_tools: list[str] = []
+
+        for tool_name in value:
+            normalized_name = tool_name.strip().lower()
+
+            if not normalized_name:
+                raise ValueError(
+                    "Tool name cannot be empty."
+                )
+
+            if " " in normalized_name:
+                raise ValueError(
+                    "Tool name must not contain spaces."
+                )
+
+            if normalized_name not in normalized_tools:
+                normalized_tools.append(
+                    normalized_name
+                )
+
+        return normalized_tools
 
     @field_validator("name")
     @classmethod

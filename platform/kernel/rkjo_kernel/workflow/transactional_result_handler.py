@@ -38,12 +38,14 @@ class TransactionalWorkflowResultHandler:
         router: WorkflowAgentRouter,
         dispatcher: AsyncWorkflowDispatcher,
         reply_queue: str,
+        authorization=None,
     ) -> None:
         if not reply_queue or not reply_queue.strip():
             raise ValueError(
                 "reply_queue must not be empty."
             )
 
+        self.authorization = authorization
         self.uow_factory = uow_factory
         self.router = router
         self.dispatcher = dispatcher
@@ -80,11 +82,6 @@ class TransactionalWorkflowResultHandler:
             )
 
         with self.uow_factory() as uow:
-            if uow.inbox.contains(
-                message.message_id
-            ):
-                return
-
             engine = WorkflowEngine(
                 repository=uow.workflows,
             )
@@ -99,6 +96,12 @@ class TransactionalWorkflowResultHandler:
             execution = engine.load_execution(
                 execution_id
             )
+
+            if self.authorization is not None:
+                self.authorization.authorize_result(uow, execution, message)
+            # Validate before inbox: a forged envelope cannot poison a valid ID.
+            if uow.inbox.contains(message.message_id):
+                return
 
             if execution.current_step_id != step_id:
                 self._handle_stale_result(

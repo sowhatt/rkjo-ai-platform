@@ -166,6 +166,8 @@ class RegistryService:
         self,
         agent_name: str,
         status: AgentStatus,
+        *,
+        instance_id: str | None = None,
     ) -> AgentDescriptor:
         """
         Met à jour le statut d'un agent.
@@ -186,6 +188,7 @@ class RegistryService:
         updated_agent = self.registry.update_status(
             agent_name=agent_name,
             status=status,
+            instance_id=instance_id,
         )
 
         self.logger.info(

@@ -180,6 +180,7 @@ def test_operator_jwt_reaches_workflow_endpoint():
     token = create_access_token(
         subject="operator-001",
         role=ApiRole.OPERATOR,
+        tenant_id="tenant-a",
     )
 
     client = TestClient(app)

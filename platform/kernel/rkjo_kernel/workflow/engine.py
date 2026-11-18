@@ -72,7 +72,8 @@ class WorkflowEngine:
 
         execution = WorkflowExecution(**arguments)
 
-        self._persist(execution)
+        if self.repository is not None:
+            self.repository.create(execution)
         self._increment_metric(
             "workflow.created"
         )

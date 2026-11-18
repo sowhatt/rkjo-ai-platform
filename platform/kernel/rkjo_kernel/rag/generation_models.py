@@ -12,6 +12,7 @@ class AnswerSource:
     document_id: str
     chunk_id: str
     score: float
+    page_number: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

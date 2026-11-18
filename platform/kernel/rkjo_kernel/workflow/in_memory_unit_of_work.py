@@ -42,15 +42,20 @@ class InMemoryOutboxStore(OutboxStore):
     ) -> None:
         self._messages[message.outbox_id] = message
 
+    def get(self, outbox_id: str) -> OutboxMessage | None:
+        return self._messages.get(outbox_id)
+
     def pending(
         self,
         *,
         limit: int = 100,
+        queue_name: str | None = None,
     ) -> list[OutboxMessage]:
         return [
             message
             for outbox_id, message in self._messages.items()
             if outbox_id not in self._published
+            and (queue_name is None or message.queue_name == queue_name)
         ][:limit]
 
     def mark_published(

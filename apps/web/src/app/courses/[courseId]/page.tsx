@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 type Course = {
   course_id: string;
@@ -21,7 +22,10 @@ export default function CourseDetailPage() {
     courseId: string;
   }>();
 
-  const courseId = params.courseId;
+  return <CourseDetail key={params.courseId} courseId={params.courseId} />;
+}
+
+function CourseDetail({ courseId }: { courseId: string }) {
 
   const [course, setCourse] =
     useState<Course | null>(null);
@@ -38,40 +42,42 @@ export default function CourseDetailPage() {
   const [message, setMessage] =
     useState("");
 
-  async function loadCourse() {
-    setLoading(true);
-
-    try {
-      const response = await fetch(
-        `/api/education/courses/${courseId}`,
-        {
-          cache: "no-store",
-        },
-      );
-
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          body.detail ??
-            "Cours introuvable.",
-        );
-      }
-
-      setCourse(body);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Erreur inconnue.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    loadCourse();
+    const controller = new AbortController();
+    async function loadCourse() {
+
+      try {
+        const response = await fetch(
+          `/api/education/courses/${courseId}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        const body = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            body.detail ??
+              "Cours introuvable.",
+          );
+        }
+
+        if (!controller.signal.aborted) setCourse(body);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Erreur inconnue.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void loadCourse();
+    return () => controller.abort();
   }, [courseId]);
 
   async function attachDocument() {
@@ -139,12 +145,12 @@ export default function CourseDetailPage() {
   return (
     <main className="course-detail-page">
       <div className="course-detail-topbar">
-        <a
+        <Link
           href="/courses"
           className="course-back"
         >
           ← Mes cours
-        </a>
+        </Link>
 
         <span className="course-status">
           ● Assistant IA disponible
@@ -163,7 +169,7 @@ export default function CourseDetailPage() {
           <p>
             Centralisez vos ressources,
             révisez et interrogez
-            l'assistant pédagogique.
+            l&apos;assistant pédagogique.
           </p>
         </div>
 
@@ -181,7 +187,7 @@ export default function CourseDetailPage() {
             href="/assistant"
             className="edu-primary-link"
           >
-            Réviser avec l'IA
+            Réviser avec l&apos;IA
           </a>
         </div>
       </section>
@@ -223,7 +229,7 @@ export default function CourseDetailPage() {
               <p>
                 Ajoutez un support de cours
                 pour permettre à RKJO de
-                l'exploiter avec l'IA.
+                l&apos;exploiter avec l&apos;IA.
               </p>
 
               <button
@@ -262,7 +268,7 @@ export default function CourseDetailPage() {
                     </div>
 
                     <div className="resource-ready">
-                      Prêt pour l'IA
+                      Prêt pour l&apos;IA
                     </div>
                   </article>
                 ),
@@ -369,7 +375,7 @@ export default function CourseDetailPage() {
             <p className="resource-modal-help">
               Pour ce MVP, sélectionnez un
               document déjà indexé dans RKJO.
-              L'import direct depuis cette
+              L&apos;import direct depuis cette
               fenêtre viendra ensuite.
             </p>
 
@@ -385,7 +391,7 @@ export default function CourseDetailPage() {
                 className="resource-select"
               >
                 <option value="demo-anatomie-coeur">
-                  Cours d'anatomie du cœur
+                  Cours d&apos;anatomie du cœur
                 </option>
               </select>
             </label>

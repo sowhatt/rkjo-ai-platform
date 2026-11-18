@@ -28,6 +28,23 @@ class PostgreSQLTransactionalWorkflowRepository:
     ) -> None:
         self._connection = connection
 
+    def create(self, execution: WorkflowExecution) -> None:
+        """Atomic create prevents caller-selected IDs overwriting another tenant."""
+        query = """
+        INSERT INTO workflow_executions
+          (execution_id, workflow_id, status, payload, created_at, updated_at)
+        VALUES (%s, %s, %s, %s::jsonb, %s, CURRENT_TIMESTAMP)
+        ON CONFLICT (execution_id) DO NOTHING
+        RETURNING execution_id;
+        """
+        values = (execution.execution_id, execution.definition.workflow_id,
+                  execution.status.value, json.dumps(workflow_execution_to_dict(execution)),
+                  execution.created_at)
+        with self._connection.cursor() as cursor:
+            cursor.execute(query, values)
+            if cursor.fetchone() is None:
+                raise ValueError("Workflow execution already exists.")
+
     def save(
         self,
         execution: WorkflowExecution,
@@ -236,10 +253,21 @@ class PostgreSQLTransactionalOutboxStore:
                 ),
             )
 
+    def get(self, outbox_id: str) -> OutboxMessage | None:
+        with self._connection.cursor() as cursor:
+            cursor.execute("SELECT outbox_id, queue_name, message_payload, created_at "
+                           "FROM workflow_outbox WHERE outbox_id = %s", (outbox_id,))
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return OutboxMessage(outbox_id=row[0], queue_name=row[1],
+                             message=AgentMessage.model_validate(row[2]), created_at=row[3])
+
     def pending(
         self,
         *,
         limit: int = 100,
+        queue_name: str | None = None,
     ) -> list[OutboxMessage]:
         with self._connection.cursor() as cursor:
             cursor.execute(
@@ -251,11 +279,12 @@ class PostgreSQLTransactionalOutboxStore:
                     created_at
                 FROM workflow_outbox
                 WHERE published_at IS NULL
+                  AND (%s::text IS NULL OR queue_name = %s)
                 ORDER BY created_at ASC
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED;
                 """,
-                (limit,),
+                (queue_name, queue_name, limit),
             )
             rows = cursor.fetchall()
 

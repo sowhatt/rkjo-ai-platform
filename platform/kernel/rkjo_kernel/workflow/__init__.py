@@ -4,6 +4,9 @@ from rkjo_kernel.workflow.agent_execution_adapter import AgentExecutionAdapter
 from rkjo_kernel.workflow.capability_runtime_execution_adapter import (
     CapabilityRuntimeExecutionAdapter,
 )
+from rkjo_kernel.workflow.capability_tool_execution_adapter import (
+    CapabilityToolExecutionAdapter,
+)
 from rkjo_kernel.workflow.engine import WorkflowEngine
 from rkjo_kernel.workflow.execution_result import ExecutionResult
 from rkjo_kernel.workflow.executor import WorkflowExecutor
@@ -42,6 +45,7 @@ __all__ = [
     "WorkflowNavigator",
     "AgentExecutionAdapter",
     "CapabilityRuntimeExecutionAdapter",
+    "CapabilityToolExecutionAdapter",
     "ExecutionResult",
     "RuntimeExecutionAdapter",
     "OrchestratorRuntimeExecutionAdapter",

@@ -196,6 +196,7 @@ class RAGAnswerSourceResponse(BaseModel):
     document_id: str
     chunk_id: str
     score: float
+    page_number: int | None = None
 
 
 class RAGAnswerApiResponse(BaseModel):
@@ -644,6 +645,7 @@ async def replace_document(
     filters = bind_identity_tenant(
         identity=identity,
         filters=None,
+        require_tenant=True,
     )
 
     temporary_path = (
@@ -716,6 +718,7 @@ def delete_document(
     filters = bind_identity_tenant(
         identity=identity,
         filters=None,
+        require_tenant=True,
     )
 
     try:
@@ -776,6 +779,7 @@ def semantic_search(
         filters = bind_identity_tenant(
             identity=identity,
             filters=filters,
+            require_tenant=True,
         )
 
         result = service.search(
@@ -839,6 +843,7 @@ def rag_answer(
         filters = bind_identity_tenant(
             identity=identity,
             filters=filters,
+            require_tenant=True,
         )
 
         result = service.answer(
@@ -862,6 +867,7 @@ def rag_answer(
                 document_id=source.document_id,
                 chunk_id=source.chunk_id,
                 score=source.score,
+                page_number=source.page_number,
             )
             for source in result.sources
         ],

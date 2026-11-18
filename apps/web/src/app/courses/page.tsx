@@ -45,41 +45,42 @@ export default function CoursesPage() {
   const [level, setLevel] =
     useState("");
 
-  async function loadCourses() {
-    setLoading(true);
-    setMessage("");
-
-    try {
-      const response = await fetch(
-        "/api/education/courses",
-        {
-          cache: "no-store",
-        },
-      );
-
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          body.detail ??
-            "Impossible de charger les cours.",
-        );
-      }
-
-      setCourses(body);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Erreur inconnue.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    loadCourses();
+    const controller = new AbortController();
+    async function loadCourses() {
+
+      try {
+        const response = await fetch(
+          "/api/education/courses",
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        const body = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            body.detail ??
+              "Impossible de charger les cours.",
+          );
+        }
+
+        if (!controller.signal.aborted) setCourses(body);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Erreur inconnue.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void loadCourses();
+    return () => controller.abort();
   }, []);
 
   async function createCourse(

@@ -9,6 +9,21 @@ from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.monitoring.metrics import MetricsRegistry
 
 
+_TRACE_METADATA_KEYS = (
+    "trace_id",
+    "mission_id",
+    "workflow_execution_id",
+    "workflow_step_id",
+    "agent_id",
+    "capability_name",
+    "tool_call_id",
+    "tenant_id",
+    "user_id",
+    "request_id",
+    "parent_span_id",
+)
+
+
 class DeadLetterPublisher:
     """Publish permanently failed messages to a DLQ."""
 
@@ -41,6 +56,19 @@ class DeadLetterPublisher:
     ) -> AgentMessage:
         """Publish a dead-letter message."""
 
+        metadata = {
+            "original_message_id": original_message.message_id,
+            "attempt": original_message.metadata.get(
+                "attempt",
+                1,
+            ),
+        }
+
+        for key in _TRACE_METADATA_KEYS:
+            value = original_message.metadata.get(key)
+            if value is not None:
+                metadata[key] = value
+
         dead_letter = AgentMessage(
             source=self.source,
             target="rkjo.dlq",
@@ -54,27 +82,7 @@ class DeadLetterPublisher:
                 ),
                 "reason": reason,
             },
-            metadata={
-                "original_message_id": (
-                    original_message.message_id
-                ),
-                "workflow_execution_id": (
-                    original_message.metadata.get(
-                        "workflow_execution_id"
-                    )
-                ),
-                "workflow_step_id": (
-                    original_message.metadata.get(
-                        "workflow_step_id"
-                    )
-                ),
-                "attempt": (
-                    original_message.metadata.get(
-                        "attempt",
-                        1,
-                    )
-                ),
-            },
+            metadata=metadata,
         )
 
         self.event_bus.publish_agent_message(
@@ -90,6 +98,12 @@ class DeadLetterPublisher:
         structured_log(
             self.logger,
             event="runtime.dead_letter",
+            trace_id=original_message.metadata.get(
+                "trace_id"
+            ),
+            mission_id=original_message.metadata.get(
+                "mission_id"
+            ),
             message_id=original_message.message_id,
             dead_letter_message_id=dead_letter.message_id,
             correlation_id=original_message.correlation_id,
@@ -98,6 +112,9 @@ class DeadLetterPublisher:
             ),
             step_id=original_message.metadata.get(
                 "workflow_step_id"
+            ),
+            capability_name=original_message.metadata.get(
+                "capability_name"
             ),
             queue_name=self.queue_name,
             attempt=original_message.metadata.get(

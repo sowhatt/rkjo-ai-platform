@@ -74,19 +74,11 @@ def test_cross_tenant_ingestion_is_forbidden():
     )
 
 
-def test_unbound_identity_preserves_metadata():
-    metadata = {
-        "tenant_id": "tenant-b",
-        "domain": "agriculture",
-    }
-
-    result = bind_identity_metadata_tenant(
-        identity=identity(None),
-        metadata=metadata,
-    )
-
-    assert result == metadata
-    assert result is not metadata
+@pytest.mark.parametrize("tenant", [None, "", " "])
+def test_unbound_identity_cannot_supply_its_own_tenant(tenant):
+    with pytest.raises(HTTPException) as exc:
+        bind_identity_metadata_tenant(identity=identity(tenant), metadata={"tenant_id": "tenant-b"})
+    assert exc.value.status_code == 403
 
 
 def test_invalid_ingestion_tenant_is_rejected():

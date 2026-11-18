@@ -1,0 +1,14 @@
+{
+  "version": "l3-neutral-v1",
+  "thresholds": {"hit_at_3": 1.0, "mrr": 1.0, "faithfulness": 1.0, "no_answer": 1.0},
+  "documents": [
+    {"id": "atlas", "text": "Le coffre Atlas contient exactement sept galets bleus. Le code du coffre Atlas est AZUR.", "tenant": "tenant-a"},
+    {"id": "boreal", "text": "Le relais Boréal ouvre chaque mardi à neuf heures. La couleur du relais Boréal est verte.", "tenant": "tenant-a"},
+    {"id": "other-tenant", "text": "Le code du coffre Atlas est INTERDIT_B et sa couleur est rouge.", "tenant": "tenant-b"}
+  ],
+  "cases": [
+    {"question": "Quel est le code du coffre Atlas ?", "document": "atlas", "required": "AZUR", "forbidden": ["INTERDIT_B", "rouge"]},
+    {"question": "Quelle est la couleur du relais Boréal ?", "document": "boreal", "required": "verte", "forbidden": ["INTERDIT_B", "rouge"]},
+    {"question": "Température volcanique Mercure ?", "document": null, "required": "not provide enough information", "forbidden": ["AZUR", "INTERDIT_B"]}
+  ]
+}

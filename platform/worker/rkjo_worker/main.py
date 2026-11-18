@@ -4,8 +4,16 @@ from __future__ import annotations
 
 import os
 import signal
+from threading import Event, Thread
 from typing import Any
+from uuid import uuid4
 
+from rkjo_kernel.composition import build_platform_kernel, build_answering_service
+from rkjo_kernel.mission.execution_context import ExecutionContext
+from dataclasses import asdict
+from rkjo_kernel.security.configuration import authority_from_env
+from rkjo_kernel.workflow.postgres_unit_of_work import PostgreSQLWorkflowUnitOfWork
+from rkjo_kernel.workflow.security_authorization import WorkflowAuthorization, ResultAuthenticator
 from rkjo_kernel.agents.base_agent import BaseAgent
 from rkjo_kernel.events.event_bus import EventBus
 from rkjo_kernel.events.rabbitmq_event_bus import RabbitMQEventBus
@@ -16,17 +24,41 @@ from rkjo_worker.agent_catalog import (
 from rkjo_worker.health_http import HealthHTTPServer
 from rkjo_worker.runtime_health import RuntimeHealthAdapter
 from rkjo_kernel.registry.registry import AgentRegistry
+from rkjo_kernel.registry.postgres_registry import (
+    PostgresAgentRegistry,
+)
 from rkjo_kernel.runtime.agent_runtime import AgentRuntime
+from rkjo_kernel.runtime.result_publisher import AgentResultPublisher
 from rkjo_kernel.services.registry_service import RegistryService
 
 
 class PlatformWorkerAgent(BaseAgent):
     """Minimal production worker used to validate distributed runtime."""
 
+    kernel = None
+
     def process(
         self,
         message: AgentMessage,
     ) -> Any:
+        data = message.payload.get("input_data", {})
+        if data.get("operation") == "rag_answer":
+            if self.kernel is None:
+                raise RuntimeError("Durable kernel is required for governed answering.")
+            meta = message.metadata
+            context = ExecutionContext(
+                mission_id=meta["mission_id"], tenant_id=meta["tenant_id"], trace_id=meta["trace_id"],
+                workflow_execution_id=meta["workflow_execution_id"], step_id=meta["workflow_step_id"],
+                user_id=meta["user_id"], request_id=message.message_id, agent_id=self.agent_name,
+                policy_context=meta.get("policy_context", {}), budget=meta.get("budget", {}),
+            )
+            result = build_answering_service(self.kernel).answer(
+                data["question"], limit=3, execution_context=context,
+            )
+            package = meta["context_package"]
+            return {"answer": result.answer, "sources": [asdict(s) for s in result.sources],
+                    "context": {"tenant_id": package.tenant_id, "mission_id": package.mission_id,
+                                "trace_id": package.trace_id, "memory_ids": [m.memory_id for m in package.items]}}
         return {
             "processed_by": self.agent_name,
             "message_id": message.message_id,
@@ -53,6 +85,7 @@ def get_env(
 
 def build_runtime(
     event_bus: EventBus | None = None,
+    registry: AgentRegistry | None = None,
 ) -> AgentRuntime:
     """Build the production runtime and register its discoverable capability.
 
@@ -61,18 +94,53 @@ def build_runtime(
     default adapter.
     """
 
+    database_url = (os.getenv("RKJO_DATABASE_URL") or os.getenv("DATABASE_URL") or "").strip()
+    authority = authority_from_env()
     bus = event_bus or RabbitMQEventBus()
 
-    registry = AgentRegistry()
+    registry_backend = registry
+
+    # Keep injected/test runtimes isolated in memory.
+    # Production runtimes share discovery through PostgreSQL.
+    if registry_backend is None:
+        if event_bus is not None:
+            registry_backend = AgentRegistry()
+        else:
+            database_url = (
+                os.getenv("RKJO_DATABASE_URL")
+                or os.getenv("DATABASE_URL")
+                or ""
+            ).strip()
+
+            if not database_url:
+                raise RuntimeError(
+                    "DATABASE_URL or RKJO_DATABASE_URL "
+                    "is required."
+                )
+
+            postgres_registry = (
+                PostgresAgentRegistry(
+                    database_url
+                )
+            )
+            postgres_registry.initialize_schema()
+            registry_backend = postgres_registry
 
     registry_service = RegistryService(
-        registry=registry
+        registry=registry_backend
     )
+
+    instance_id = uuid4().hex
 
     descriptor = build_platform_worker_descriptor()
 
-    registry_service.register_agent(
-        descriptor
+    descriptor = descriptor.model_copy(
+        update={
+            "metadata": {
+                **descriptor.metadata,
+                "instance_id": instance_id,
+            }
+        }
     )
 
     agent = PlatformWorkerAgent(
@@ -81,11 +149,36 @@ def build_runtime(
         event_bus=bus,
     )
 
-    return AgentRuntime(
+    authorization = None
+    authenticator = None
+    if event_bus is None or authority is not None:
+        authenticator = ResultAuthenticator.from_env()
+        authorization = WorkflowAuthorization(
+            uow_factory=lambda: PostgreSQLWorkflowUnitOfWork(database_url),
+            reply_queue=get_env("RKJO_WORKFLOW_RESULT_QUEUE", "rkjo.workflow.results"),
+            authority=authority,
+        )
+
+    result_publisher = AgentResultPublisher(
+        event_bus=bus,
+        source=descriptor.name,
+        authenticator=authenticator,
+    )
+
+    kernel = build_platform_kernel(agent_registry=registry_backend) if event_bus is None else None
+    agent.kernel = kernel
+    runtime = AgentRuntime(
         agent=agent,
         event_bus=bus,
         registry_service=registry_service,
+        result_publisher=result_publisher,
+        instance_id=instance_id,
+        descriptor=descriptor,
+        authorization=authorization,
+        context_runtime=kernel.context_runtime if kernel else None,
     )
+    runtime.kernel = kernel
+    return runtime
 
 
 def main() -> None:
@@ -122,14 +215,35 @@ def main() -> None:
         _stop_handler,
     )
 
+    heartbeat_stop = Event()
+    def heartbeat():
+        registry = runtime.registry_service.registry
+        if not isinstance(registry, PostgresAgentRegistry):
+            return
+        interval = max(0.1, registry.lease_seconds / 3)
+        while not heartbeat_stop.wait(interval):
+            try:
+                registry.heartbeat(runtime.agent.agent_name, runtime.instance_id)
+            except Exception:
+                # A failed heartbeat expires discovery; never advertise falsely.
+                runtime.logger.exception("Worker registry heartbeat failed.")
+    heartbeat_thread = Thread(target=heartbeat, daemon=True)
+
     try:
+        if runtime.kernel:
+            runtime.kernel.start()
+        heartbeat_thread.start()
         health_server.start()
         runtime.start()
     except KeyboardInterrupt:
         pass
     finally:
+        heartbeat_stop.set()
+        heartbeat_thread.join(timeout=2)
         health_server.stop()
         runtime.event_bus.close()
+        if runtime.kernel:
+            runtime.kernel.stop()
 
 
 if __name__ == "__main__":

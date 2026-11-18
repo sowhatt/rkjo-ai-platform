@@ -1,0 +1,1 @@
+"""Provider-neutral RKJO omnichannel contracts (OMNI V2.1)."""
