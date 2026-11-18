@@ -9,6 +9,13 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from datetime import datetime, timezone
+from uuid import uuid4
+import shutil
+if __package__:
+    from .l1_diagnostics import infrastructure, publish
+else:
+    from l1_diagnostics import infrastructure, publish
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,14 +71,30 @@ def environment(project):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", required=True)
+    parser.add_argument("--evidence-dir", type=Path)
     args, pytest_args = parser.parse_known_args()
     env = environment(args.project)
-    evidence = Path(env["RKJO_L1_EVIDENCE"])
-    evidence.mkdir(parents=True, exist_ok=True)
+    run_id = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')+'-'+uuid4().hex[:8]
+    evidence = args.evidence_dir or Path(env["RKJO_L1_EVIDENCE"])/run_id
+    evidence.mkdir(parents=True, exist_ok=False)
+    env["RKJO_L1_EVIDENCE"] = str(evidence.resolve())
     (evidence / "infrastructure.json").write_text(json.dumps({
         "project": args.project, "database_host": "127.0.0.1", "database": "l1_test",
         "base_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "python": sys.version, "pytest_arguments": pytest_args}, indent=2))
-    raise SystemExit(subprocess.call([sys.executable, "-m", "pytest"] +
-        (pytest_args or ["tests/l1", "-q", "--junitxml=.test-results/l1/acceptance.xml"]),
-        cwd=ROOT, env=env))
+    arguments = pytest_args or ['tests/l1','-q']
+    requested_junit = next((Path(a.split('=',1)[1]) for a in arguments if a.startswith('--junitxml=')),None)
+    arguments = [a for a in arguments if not a.startswith('--junitxml=')]
+    junit = evidence/'acceptance.xml'
+    try:
+        with (evidence/'pytest.stdout').open('w') as output:
+            result = subprocess.call([sys.executable,'-m','pytest',*arguments,
+                '--tb=long',f'--junitxml={junit}'],cwd=ROOT,env=env,stdout=output,stderr=subprocess.STDOUT)
+    finally:
+        infrastructure(ROOT,args.project,evidence)
+        publish(evidence,ROOT/'.test-results/l1-public'/run_id,env)
+    if requested_junit and junit.exists():
+        requested_junit.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(junit,requested_junit)
+    print(json.dumps({'exit_code':result,'evidence':str(evidence),'public_run':run_id}))
+    raise SystemExit(result)

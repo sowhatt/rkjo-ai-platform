@@ -1,0 +1,49 @@
+{
+  "status": "BLOCKED",
+  "candidate_sha": "d2521db0bd4dbfef7fb9fa11a42b0c0e49fe9b19",
+  "consolidation_sha": "ce4de07cee91c92ddbf6c9a8206b5f56ec2f3891",
+  "pr": 18,
+  "merged": false,
+  "ci_run": 44142422117,
+  "ci_attempt": 1,
+  "ci_tested_merge_sha": "674561df0696465ae52654643eed0ef61ba48a3d",
+  "counts": {
+    "regression": {
+      "passed": 1448,
+      "failure": 0,
+      "error": 0,
+      "skipped": 0
+    },
+    "l1": {
+      "passed": 8,
+      "failure": 0,
+      "error": 0,
+      "skipped": 0
+    },
+    "l2": {
+      "passed": 7,
+      "failure": 0,
+      "error": 0,
+      "skipped": 0
+    }
+  },
+  "web_ci": "npm ci and lint passed; npm audit failed; build/proxy not executed by CI",
+  "web_local": "Node 24.22.3 container: npm ci, lint, build, six real Next proxy routes passed; lock unchanged",
+  "advisory": "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+  "latest_picomatch_published": "4.0.7",
+  "affected": "<=4.0.7",
+  "patched_version": null,
+  "initial_cold_runs": {
+    "passed": 1,
+    "setup_errors": 9,
+    "skipped": 0
+  },
+  "corrected_cold_runs": {
+    "passed": 10,
+    "errors": 0,
+    "skipped": 0
+  },
+  "ci_reruns": 0,
+  "postmerge_ci": null,
+  "l4_started": false
+}

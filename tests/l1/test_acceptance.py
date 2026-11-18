@@ -21,6 +21,7 @@ from rkjo_api.security import ApiRole
 from rkjo_kernel.messages.agent_message import AgentMessage
 from rkjo_kernel.workflow.postgres_unit_of_work import PostgreSQLWorkflowUnitOfWork
 from rkjo_kernel.workflow.security_authorization import ResultAuthenticator
+from scripts.l1_diagnostics import snapshot, timestamp
 
 ROOT = Path(__file__).resolve().parents[2]
 DB = os.environ["RKJO_TEST_DATABASE_URL"]
@@ -86,15 +87,20 @@ class Stack:
         self.logs.append(log)
         self.processes[service] = subprocess.Popen(cmd, cwd=ROOT, env=self.env,
                                                   stdout=log, stderr=subprocess.STDOUT)
-        self.events.append({"start": service, "pid": self.processes[service].pid, "command": cmd})
+        self.events.append({"start": service, "pid": self.processes[service].pid, "command": cmd, **timestamp()})
         def service_ready(url):
             if self.processes[service].poll() is not None:
                 raise RuntimeError(f"L1 {service} process exited before readiness; see its local log.")
             return httpx.get(url).status_code == 200
-        if service == "api":
-            wait(lambda: service_ready(self.url + "/health"))
-        elif service == "worker":
-            wait(lambda: service_ready("http://127.0.0.1:" + self.env["RKJO_WORKER_HEALTH_PORT"] + "/ready"))
+        try:
+            if service == "api":
+                wait(lambda: service_ready(self.url + "/health"))
+            elif service == "worker":
+                wait(lambda: service_ready("http://127.0.0.1:" + self.env["RKJO_WORKER_HEALTH_PORT"] + "/ready"))
+        except BaseException:
+            snapshot(self, 'start-failure-'+service)
+            raise
+        self.events.append({'ready': service, **timestamp()})
 
     def stop(self, service, kill=False):
         process = self.processes.pop(service, None)
@@ -167,6 +173,7 @@ class Stack:
             return AgentMessage.model_validate_json(body) if method else None
 
     def close(self):
+        snapshot(self, 'before-close')
         for service in list(self.processes):
             self.stop(service)
         for log in self.logs:

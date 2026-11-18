@@ -93,5 +93,146 @@
     "OpenAI contract only; no actual remote call.",
     "Token admission reservation is not exact tokenization or monetary pricing; max_cost refused.",
     "No production mapping, deployment or new-lot merge."
-  ]
+  ],
+  "finalization": {
+    "recorded_date": "2026-11-17",
+    "candidate_sha": "30c4d39061548973e205593594270b8350b55b7f",
+    "merge_sha": "ce4de07cee91c92ddbf6c9a8206b5f56ec2f3891",
+    "target": "feat/platform-consolidation-20261109",
+    "pr": "https://github.com/sowhatt/rkjo-ai-platform/pull/17",
+    "premerge_ci_run": 43717291432,
+    "premerge_ci_checkout": "b1f25a61b695b7e8eba0fc5e0144f5507dbd13b9",
+    "shared_tree": "ce009755a712e27d7134af4c1dc1e095e6a680c9",
+    "premerge_passed": {
+      "regression": 1445,
+      "l1": 8,
+      "l2": 7
+    },
+    "postmerge_ci_run": 44116538750,
+    "postmerge_ci_attempt": 1,
+    "postmerge_checkout": "ce4de07cee91c92ddbf6c9a8206b5f56ec2f3891",
+    "postmerge_conclusion": "failure",
+    "postmerge_regression": {
+      "passed": 1445,
+      "failure": 0,
+      "error": 0,
+      "skipped": 0
+    },
+    "postmerge_l2": {
+      "passed": 7,
+      "failure": 0,
+      "error": 0,
+      "skipped": 0
+    },
+    "postmerge_l1": {
+      "passed": 7,
+      "failure": 0,
+      "error": 1,
+      "skipped": 0
+    },
+    "postmerge_web": "success",
+    "postmerge_packaging": "success",
+    "l1_error_case": "tests.l1.test_acceptance.test_two_steps_restart_and_insert_only",
+    "l1_error_seconds": 2.337,
+    "l1_error_cause": "unknown: published summary and job log contain neither exception nor process diagnostics",
+    "ci_reruns_requested": 0,
+    "functional_criteria_demonstrated": 7,
+    "delivery_status": "BLOCKED",
+    "blocker_id": "L3-CI-01",
+    "next_lot": "L4 — outils sensibles et transports MCP",
+    "next_lot_started": false,
+    "discovery_check": {
+      "candidate_sha": "30c4d39061548973e205593594270b8350b55b7f",
+      "protocol_sha256": "ee1839f6db297c4704139b1def0c27a3fce27b574a2e130c789aaa01fe4690cd",
+      "project": "rkjo-l1-l3-discovery-20261117",
+      "lease_seconds": 3,
+      "provider_calls": 0,
+      "start_requests": 1,
+      "passed": true,
+      "before_restart": {
+        "label": "before_restart",
+        "status": "available",
+        "updated_at": "2026-11-17T15:36:34.818543+00:00",
+        "sql_time": "2026-11-17T15:36:34.935041+00:00",
+        "process_before": "2026-11-17T15:36:34.931309+00:00",
+        "process_after": "2026-11-17T15:36:34.935921+00:00",
+        "instance": "50ea5b0765f54460b54778a067240188",
+        "lease_age_seconds": 0.117378,
+        "clock_gap_seconds": 0
+      },
+      "after_restart": {
+        "label": "after_restart",
+        "status": "available",
+        "updated_at": "2026-11-17T15:36:35.650532+00:00",
+        "sql_time": "2026-11-17T15:36:35.674524+00:00",
+        "process_before": "2026-11-17T15:36:35.671183+00:00",
+        "process_after": "2026-11-17T15:36:35.675303+00:00",
+        "instance": "a6407bc3c6e843749e8e414f8f530e78",
+        "lease_age_seconds": 0.024771,
+        "clock_gap_seconds": 0
+      },
+      "start_status": 202,
+      "before_cleanup": {
+        "label": "before_cleanup",
+        "status": "available",
+        "updated_at": "2026-11-17T15:36:35.747963+00:00",
+        "sql_time": "2026-11-17T15:36:35.775478+00:00",
+        "process_before": "2026-11-17T15:36:35.772530+00:00",
+        "process_after": "2026-11-17T15:36:35.776220+00:00",
+        "instance": "a6407bc3c6e843749e8e414f8f530e78",
+        "lease_age_seconds": 0.028257,
+        "clock_gap_seconds": 0
+      }
+    },
+    "historical_503_cause": "unconfirmed; successful bounded reproduction does not establish the historical cause"
+  },
+  "ci_01_followup": {
+    "status": "BLOCKED",
+    "candidate_sha": "d2521db0bd4dbfef7fb9fa11a42b0c0e49fe9b19",
+    "consolidation_sha": "ce4de07cee91c92ddbf6c9a8206b5f56ec2f3891",
+    "pr": 18,
+    "merged": false,
+    "ci_run": 44142422117,
+    "ci_attempt": 1,
+    "ci_tested_merge_sha": "674561df0696465ae52654643eed0ef61ba48a3d",
+    "counts": {
+      "regression": {
+        "passed": 1448,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0
+      },
+      "l1": {
+        "passed": 8,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0
+      },
+      "l2": {
+        "passed": 7,
+        "failure": 0,
+        "error": 0,
+        "skipped": 0
+      }
+    },
+    "web_ci": "npm ci and lint passed; npm audit failed; build/proxy not executed by CI",
+    "web_local": "Node 24.22.3 container: npm ci, lint, build, six real Next proxy routes passed; lock unchanged",
+    "advisory": "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+    "latest_picomatch_published": "4.0.7",
+    "affected": "<=4.0.7",
+    "patched_version": null,
+    "initial_cold_runs": {
+      "passed": 1,
+      "setup_errors": 9,
+      "skipped": 0
+    },
+    "corrected_cold_runs": {
+      "passed": 10,
+      "errors": 0,
+      "skipped": 0
+    },
+    "ci_reruns": 0,
+    "postmerge_ci": null,
+    "l4_started": false
+  }
 }
